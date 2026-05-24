@@ -62,7 +62,7 @@ else
             break
         fi
         echo "尝试下一个镜像..."
-    fi
+    done
 fi
 
 cd "$PROJECT_DIR"
