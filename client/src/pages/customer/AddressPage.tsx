@@ -9,7 +9,7 @@ export default function AddressPage() {
   const navigate = useNavigate();
   const [addresses, setAddresses] = useState<any[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState({ contact_name: '', contact_phone: '', detail: '', is_default: false });
+  const [form, setForm] = useState({ contact_name: '', contact_phone: '', detail: '', is_default: 0 });
   const [loading, setLoading] = useState(false);
 
   function loadAddresses() {
@@ -31,7 +31,7 @@ export default function AddressPage() {
       });
     } else {
       setEditing('new');
-      setForm({ contact_name: '', contact_phone: '', detail: '', is_default: false });
+      setForm({ contact_name: '', contact_phone: '', detail: '', is_default: 0 });
     }
   }
 
@@ -63,7 +63,7 @@ export default function AddressPage() {
   }
 
   async function handleSetDefault(id: string) {
-    await customerApi.updateAddress(id, { is_default: true });
+    await customerApi.updateAddress(id, { is_default: 1 });
     loadAddresses();
   }
 

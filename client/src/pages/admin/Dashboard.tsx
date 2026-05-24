@@ -122,7 +122,7 @@ export default function AdminDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis dataKey="name" type="category" fontSize={12} tickLine={false} axisLine={false} width={50} />
-                <Tooltip formatter={(v: number) => ['¥' + v.toFixed(2), '佣金']} />
+                <Tooltip formatter={(v: any) => ['¥' + Number(v).toFixed(2), '佣金']} />
                 <Bar dataKey="total_commission" fill="url(#barGradient)" radius={[0, 6, 6, 0]} barSize={22} />
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
