@@ -1,4 +1,5 @@
 import api from './client';
+import axios from 'axios';
 
 const adminApi = axios.create({
   baseURL: '/api/admin',
@@ -6,8 +7,8 @@ const adminApi = axios.create({
 });
 
 adminApi.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
+  (response: any) => response.data,
+  (error: any) => {
     const message = error.response?.data?.message || '网络请求失败';
     return Promise.reject(new Error(message));
   }

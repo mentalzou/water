@@ -6,11 +6,9 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
 function authFetch(url: string, options?: RequestInit): Promise<any> {
   const token = localStorage.getItem('deliveryman_token');
   return api.get(url.replace(API_BASE + '/', ''), {
-    ...(options || {}),
     headers: {
-      ...options?.headers,
       Authorization: `Bearer ${token}`,
-    },
+    } as Record<string, string>,
   });
 }
 
