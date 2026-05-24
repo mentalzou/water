@@ -1,0 +1,261 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Droplets, ShoppingCart, CheckCircle2, Phone, MapPin, Plus, Minus } from 'lucide-react';
+import { customerApi } from '../../api/customer.api';
+
+interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  unit?: string;
+}
+
+interface SelectedItem {
+  product: Product;
+  quantity: number;
+}
+
+export default function RechargePage() {
+  const navigate = useNavigate();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [orderResult, setOrderResult] = useState<any>(null);
+
+  useEffect(() => {
+    customerApi.getProducts().then((res: any) => {
+      if (res.code === 200) setProducts(res.data || []);
+    });
+    // 预填分销商手机号
+    const user = JSON.parse(localStorage.getItem('distributor_user') || '{}');
+    if (user.phone) setPhone(user.phone);
+  }, []);
+
+  /** 选中的商品列表（带数量） */
+  const selectedItems = useMemo((): SelectedItem[] => {
+    return products.filter(p => selectedIds.has(p.id)).map(p => ({
+      product: p,
+      quantity: itemQuantities[p.id] || 1,
+    }));
+  }, [products, selectedIds, itemQuantities]);
+
+  /** 合计金额 */
+  const totalAmount = useMemo(() => {
+    return Math.round(selectedItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0) * 100) / 100;
+  }, [selectedItems]);
+
+  /** 切换选中 */
+  function toggleSelect(productId: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+    // 选中时默认数量为1
+    setItemQuantities(prev => ({ ...prev, [productId]: prev[productId] || 1 }));
+  }
+
+  /** 调整单个商品数量 */
+  function updateQty(productId: string, delta: number) {
+    setItemQuantities(prev => {
+      const current = prev[productId] || 1;
+      const next = Math.max(1, current + delta);
+      return { ...prev, [productId]: next };
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (selectedIds.size === 0 || !phone) return;
+    setSubmitting(true);
+
+    try {
+      const user = JSON.parse(localStorage.getItem('distributor_user') || '{}');
+      const distributorCode = user.distributorCode;
+
+      // 构建商品列表（一个订单包含多个商品）
+      const orderItems = selectedItems.map(item => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+      }));
+
+      // 创建单个订单（包含多个商品）
+      const orderRes: any = await customerApi.createOrder({
+        customer_phone: phone,
+        customer_name: user.name || '分销商',
+        address: address || '自提',
+        items: orderItems,
+        distributor_code: distributorCode,
+      });
+
+      if (orderRes.data?.id) {
+        // 支付订单
+        const payRes: any = await customerApi.payForOrder(orderRes.data.id);
+        setOrderResult(payRes.data || orderRes.data);
+      } else {
+        alert(orderRes.message || '下单失败');
+      }
+    } catch (err: any) {
+      alert(err.message || '下单失败');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (orderResult) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex flex-col items-center justify-center p-6">
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-6">
+          <CheckCircle2 className="w-10 h-10 text-green-500" />
+        </div>
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">购买成功</h2>
+        <p className="text-gray-500 text-sm mb-8">订单已创建并支付成功</p>
+        <button onClick={() => navigate('/distributor')} className="w-full max-w-sm bg-gradient-to-r from-water-light to-water text-white py-3.5 rounded-2xl font-medium shadow-lg shadow-water/30 active:scale-[0.98] transition-transform">
+          返回首页
+        </button>
+        <button onClick={() => { setOrderResult(null); setSelectedIds(new Set()); setItemQuantities({}); }} className="mt-4 text-water font-medium">
+          继续购买
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white pb-24">
+      {/* Header */}
+      <header className="relative pt-12 pb-20 px-5 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-water-light via-water to-teal-400" />
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,64 C360,120 720,40 1080,80 C1260,96 1380,88 1440,84 L1440,120 L0,120 Z" fill="#F0FDFA"/>
+          </svg>
+        </div>
+        <div className="relative z-10 flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+            <ArrowLeft className="w-4 h-4 text-white" />
+          </button>
+          <div className="flex items-center gap-2">
+            <Droplets className="w-6 h-6 text-white" />
+            <h1 className="text-xl font-bold text-white">购买/充值</h1>
+          </div>
+        </div>
+      </header>
+
+      <form onSubmit={handleSubmit} className="px-4 space-y-4 -mt-2">
+        {/* Product Selection - Multi-select */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4 text-water" /> 选择商品
+            {selectedIds.size > 0 && (
+              <span className="ml-auto text-xs font-normal text-water bg-water/10 px-2 py-0.5 rounded-full">
+                已选 {selectedIds.size} 件
+              </span>
+            )}
+          </h3>
+          <div className="space-y-2">
+            {products.map((product) => {
+              const isSelected = selectedIds.has(product.id);
+              return (
+                <label key={product.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-water/10 border-2 border-water' : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'}`}>
+                  {/* Checkbox */}
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-water border-water' : 'border-gray-300'}`}>
+                    {isSelected && <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  </div>
+                  <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(product.id)} className="hidden" />
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-800 text-sm">{product.name}</p>
+                    {product.description && <p className="text-gray-400 text-xs mt-0.5 line-clamp-1">{product.description}</p>}
+                  </div>
+                  <span className="text-water font-bold">¥{product.price.toFixed(2)}</span>
+                  {product.unit && <span className="text-gray-400 text-xs">/{product.unit}</span>}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Contact Info */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <Phone className="w-4 h-4 text-water" /> 联系方式
+          </h3>
+          <input
+            type="tel"
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+            placeholder="请输入手机号（必填）"
+            maxLength={11}
+            className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-water/30 transition-all border-none placeholder:text-gray-400"
+          />
+        </div>
+
+        {/* Address */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-water" /> 收货地址
+          </h3>
+          <textarea
+            value={address}
+            onChange={e => setAddress(e.target.value)}
+            placeholder="收货地址（选填，默认自提）"
+            rows={2}
+            className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-water/30 transition-all resize-none border-none placeholder:text-gray-400"
+          />
+        </div>
+
+        {/* Selected Items & Total */}
+        {selectedIds.size > 0 && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">已选商品</h3>
+            <div className="space-y-3">
+              {selectedItems.map((item) => (
+                <div key={item.product.id} className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0 mr-2">
+                    <p className="text-sm font-medium text-gray-800 truncate">{item.product.name}</p>
+                    <p className="text-xs text-gray-400">¥{item.product.price.toFixed(2)}{item.product.unit ? `/${item.product.unit}` : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" onClick={() => updateQty(item.product.id, -1)} className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200 transition-colors"><Minus className="w-3 h-3"/></button>
+                    <span className="w-8 text-center font-bold text-base">{item.quantity}</span>
+                    <button type="button" onClick={() => updateQty(item.product.id, 1)} className="w-7 h-7 rounded-lg bg-water/10 flex items-center justify-center text-water active:bg-water/20 transition-colors"><Plus className="w-3 h-3"/></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-dashed border-gray-200 mt-4 pt-3 flex justify-between items-end">
+              <div>
+                <p className="text-xs text-gray-400">合计（{selectedIds.size} 种商品）</p>
+                <p className="text-2xl font-bold gradient-text">¥{totalAmount.toFixed(2)}</p>
+              </div>
+              <p className="text-xs text-gray-400 text-right">
+                {selectedItems.map(i => `${i.product.name}×${i.quantity}`).join('、')}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <button
+          type="submit"
+          disabled={submitting || !phone || selectedIds.size === 0}
+          className="w-full bg-gradient-to-r from-water-light to-water text-white py-4 rounded-2xl font-semibold text-base shadow-lg shadow-water/30 active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+        >
+          {submitting ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              处理中...
+            </>
+          ) : (
+            `立即购买 ¥${totalAmount.toFixed(2)}`
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}
