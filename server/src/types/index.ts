@@ -5,6 +5,7 @@ export interface User {
   role: string;
   avatar?: string;
   password_hash?: string;
+  points: number;
   status: 'active' | 'inactive' | 'locked';
   created_at: string;
   updated_at: string;
@@ -57,25 +58,42 @@ export interface Brand {
   id: string;
   name: string;
   logo?: string;
-  description: string;
+  description?: string;
+  category_id?: string;
+  category_name?: string;
+  status?: string;
+  sort_order?: number;
+  created_at?: string;
+}
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  icon?: string;
   status: 'active' | 'inactive';
   sort_order: number;
-  created_at: string;
+  created_at?: string;
 }
 
 export interface Product {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   price: number;
-  unit: string;
+  unit?: string;
   image?: string;
-  stock: number;
+  stock?: number;
   brand_id?: string;
-  status: 'active' | 'inactive';
-  sort_order: number;
-  created_at: string;
+  brand_name?: string;
+  category_id?: string;
+  category_name?: string;
+  status?: string;
+  sort_order?: number;
+  created_at?: string;
 }
+
 
 export interface Order {
   id: string;
@@ -123,6 +141,44 @@ export interface SystemConfig {
   type: 'string' | 'number' | 'boolean' | 'json';
   description: string;
   group: string;
+}
+
+export interface PointsRecord {
+  id: string;
+  user_id: string;
+  order_id?: string;
+  change_type: 'earn' | 'spend' | 'refund' | 'adjust' | 'expire';
+  change_amount: number;
+  balance_after: number;
+  description: string;
+  created_at: string;
+}
+
+export interface RechargePackage {
+  id: string;
+  name: string;
+  amount: number;
+  discount_rate: number;
+  description?: string;
+  status: 'active' | 'inactive';
+  sort_order?: number;
+  created_at?: string;
+}
+
+export interface UserRecharge {
+  id: string;
+  user_id: string;
+  package_id: string;
+  amount: number;
+  discount_rate: number;
+  paid_amount: number;
+  remaining_balance: number;
+  status: 'active' | 'expired' | 'refunded';
+  transaction_id?: string;
+  remark?: string;
+  created_at?: string;
+  paid_at?: string;
+  package?: RechargePackage;
 }
 
 export interface ApiResponse<T = any> {

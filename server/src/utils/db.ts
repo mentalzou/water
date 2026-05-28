@@ -18,25 +18,26 @@ export function getDb(): Database.Database {
 export function initTables(database: Database.Database): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      phone TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL DEFAULT '',
-      role TEXT NOT NULL DEFAULT 'customer',
-      password_hash TEXT DEFAULT '',
-      avatar TEXT DEFAULT '',
-      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive','locked')),
+       id TEXT PRIMARY KEY,
+       phone TEXT NOT NULL UNIQUE,
+       name TEXT NOT NULL DEFAULT '',
+       role TEXT NOT NULL DEFAULT 'customer',
+       password_hash TEXT DEFAULT '',
+       avatar TEXT DEFAULT '',
+       points INTEGER DEFAULT 0,
+       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive','locked')),
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
-    );
+      );
 
     CREATE TABLE IF NOT EXISTS roles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      code TEXT NOT NULL UNIQUE,
-      description TEXT DEFAULT '',
-      permissions TEXT DEFAULT '[]',
-      created_at TEXT DEFAULT (datetime('now'))
-    );
+       id TEXT PRIMARY KEY,
+       name TEXT NOT NULL UNIQUE,
+       code TEXT NOT NULL UNIQUE,
+       description TEXT DEFAULT '',
+       permissions TEXT DEFAULT '[]',
+       created_at TEXT DEFAULT (datetime('now'))
+  );
 
     CREATE TABLE IF NOT EXISTS distributors (
       id TEXT PRIMARY KEY,
@@ -76,6 +77,18 @@ export function initTables(database: Database.Database): void {
       name TEXT NOT NULL UNIQUE,
       logo TEXT DEFAULT '',
       description TEXT DEFAULT '',
+      category_id TEXT DEFAULT '' REFERENCES product_categories(id),
+      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+      );
+
+    CREATE TABLE IF NOT EXISTS product_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      code TEXT NOT NULL UNIQUE,
+      description TEXT DEFAULT '',
+      icon TEXT DEFAULT '',
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
       sort_order INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
@@ -90,6 +103,7 @@ export function initTables(database: Database.Database): void {
       image TEXT DEFAULT '',
       stock INTEGER DEFAULT 99999,
       brand_id TEXT DEFAULT '' REFERENCES brands(id),
+      category_id TEXT DEFAULT '' REFERENCES product_categories(id),
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
       sort_order INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
@@ -150,8 +164,8 @@ export function initTables(database: Database.Database): void {
     );
 
     CREATE TABLE IF NOT EXISTS addresses (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       contact_name TEXT NOT NULL,
       contact_phone TEXT NOT NULL,
       province TEXT DEFAULT '',
@@ -161,7 +175,44 @@ export function initTables(database: Database.Database): void {
       is_default INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
-    );
+      );
+
+    CREATE TABLE IF NOT EXISTS points_records (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      order_id TEXT REFERENCES orders(id),
+      change_type TEXT NOT NULL CHECK(change_type IN ('earn', 'spend', 'refund', 'adjust', 'expire')),
+      change_amount INTEGER NOT NULL,
+      balance_after INTEGER NOT NULL,
+      description TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now'))
+      );
+
+    CREATE TABLE IF NOT EXISTS recharge_packages (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        amount REAL NOT NULL,
+        discount_rate REAL NOT NULL,
+        description TEXT DEFAULT '',
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+        );
+
+    CREATE TABLE IF NOT EXISTS user_recharges (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        package_id TEXT NOT NULL REFERENCES recharge_packages(id),
+        amount REAL NOT NULL,
+        discount_rate REAL NOT NULL,
+        paid_amount REAL NOT NULL,
+        remaining_balance REAL NOT NULL,
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','expired','refunded')),
+        transaction_id TEXT DEFAULT '',
+        remark TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now')),
+        paid_at TEXT DEFAULT ''
+        );
   `);
 
   // 兼容性迁移：为已存在的数据库添加新表和字段
@@ -181,21 +232,96 @@ function migrateDatabase(db: Database.Database): void {
         name TEXT NOT NULL UNIQUE,
         logo TEXT DEFAULT '',
         description TEXT DEFAULT '',
+        category_id TEXT DEFAULT '' REFERENCES product_categories(id),
         status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
         sort_order INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now'))
       )
     `);
+  } else {
+    // 为已存在的 brands 表添加 category_id 字段
+    try {
+      const brandCols = db.prepare('PRAGMA table_info(brands)').all() as any[];
+      const hasCategoryId = brandCols.some((c: any) => c.name === 'category_id');
+      if (!hasCategoryId) {
+        console.log('[Migration] Adding category_id column to brands table...');
+        db.exec("ALTER TABLE brands ADD COLUMN category_id TEXT DEFAULT '' REFERENCES product_categories(id)");
+        console.log('[Migration] category_id column added to brands table successfully');
+      }
+    } catch (e: any) {
+      console.error('[Migration] Failed to add category_id to brands table:', e.message);
+    }
+  }
+
+  // 创建 product_categories 表（如果不存在）
+  const hasCategories = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='product_categories'").get();
+  if (!hasCategories) {
+    db.exec(`      CREATE TABLE IF NOT EXISTS product_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      code TEXT NOT NULL UNIQUE,
+      description TEXT DEFAULT '',
+      icon TEXT DEFAULT '',
+      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
   }
 
   // 为 products 表添加 brand_id 字段（如果不存在）
+  // 为 products 表添加 category_id 字段（如果不存在）
   try {
     const cols = db.prepare('PRAGMA table_info(products)').all() as any[];
+
+    const hasCategoryId = cols.some((c: any) => c.name === 'category_id');
+    if (!hasCategoryId) {
+      db.exec("ALTER TABLE products ADD COLUMN category_id TEXT DEFAULT '' REFERENCES product_categories(id)");
+    }
+
     const hasBrandId = cols.some((c: any) => c.name === 'brand_id');
     if (!hasBrandId) {
       db.exec("ALTER TABLE products ADD COLUMN brand_id TEXT DEFAULT '' REFERENCES brands(id)");
     }
-  } catch { /* ignore */ }
+  } catch (e: any) {
+    console.error('[Migration] Failed to add columns to products table:', e.message);
+  }
+
+  // 创建 recharge_packages 表（如果不存在）
+  const hasRechargePackages = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='recharge_packages'").get();
+  if (!hasRechargePackages) {
+    db.exec(`      CREATE TABLE IF NOT EXISTS recharge_packages (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL,
+      discount_rate REAL NOT NULL,
+      description TEXT DEFAULT '',
+      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+  }
+
+  // 创建 user_recharges 表（如果不存在）
+  const hasUserRecharges = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_recharges'").get();
+  if (!hasUserRecharges) {
+    db.exec(`      CREATE TABLE IF NOT EXISTS user_recharges (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          package_id TEXT NOT NULL REFERENCES recharge_packages(id),
+          amount REAL NOT NULL,
+          discount_rate REAL NOT NULL,
+          paid_amount REAL NOT NULL,
+          remaining_balance REAL NOT NULL,
+          status TEXT DEFAULT 'active' CHECK(status IN ('active','expired','refunded')),
+          transaction_id TEXT DEFAULT '',
+          remark TEXT DEFAULT '',
+          created_at TEXT DEFAULT (datetime('now')),
+          paid_at TEXT DEFAULT ''
+          )
+    `);
+  }
 
   // 创建 order_items 表（如果不存在）
   const hasOrderItems = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='order_items'").get();
@@ -224,19 +350,43 @@ function migrateDatabase(db: Database.Database): void {
   // 创建 addresses 表（如果不存在）
   const hasAddresses = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='addresses'").get();
   if (!hasAddresses) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS addresses (
+    db.exec(`      CREATE TABLE IF NOT EXISTS addresses (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      contact_name TEXT NOT NULL,
+      contact_phone TEXT NOT NULL,
+      province TEXT DEFAULT '',
+      city TEXT DEFAULT '',
+      district TEXT DEFAULT '',
+      detail TEXT NOT NULL,
+      is_default INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+  }
+  // 为 users 表添加 points 字段（如果不存在）
+  try {
+    const userCols = db.prepare('PRAGMA table_info(users)').all() as any[];
+    const hasPoints = userCols.some((c: any) => c.name === 'points');
+    if (!hasPoints) {
+      db.exec("ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0");
+    }
+  } catch { /* ignore */ }
+
+  // 创建 points_records 表（如果不存在）
+  const hasPointsRecords = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='points_records'").get();
+  if (!hasPointsRecords) {
+    db.exec(`     
+     CREATE TABLE IF NOT EXISTS points_records (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        contact_name TEXT NOT NULL,
-        contact_phone TEXT NOT NULL,
-        province TEXT DEFAULT '',
-        city TEXT DEFAULT '',
-        district TEXT DEFAULT '',
-        detail TEXT NOT NULL,
-        is_default INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        order_id TEXT REFERENCES orders(id),
+        change_type TEXT NOT NULL CHECK(change_type IN ('earn', 'spend', 'refund', 'adjust', 'expire')),
+        change_amount INTEGER NOT NULL,
+        balance_after INTEGER NOT NULL,
+        description TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now'))
       )
     `);
   }
@@ -259,10 +409,10 @@ function migrateOrdersTableSchema(db: Database.Database): void {
 
     if (hasOldFields) {
       console.log('[Migration] Migrating orders table to support multi-item orders...');
-      
+
       // 1. 先迁移现有数据到 order_items
       migrateOrdersToItems(db);
-      
+
       // 2. 创建新的 orders 表（不含旧的商品字段）
       db.exec(`
         CREATE TABLE orders_new_schema_v2 (
@@ -289,12 +439,12 @@ function migrateOrdersTableSchema(db: Database.Database): void {
 
       // 3. 复制数据到新表（忽略旧字段）
       db.exec(`
-        INSERT INTO orders_new_schema_v2 
-          (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, 
-           distributor_commission, deliveryman_id, status, pay_status, transaction_id, remark,
-           created_at, updated_at, paid_at, assigned_at, delivered_at)
-        SELECT 
-          id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, 
+        INSERT INTO orders_new_schema_v2
+        (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id,
+         distributor_commission, deliveryman_id, status, pay_status, transaction_id, remark,
+         created_at, updated_at, paid_at, assigned_at, delivered_at)
+        SELECT
+          id, order_no, customer_phone, customer_name, address, total_amount, distributor_id,
           distributor_commission, deliveryman_id, status, pay_status, transaction_id, remark,
           created_at, updated_at, paid_at, assigned_at, delivered_at
         FROM orders;
@@ -302,10 +452,10 @@ function migrateOrdersTableSchema(db: Database.Database): void {
 
       // 4. 删除旧表
       db.exec('DROP TABLE orders;');
-      
+
       // 5. 重命名新表
       db.exec('ALTER TABLE orders_new_schema_v2 RENAME TO orders;');
-      
+
       console.log('[Migration] Orders table migration completed successfully!');
     }
   } catch (e) {
@@ -317,23 +467,23 @@ function migrateOrdersTableSchema(db: Database.Database): void {
 function migrateOrdersToItems(db: Database.Database): void {
   try {
     const oldOrders = db.prepare(`
-      SELECT id, product_id, quantity, unit_price 
-      FROM orders 
+      SELECT id, product_id, quantity, unit_price
+      FROM orders
       WHERE product_id IS NOT NULL AND product_id != ''
     `).all() as any[];
-    
+
     if (oldOrders.length > 0) {
       const insertItem = db.prepare(
         'INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price, subtotal, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       );
-      
+
       for (const order of oldOrders) {
         // 获取产品名称
         const product = db.prepare('SELECT name, unit FROM products WHERE id = ?').get(order.product_id) as any;
         const itemName = product?.name || order.product_id;
         const itemUnit = product?.unit || '瓶';
         const subtotal = (order.unit_price || 0) * (order.quantity || 1);
-        
+
         insertItem.run(
           `${order.id}-item-1`,
           order.id,
@@ -345,7 +495,7 @@ function migrateOrdersToItems(db: Database.Database): void {
           itemUnit
         );
       }
-      
+
       console.log(`[Migration] Migrated ${oldOrders.length} orders to order_items`);
     }
   } catch (e) {
@@ -354,30 +504,46 @@ function migrateOrdersToItems(db: Database.Database): void {
 }
 
 function seedDefaultData(database: Database.Database): void {
+  const categoryCount = database.prepare('SELECT COUNT(*) as count FROM product_categories').get() as { count: number };
+  if (categoryCount.count === 0) {
+    const insertCategory = database.prepare(
+        'INSERT INTO product_categories (id, name, code, description, icon, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    insertCategory.run('cat-001', '桶装水', 'barrel_water', '大桶装饮用水，适合家庭和办公室使用', '💧', 1);
+    insertCategory.run('cat-002', '瓶装水', 'bottle_water', '便携式瓶装水，随时随地补充水分', '🥤', 2);
+    insertCategory.run('cat-003', '饮水器', 'water_dispenser', '智能饮水设备，提供冷热饮水', '🚰', 3);
+    insertCategory.run('cat-004', '超值购', 'value_buy', '特价优惠组合，性价比之选', '🎁', 4);
+    insertCategory.run('cat-005', '定制水', 'custom_water', '企业定制专属用水，彰显品牌', '✨', 5);
+  }
+
   const productCount = database.prepare('SELECT COUNT(*) as count FROM products').get() as { count: number };
   if (productCount.count === 0) {
-    // 先插入品牌
+    // 先插入品牌（带分类关联）
     const brandCount = database.prepare('SELECT COUNT(*) as count FROM brands').get() as { count: number };
     if (brandCount.count === 0) {
       const insertBrand = database.prepare(
-        'INSERT INTO brands (id, name, description, sort_order) VALUES (?, ?, ?, ?)'
+        'INSERT INTO brands (id, name, description, category_id, sort_order) VALUES (?, ?, ?, ?, ?)'
       );
-      insertBrand.run('brand-001', '怡宝', '国民饮用水品牌', 1);
-      insertBrand.run('brand-002', '农夫山泉', '天然好水，健康之选', 2);
-      insertBrand.run('brand-003', '百岁山', '高端矿泉水品牌', 3);
+      insertBrand.run('brand-001', '怡宝', '国民饮用水品牌', 'cat-002', 1);
+      insertBrand.run('brand-002', '农夫山泉', '天然好水，健康之选', 'cat-001', 2);
+      insertBrand.run('brand-003', '百岁山', '高端矿泉水品牌', 'cat-002', 3);
+      insertBrand.run('brand-004', '娃哈哈', '知名饮料品牌', 'cat-001', 4);
+      insertBrand.run('brand-005', '康师傅', '优质饮用水品牌', 'cat-001', 5);
     }
     const insertProduct = database.prepare(
-      'INSERT INTO products (id, name, description, price, unit, brand_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO products (id, name, description, price, unit, brand_id, category_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
-    insertProduct.run('prod-001', '纯天然矿泉水', '源自深层地下岩层，富含多种矿物质，口感甘甜清冽', 3.00, '瓶', 'brand-001', 1);
-    insertProduct.run('prod-002', '山泉水大桶装', '高山源头活水，适合家庭日常饮用，一桶20升', 25.00, '桶', 'brand-002', 2);
-    insertProduct.run('prod-003', '高端冰川水', '来自万年冰川融水，极致纯净，送礼首选', 8.00, '瓶', 'brand-003', 3);
+    insertProduct.run('prod-001', '纯天然矿泉水', '源自深层地下岩层，富含多种矿物质，口感甘甜清冽', 3.00, '瓶', 'brand-001', 'cat-002', 1);
+    insertProduct.run('prod-002', '山泉水大桶装', '高山源头活水，适合家庭日常饮用，一桶20升', 25.00, '桶', 'brand-002', 'cat-001', 2);
+    insertProduct.run('prod-003', '高端冰川水', '来自万年冰川融水，极致纯净，送礼首选', 8.00, '瓶', 'brand-003', 'cat-002', 3);
+    insertProduct.run('prod-004', '纯净水桶装', '多重过滤，安全放心', 18.00, '桶', 'brand-004', 'cat-001', 4);
+    insertProduct.run('prod-005', '天然矿泉水', '天然矿化，健康好水', 30.00, '桶', 'brand-005', 'cat-001', 5);
   }
 
   const configCount = database.prepare('SELECT COUNT(*) as count FROM system_config').get() as { count: number };
   if (configCount.count === 0) {
     const insertConfig = database.prepare(
-      'INSERT OR IGNORE INTO system_config (key, value, type, description, group_key) VALUES (?, ?, ?, ?, ?)'
+        'INSERT OR IGNORE INTO system_config (key, value, type, description, group_key) VALUES (?, ?, ?, ?, ?)'
     );
     insertConfig.run('commission_type', 'percentage', 'string', '返佣类型：percentage=百分比, fixed=固定金额', 'commission');
     insertConfig.run('commission_rate', '5', 'number', '返佣数值：百分比时为5表示5%，固定金额时为具体元数', 'commission');
@@ -386,11 +552,31 @@ function seedDefaultData(database: Database.Database): void {
     insertConfig.run('wx_api_key', '', 'string', '微信支付APIv3密钥', 'payment');
     insertConfig.run('wx_app_id', '', 'string', '微信应用AppID', 'payment');
     insertConfig.run('admin_password', 'admin123456', 'string', '管理员初始密码', 'auth');
+    insertConfig.run('points_earn_rate', '1', 'number', '积分获取比例：1表示消费1元获得1积分', 'points');
+    insertConfig.run('points_min_order_amount', '0', 'number', '积分获取最低订单金额：0表示无限制', 'points');
+  }
+
+  // 初始化充值套餐数据
+  const packageCount = database.prepare('SELECT COUNT(*) as count FROM recharge_packages').get() as { count: number };
+  if (packageCount.count === 0) {
+    const insertPackage = database.prepare(
+        'INSERT INTO recharge_packages (id, name, amount, discount_rate, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    insertPackage.run('pkg-001', '充值200元套餐', 200, 0.8, '充值200元，订水享受8折优惠', 1);
+    insertPackage.run('pkg-002', '充值500元套餐', 500, 0.7, '充值500元，订水享受7折优惠', 2);
+    insertPackage.run('pkg-003', '充值1000元套餐', 1000, 0.65, '充值1000元，订水享受6.5折优惠', 3);
+    insertPackage.run('pkg-004', '充值2000元套餐', 2000, 0.6, '充值2000元，订水享受6折优惠', 4);
+    insertPackage.run('pkg-005', '充值5000元套餐', 5000, 0.5, '充值5000元，订水享受5折优惠', 5);
   }
 
   const adminCount = database.prepare("SELECT COUNT(*) as count FROM users WHERE role='admin'").get() as { count: number };
   if (adminCount.count === 0) {
-    database.prepare("INSERT INTO users (id, phone, name, role, status) VALUES ('admin-001', '13800000000', '系统管理员', 'admin', 'active')");
+    database.prepare("INSERT INTO users (id, phone, name, role, status) VALUES ('admin-001', '13800000000', '系统管理员', 'admin', 'active')").run();
+    const insertUser = database.prepare(
+        'INSERT INTO users (id, phone, name, role, password_hash, avatar, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    insertUser.run('admin-001', '13800000000', '系统管理员', 'admin', 'pbkdf2_sha256$260000$94276ea53064985dc60f91157603838a$ca87f115c59d2e42f98c3c7c79a08179e12c10101ac4f24fea130b20b0a13396',
+        '', 'active', '2026-05-10 03:19:28', '2026-05-10 03:19:35');
   }
 
   const roleCount = database.prepare('SELECT COUNT(*) as count FROM roles').get() as { count: number };

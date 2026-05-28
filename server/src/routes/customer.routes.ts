@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import * as customerController from '../controllers/customer.controller';
 import { optionalAuth } from '../middleware/auth.middleware';
+import {
+    getPackages,
+    recharge,
+    getMyRecharges,
+    getActiveRecharge,
+} from '../controllers/recharge.controller';
 
 const router = Router();
 
@@ -8,8 +14,13 @@ const router = Router();
 router.post('/customers/login', customerController.customerLogin);
 router.post('/customers/register', customerController.customerRegister);
 
-// Public: Get available products
+// Public: Get available products and categories
 router.get('/products', customerController.getProducts);
+router.get('/categories', (_req, res) => {
+    const { categoryModel } = require('../models/category.model');
+    const { success } = require('../utils/response');
+    success(res, categoryModel.findAll(true));
+});
 
 // Create order
 router.post('/orders', customerController.createOrder);
@@ -19,16 +30,29 @@ router.get('/my-orders', customerController.getMyOrders);
 // Payment (mock)
 router.post('/orders/:id/pay', customerController.payForOrder);
 
+// Recharge - public (get packages list)
+router.get('/customers/recharge/packages', getPackages);
+
 // Customer Profile (optional auth - works with or without token)
 router.use(optionalAuth);
 
 // Password change
 router.put('/customers/password', customerController.changePassword);
 
+// Recharge - protected (need login)
+router.post('/customers/recharge', recharge);
+router.get('/customers/recharge/my-recharges', getMyRecharges);
+router.get('/customers/recharge/active', getActiveRecharge);
+
 // Address management
 router.get('/addresses', customerController.getAddresses);
 router.post('/addresses', customerController.addAddress);
 router.put('/addresses/:id', customerController.updateAddress);
 router.delete('/addresses/:id', customerController.deleteAddress);
+
+// Points management
+router.get('/customers/points', customerController.getMyPoints);
+router.get('/customers/points/records', customerController.getMyPointsRecords);
+router.post('/customers/points/use', customerController.usePoints);
 
 export default router;

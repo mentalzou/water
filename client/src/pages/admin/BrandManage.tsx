@@ -7,34 +7,61 @@ function getToken(): string {
   return localStorage.getItem('admin_token') || '';
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface Brand {
   id: string;
   name: string;
   logo?: string;
   description: string;
+  category_id?: string;
+  category_name?: string;
   status: string;
 }
 
 export default function BrandManage() {
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', logo: '' });
+  const [form, setForm] = useState({ name: '', description: '', logo: '', category_id: '' });
   const [editId, setEditId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [keyword, setKeyword] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
-  useEffect(() => { loadBrands(); }, []);
-  useEffect(() => { loadBrands(); }, [keyword]);
+  useEffect(() => { loadCategories(); loadBrands(); }, []);
+  useEffect(() => { loadBrands(); }, [keyword, categoryFilter]);
+
+  async function loadCategories() {
+    try {
+      const token = getToken();
+      const res: any = await fetch(`${API_BASE}/admin/categories/select`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(r => r.text()).then(text => {
+        try { return JSON.parse(text); } catch { return null; }
+      });
+      if (res && res.code === 200) {
+        setCategories(res.data || []);
+      }
+    } catch { /* ignore */ }
+  }
 
   async function loadBrands() {
     try {
       setLoading(true);
       setError('');
       const token = getToken();
-      const qs = keyword ? `?keyword=${encodeURIComponent(keyword)}` : '';
-      const res: any = await fetch(`${API_BASE}/admin/brands${qs}`, {
+      const params = new URLSearchParams();
+      if (categoryFilter) params.set('category_id', categoryFilter);
+      if (keyword) params.set('keyword', keyword);
+      const qs = params.toString();
+      const res: any = await fetch(`${API_BASE}/admin/brands${qs ? '?' + qs : ''}`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then(r => r.text()).then(text => {
         try { return JSON.parse(text); }
@@ -58,7 +85,12 @@ export default function BrandManage() {
     setSubmitting(true);
     try {
       const token = getToken();
-      const data = { name: form.name, description: form.description, logo: form.logo };
+      const data = {
+        name: form.name,
+        description: form.description,
+        logo: form.logo,
+        category_id: form.category_id || undefined
+      };
       let res: any;
       if (editId) {
         res = await fetch(`${API_BASE}/admin/brands/${editId}`, {
@@ -111,7 +143,7 @@ export default function BrandManage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -121,20 +153,27 @@ export default function BrandManage() {
         </div>
         <div className="flex items-center gap-3">
           <input value={keyword} onChange={e => setKeyword(e.target.value)}
-            placeholder="搜索品牌名称..."
-            className="px-3 py-2.5 bg-white rounded-xl border border-gray-200 outline-none focus:ring-2 ring-water/30 text-sm text-gray-600 w-[180px]" />
-          <button onClick={() => setKeyword('')}
+           placeholder="搜索品牌名称..."
+           className="px-3 py-2.5 bg-white rounded-xl border border-gray-200 outline-none focus:ring-2 ring-water/30 text-sm text-gray-600 w-[180px]" />
+          {categories.length > 0 && (
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
+                    className="px-3 py-2.5 bg-white rounded-xl border border-gray-200 outline-none focus:ring-2 ring-water/30 text-sm text-gray-600 min-w-[140px]">
+              <option value="">全部分类</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+          <button onClick={() => { setKeyword(''); setCategoryFilter(''); }}
             className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm">
             <RotateCcw className="w-3.5 h-3.5" /> 重置
           </button>
-          <button onClick={() => { setForm({ name: '', description: '', logo: '' }); setEditId(null); setShowForm(true); }}
+          <button onClick={() => { setForm({ name: '', description: '', logo: '', category_id: '' }); setEditId(null); setShowForm(true); }}
             className="flex items-center gap-2 px-5 py-2.5 bg-water text-white rounded-xl hover:bg-water-dark shadow-md">
             <Plus className="w-4 h-4" /> 添加品牌
           </button>
         </div>
       </div>
 
-      {error && (
+    {error && (
         <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl">
           <AlertCircle className="w-5 h-5 shrink-0" /> {error}
         </div>
@@ -159,11 +198,18 @@ export default function BrandManage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-800 text-lg">{brand.name}</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">{brand.description || '暂无描述'}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {brand.category_name && (
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-medium">
+                    {brand.category_name}
+                  </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">{brand.description || '暂无描述'}</p>
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => { setEditId(brand.id); setForm({ name: brand.name, description: brand.description || '', logo: brand.logo || '' }); setShowForm(true); }}
+                  <button onClick={() => { setEditId(brand.id); setForm({ name: brand.name, description: brand.description || '', logo: brand.logo || '', category_id: brand.category_id || '' }); setShowForm(true); }}
                     className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500 transition-colors">
                     <Edit2 className="w-3.5 h-3.5"/>
                   </button>
@@ -187,6 +233,14 @@ export default function BrandManage() {
               <button onClick={() => setShowForm(false)} className="p-1 rounded-lg hover:bg-gray-100"><X className="w-5 h-5 text-gray-500"/></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">所属分类</label>
+                <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30">
+                  <option value="">不选择分类</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">品牌名称 *</label>
                 <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required

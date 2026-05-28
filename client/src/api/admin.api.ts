@@ -72,3 +72,14 @@ export const getOrders = (page = 1, pageSize = 20, status?: string) => {
 export const getConfigs = () => adminApi.get('/configs');
 export const updateConfig = (key: string, value: string) =>
   adminApi.put('/configs', { key, value });
+
+// Recharge Packages
+export const getRechargePackages = () => adminApi.get('/recharge/packages');
+export const createRechargePackage = (data: any) =>
+    adminApi.post('/recharge/packages', data);
+export const updateRechargePackage = (id: string, data: any) =>
+    adminApi.put(`/recharge/packages/${id}`, data);
+export const updateRechargePackageStatus = (id: string, status: string) =>
+    adminApi.put(`/recharge/packages/${id}/status`, { status });
+export const deleteRechargePackage = (id: string) =>
+    adminApi.delete(`/recharge/packages/${id}`);

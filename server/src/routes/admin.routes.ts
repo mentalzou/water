@@ -24,6 +24,11 @@ router.put('/users/:id', adminController.updateUser);
 router.delete('/users/:id', adminController.deleteUser);
 router.put('/users/:id/reset-password', adminController.resetUserPassword);
 
+// User Points Management
+router.get('/users/:id/points', adminController.getUserPoints);
+router.post('/users/:id/points/adjust', adminController.adjustUserPoints);
+router.get('/users/:id/points/records', adminController.getUserPointsHistory);
+
 // Role Management
 router.get('/roles', adminController.listRoles);
 router.post('/roles', adminController.createRole);
@@ -50,6 +55,13 @@ router.post('/areas', adminController.createArea);
 router.put('/areas/:id', adminController.updateArea);
 router.delete('/areas/:id', adminController.deleteArea);
 
+// Categories CRUD
+router.get('/categories', adminController.listCategories);
+router.post('/categories', adminController.createCategory);
+router.put('/categories/:id', adminController.updateCategory);
+router.delete('/categories/:id', adminController.deleteCategory);
+router.get('/categories/select', adminController.listCategoriesForSelect);
+
 // Brands CRUD
 router.get('/brands', adminController.listBrands);
 router.post('/brands', adminController.createBrand);
@@ -69,5 +81,12 @@ router.get('/orders', adminController.listAllOrders);
 // System config
 router.get('/configs', adminController.getConfigs);
 router.put('/configs', adminController.updateConfig);
+
+// Recharge Packages Management
+router.get('/recharge/packages', adminController.listRechargePackages);
+router.post('/recharge/packages', adminController.createRechargePackage);
+router.put('/recharge/packages/:id', adminController.updateRechargePackage);
+router.put('/recharge/packages/:id/status', adminController.updateRechargePackageStatus);
+router.delete('/recharge/packages/:id', adminController.deleteRechargePackage);
 
 export default router;

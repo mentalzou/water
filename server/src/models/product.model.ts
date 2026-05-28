@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../utils/db';
 import type { Product } from '../types';
@@ -8,7 +9,7 @@ export const productModel = {
   create(data: Partial<Product>): Product {
     const id = `prod-${Date.now()}`;
     db.prepare(
-      'INSERT INTO products (id, name, description, price, unit, image, stock, brand_id, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO products (id, name, description, price, unit, image, stock, brand_id, category_id, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       id,
       data.name || '',
@@ -18,6 +19,7 @@ export const productModel = {
       data.image || '',
       data.stock ?? 99999,
       data.brand_id || '',
+      data.category_id || '',
       data.status || 'active',
       data.sort_order ?? 0
     );
@@ -25,14 +27,16 @@ export const productModel = {
   },
 
   findById(id: string): Product | undefined {
-    const row = db.prepare('SELECT p.*, b.name as brand_name FROM products p LEFT JOIN brands b ON p.brand_id = b.id WHERE p.id = ?').get(id) as any;
+    const row = db.prepare(
+        'SELECT p.*, b.name as brand_name, c.name as category_name FROM products p LEFT JOIN brands b ON p.brand_id = b.id LEFT JOIN product_categories c ON p.category_id = c.id WHERE p.id = ?'
+    ).get(id) as any;
     return row || undefined;
   },
 
-  findAll(activeOnly = true, options?: { brandId?: string; keyword?: string }): Product[] {
+  findAll(activeOnly = true, options?: { brandId?: string; categoryId?: string; keyword?: string }): Product[] {
     let sql = activeOnly
-      ? 'SELECT p.*, b.name as brand_name FROM products p LEFT JOIN brands b ON p.brand_id = b.id WHERE p.status = ?'
-      : 'SELECT p.*, b.name as brand_name FROM products p LEFT JOIN brands b ON p.brand_id = b.id WHERE 1=1';
+      ? 'SELECT p.*, b.name as brand_name, c.name as category_name FROM products p LEFT JOIN brands b ON p.brand_id = b.id LEFT JOIN product_categories c ON p.category_id = c.id WHERE p.status = ?'
+      : 'SELECT p.*, b.name as brand_name, c.name as category_name FROM products p LEFT JOIN brands b ON p.brand_id = b.id LEFT JOIN product_categories c ON p.category_id = c.id WHERE 1=1';
     const params: any[] = [];
     if (activeOnly) {
       params.push('active');
@@ -40,6 +44,10 @@ export const productModel = {
     if (options?.brandId) {
       sql += ' AND p.brand_id = ?';
       params.push(options.brandId);
+    }
+    if (options?.categoryId) {
+      sql += ' AND p.category_id = ?';
+      params.push(options.categoryId);
     }
     if (options?.keyword) {
       sql += ' AND p.name LIKE ?';

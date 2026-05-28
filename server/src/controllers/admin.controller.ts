@@ -9,9 +9,11 @@ import { commissionModel } from '../models/commission.model';
 import { userModel } from '../models/user.model';
 import { roleModel } from '../models/role.model';
 import { brandModel } from '../models/brand.model';
+import { categoryModel } from '../models/category.model';
 import { getDb } from '../utils/db';
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
+import { changePoints, getUserPointsRecords } from '../services/points.service';
 import { v4 as uuidv4 } from 'uuid';
 
 /** 安全提取 req.body 中的字符串值 */
@@ -28,7 +30,7 @@ export function getDashboard(_req: Request, res: Response): void {
   const todayStr = todayStart.toISOString().split('T')[0];
 
   const todayOrders = (db.prepare(
-    "SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM orders WHERE pay_status = 'paid' AND date(created_at) = ?"
+      "SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM orders WHERE pay_status = 'paid' AND date(created_at) = ?"
   ).get(todayStr) as any);
 
   const totalCustomers = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'customer'").get() as { count: number }).count;
@@ -37,18 +39,16 @@ export function getDashboard(_req: Request, res: Response): void {
 
   // Recent orders
   const recentOrders = db.prepare(
-    `SELECT o.order_no, o.customer_name, o.customer_phone, o.total_amount, o.status,
-       (SELECT group_concat(oi.product_name, ', ')
-        FROM order_items oi WHERE oi.order_id = o.id) as product_name
-     FROM orders o
-     ORDER BY o.created_at DESC LIMIT 10`
+      `SELECT o.order_no, o.customer_name, o.customer_phone, o.total_amount, o.status, p.name as product_name
+       FROM orders o LEFT JOIN products p ON o.product_id = p.id
+       ORDER BY o.created_at DESC LIMIT 10`
   ).all();
 
   // Top distributors
   const topDistributors = db.prepare(
-    `SELECT d.code, u.name, d.total_commission
-     FROM distributors d LEFT JOIN users u ON d.user_id = u.id
-     ORDER BY d.total_commission DESC LIMIT 5`
+      `SELECT d.code, u.name, d.total_commission
+       FROM distributors d LEFT JOIN users u ON d.user_id = u.id
+       ORDER BY d.total_commission DESC LIMIT 5`
   ).all();
 
   success(res, {
@@ -186,7 +186,7 @@ export function resetDeliverymanPassword(req: Request, res: Response): void {
     } else {
       userId = uuidv4();
       db.prepare('INSERT INTO users (id, phone, name, role, status, password_hash) VALUES (?, ?, ?, ?, ?, ?)').run(
-        userId, dm.phone, dm.name, 'deliveryman', dm.status || 'active', hashPassword(newPassword),
+          userId, dm.phone, dm.name, 'deliveryman', dm.status || 'active', hashPassword(newPassword),
       );
     }
     // Update password regardless (in case we found existing user)
@@ -228,19 +228,54 @@ export function deleteArea(req: Request, res: Response): void {
   success(res, null, '删除成功');
 }
 
+// ============ Categories ============
+export function createCategory(req: Request, res: Response): void {
+  const name = str(req.body.name);
+  const code = str(req.body.code);
+  if (!name || !code) { error(res, '请提供分类名称和编码'); return; }
+  const description = str(req.body.description);
+  const icon = str(req.body.icon);
+  const result = categoryModel.create({ name, code, description, icon });
+  success(res, result, '分类创建成功');
+}
+
+export function listCategories(req: Request, res: Response): void {
+  const keyword = req.query.keyword ? str(req.query.keyword) : undefined;
+  success(res, categoryModel.findAll(false, keyword));
+}
+
+export function updateCategory(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  const result = categoryModel.update(id, req.body as any);
+  if (!result) return notFound(res);
+  success(res, result, '更新成功');
+}
+
+export function deleteCategory(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  categoryModel.delete(id);
+  success(res, null, '删除成功');
+}
+
+export function listCategoriesForSelect(_req: Request, res: Response): void {
+  success(res, categoryModel.findForSelect());
+}
+
 // ============ Brands ============
 export function createBrand(req: Request, res: Response): void {
   const name = str(req.body.name);
   if (!name) { error(res, '请提供品牌名称'); return; }
   const description = str(req.body.description);
   const logo = str(req.body.logo);
-  const result = brandModel.create({ name, description, logo });
+  const category_id = req.body.category_id ? str(req.body.category_id) : undefined;
+  const result = brandModel.create({ name, description, logo, category_id });
   success(res, result, '品牌创建成功');
 }
 
 export function listBrands(req: Request, res: Response): void {
   const keyword = req.query.keyword ? str(req.query.keyword) : undefined;
-  success(res, brandModel.findAll(false, keyword));
+  const categoryId = req.query.category_id ? str(req.query.category_id) : undefined;
+  success(res, brandModel.findAll(false, keyword, categoryId));
 }
 
 export function updateBrand(req: Request, res: Response): void {
@@ -267,14 +302,16 @@ export function createProduct(req: Request, res: Response): void {
   const unit = str(req.body.unit);
   const description = str(req.body.description);
   const brandId = req.body.brand_id ? str(req.body.brand_id) : undefined;
+  const categoryId = req.body.category_id ? str(req.body.category_id) : undefined;
   if (!name || isNaN(price)) { error(res, '请提供产品名称和价格'); return; }
-  const result = productModel.create({ name, description, price, unit, brand_id: brandId });
+  const result = productModel.create({ name, description, price, unit, brand_id: brandId, category_id: categoryId });
   success(res, result, '产品创建成功');
 }
 
 export function listProducts(req: Request, res: Response): void {
-  const options: { brandId?: string; keyword?: string } = {};
+  const options: { brandId?: string; categoryId?: string; keyword?: string } = {};
   if (req.query.brand_id) options.brandId = str(req.query.brand_id);
+  if (req.query.category_id) options.categoryId = str(req.query.category_id);
   if (req.query.keyword) options.keyword = str(req.query.keyword);
   success(res, productModel.findAll(false, options));
 }
@@ -352,7 +389,7 @@ export function adminLogin(req: Request, res: Response): void {
   if (user.role !== 'admin') {
     const userRole = roleModel.findByCode(user.role);
     const hasAdminPermission = userRole && Array.isArray(JSON.parse(userRole.permissions || '[]')) &&
-      JSON.parse(userRole.permissions || '[]').length > 0;
+        JSON.parse(userRole.permissions || '[]').length > 0;
     if (!hasAdminPermission) {
       error(res, '无权登录管理后台', 403);
       return;
@@ -549,4 +586,209 @@ export function deleteRole(req: Request, res: Response): void {
   }
   roleModel.delete(id);
   success(res, null, '删除成功');
+}
+
+/**
+ * 获取用户积分信息
+ */
+export function getUserPoints(req: Request, res: Response): void {
+  const { id } = req.params;
+
+  const user = userModel.findById(id);
+  if (!user) {
+    error(res, '用户不存在', 404);
+    return;
+  }
+
+  success(res, {
+    userId: user.id,
+    name: user.name,
+    phone: user.phone,
+    points: user.points || 0,
+  });
+}
+
+/**
+ * 调整用户积分
+ */
+export function adjustUserPoints(req: Request, res: Response): void {
+  const { id } = req.params;
+  const { amount, description } = req.body;
+
+  if (!amount || typeof amount !== 'number') {
+    error(res, '请输入有效的积分数量');
+    return;
+  }
+
+  const user = userModel.findById(id);
+  if (!user) {
+    error(res, '用户不存在', 404);
+    return;
+  }
+
+  try {
+    const result = changePoints({
+      userId: id,
+      changeType: 'adjust',
+      amount: Math.abs(amount), // 取绝对值，正负由changeType决定
+      description: description || `管理员调整积分`,
+    });
+
+    success(res, {
+      userId: id,
+      newBalance: result.newBalance,
+      adjustedAmount: amount,
+    }, '积分调整成功');
+  } catch (err: any) {
+    error(res, err.message || '积分调整失败');
+  }
+}
+
+/**
+ * 获取用户积分记录
+ */
+export function getUserPointsHistory(req: Request, res: Response): void {
+  const { id } = req.params;
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.pageSize as string) || 20;
+
+  const user = userModel.findById(id);
+  if (!user) {
+    error(res, '用户不存在', 404);
+    return;
+  }
+
+  const { data, total } = getUserPointsRecords(id, page, pageSize);
+
+  success(res, {
+    userId: id,
+    userName: user.name,
+    currentPoints: user.points || 0,
+    records: data,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    },
+  });
+}
+
+// ============ Recharge Packages ============
+export function listRechargePackages(_req: Request, res: Response): void {
+  const db = getDb();
+  const packages = db.prepare(
+      "SELECT * FROM recharge_packages ORDER BY sort_order ASC"
+  ).all();
+  success(res, packages);
+}
+
+export function createRechargePackage(req: Request, res: Response): void {
+  const { name, amount, discount_rate, description, sort_order } = req.body;
+
+  if (!name || !amount || !discount_rate) {
+    error(res, '请提供套餐名称、金额和折扣率');
+    return;
+  }
+
+  try {
+    const id = uuidv4();
+    const db = getDb();
+    db.prepare(
+        'INSERT INTO recharge_packages (id, name, amount, discount_rate, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(id, name, parseFloat(amount), parseFloat(discount_rate), description || '', parseInt(sort_order) || 0);
+
+    const pkg = db.prepare('SELECT * FROM recharge_packages WHERE id = ?').get(id);
+    success(res, pkg, '充值套餐创建成功');
+  } catch (err: any) {
+    error(res, err.message || '创建失败');
+  }
+}
+
+export function updateRechargePackage(req: Request, res: Response): void {
+  const { id } = req.params;
+  const { name, amount, discount_rate, description, sort_order } = req.body;
+
+  try {
+    const db = getDb();
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (name !== undefined) {
+      updates.push('name = ?');
+      values.push(name);
+    }
+    if (amount !== undefined) {
+      updates.push('amount = ?');
+      values.push(parseFloat(amount));
+    }
+    if (discount_rate !== undefined) {
+      updates.push('discount_rate = ?');
+      values.push(parseFloat(discount_rate));
+    }
+    if (description !== undefined) {
+      updates.push('description = ?');
+      values.push(description);
+    }
+    if (sort_order !== undefined) {
+      updates.push('sort_order = ?');
+      values.push(parseInt(sort_order));
+    }
+
+    if (updates.length === 0) {
+      error(res, '没有要更新的字段');
+      return;
+    }
+
+    values.push(id);
+    db.prepare(`UPDATE recharge_packages SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+    const pkg = db.prepare('SELECT * FROM recharge_packages WHERE id = ?').get(id);
+    success(res, pkg, '更新成功');
+  } catch (err: any) {
+    error(res, err.message || '更新失败');
+  }
+}
+
+export function updateRechargePackageStatus(req: Request, res: Response): void {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status || !['active', 'inactive'].includes(status)) {
+    error(res, '请提供有效的状态');
+    return;
+  }
+
+  try {
+    const db = getDb();
+    db.prepare('UPDATE recharge_packages SET status = ? WHERE id = ?').run(status, id);
+    const pkg = db.prepare('SELECT * FROM recharge_packages WHERE id = ?').get(id);
+
+    if (!pkg) {
+      error(res, '套餐不存在', 404);
+      return;
+    }
+
+    success(res, pkg, '状态更新成功');
+  } catch (err: any) {
+    error(res, err.message || '更新失败');
+  }
+}
+
+export function deleteRechargePackage(req: Request, res: Response): void {
+  const { id } = req.params;
+
+  try {
+    const db = getDb();
+    const result = db.prepare('DELETE FROM recharge_packages WHERE id = ?').run(id);
+
+    if (result.changes === 0) {
+      error(res, '套餐不存在', 404);
+      return;
+    }
+
+    success(res, null, '套餐删除成功');
+  } catch (err: any) {
+    error(res, err.message || '删除失败');
+  }
 }

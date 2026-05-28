@@ -20,8 +20,23 @@ export const customerApi = {
   deleteAddress: (id: string) =>
     api.delete(`/addresses/${id}`),
 
-  // 商品
+  // 个人中心 - 积分管理
+  getMyPoints: () => api.get('/customers/points'),
+  getMyPointsRecords: (page = 1, pageSize = 20) =>
+      api.get(`/customers/points/records?page=${page}&pageSize=${pageSize}`),
+  usePoints: (points: number, description?: string) =>
+      api.post('/customers/points/use', { points, description }),
+
+  // 充值相关
+  getRechargePackages: () => api.get('/customers/recharge/packages'),
+  recharge: (packageId: string) => api.post('/customers/recharge', { package_id: packageId }),
+  getMyRecharges: (page = 1, pageSize = 20) =>
+      api.get(`/customers/recharge/my-recharges?page=${page}&pageSize=${pageSize}`),
+  getActiveRecharge: () => api.get('/customers/recharge/active'),
+
+  // 商品和分类
   getProducts: () => api.get('/products'),
+  getCategories: () => api.get('/categories'),
 
   // 订单（兼容旧接口）
   createOrder: (data: {

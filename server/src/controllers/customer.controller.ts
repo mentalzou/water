@@ -4,9 +4,11 @@ import { productModel } from '../models/product.model';
 import { orderModel } from '../models/order.model';
 import { distributorModel } from '../models/distributor.model';
 import { userModel } from '../models/user.model';
-import addressModel from '../models/address.model';import { createCustomerOrder, processPaymentSuccess } from '../services/order.service';
+import addressModel from '../models/address.model';
+import { createCustomerOrder, processPaymentSuccess } from '../services/order.service';
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
+import { getUserPointsRecords, getPointsConfig, changePoints } from '../services/points.service';
 
 /** 安全提取 req.body 中的字符串值 */
 function str(val: unknown): string {
@@ -297,5 +299,59 @@ export function deleteAddress(req: Request, res: Response): void {
     success(res, null, '删除成功');
   } else {
     error(res, '地址不存在或无权删除', 404);
+  }
+}
+
+// ============ Points Management ============
+export function getMyPoints(req: Request, res: Response): void {
+  const userId = (req as any).user?.userId;
+  if (!userId) { error(res, '未登录', 401); return; }
+
+  const user = userModel.findById(userId);
+  if (!user) { error(res, '用户不存在', 404); return; }
+
+  const config = getPointsConfig();
+  success(res, {
+    points: user.points || 0,
+    earnRate: config.earnRate,
+    minOrderAmount: config.minOrderAmount,
+  });
+}
+
+export function getMyPointsRecords(req: Request, res: Response): void {
+  const userId = (req as any).user?.userId;
+  if (!userId) { error(res, '未登录', 401); return; }
+
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.pageSize as string) || 20;
+
+  const { data, total } = getUserPointsRecords(userId, page, pageSize);
+  paginated(res, data, page, pageSize, total);
+}
+
+export function usePoints(req: Request, res: Response): void {
+  const userId = (req as any).user?.userId;
+  if (!userId) { error(res, '未登录', 401); return; }
+
+  const pointsToUse = parseInt(req.body.points || '0');
+  if (pointsToUse <= 0) {
+    error(res, '请输入有效的积分数量');
+    return;
+  }
+
+  try {
+    const result = changePoints({
+      userId,
+      changeType: 'spend',
+      amount: pointsToUse,
+      description: req.body.description || '积分消费',
+    });
+
+    success(res, {
+      newBalance: result.newBalance,
+      usedPoints: pointsToUse,
+    }, '积分使用成功');
+  } catch (err: any) {
+    error(res, err.message || '积分使用失败');
   }
 }

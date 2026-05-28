@@ -5,15 +5,16 @@ import type { Brand } from '../types';
 const db = getDb();
 
 export const brandModel = {
-  create(data: { name: string; description?: string; logo?: string; status?: string; sort_order?: number }): Brand {
+  create(data: { name: string; description?: string; logo?: string; category_id?: string; status?: string; sort_order?: number }): Brand {
     const id = `brand-${Date.now()}`;
     db.prepare(
-      'INSERT INTO brands (id, name, logo, description, status, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO brands (id, name, logo, description, category_id, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(
       id,
       data.name || '',
       data.logo || '',
       data.description || '',
+      data.category_id || '',
       data.status || 'active',
       data.sort_order ?? 0
     );
@@ -21,24 +22,36 @@ export const brandModel = {
   },
 
   findById(id: string): Brand | undefined {
-    return db.prepare('SELECT * FROM brands WHERE id = ?').get(id) as Brand | undefined;
+    const row = db.prepare('SELECT b.*, c.name as category_name FROM brands b LEFT JOIN product_categories c ON b.category_id = c.id WHERE b.id = ?').get(id) as any;
+    return row || undefined;
   },
 
-  findAll(activeOnly = true, keyword?: string): Brand[] {
+  findAll(activeOnly = true, keyword?: string, categoryId?: string): Brand[] {
     let sql = activeOnly
-      ? 'SELECT * FROM brands WHERE status = ?'
-      : 'SELECT * FROM brands WHERE 1=1';
+        ? 'SELECT b.*, c.name as category_name FROM brands b LEFT JOIN product_categories c ON b.category_id = c.id WHERE b.status = ?'
+        : 'SELECT b.*, c.name as category_name FROM brands b LEFT JOIN product_categories c ON b.category_id = c.id WHERE 1=1';
     const params: any[] = activeOnly ? ['active'] : [];
     if (keyword) {
-      sql += ' AND name LIKE ?';
+      sql += ' AND b.name LIKE ?';
       params.push(`%${keyword}%`);
     }
-    sql += ' ORDER BY sort_order ASC';
+    if (categoryId) {
+      sql += ' AND b.category_id = ?';
+      params.push(categoryId);
+    }
+    sql += ' ORDER BY b.sort_order ASC';
     return db.prepare(sql).all(...params) as Brand[];
   },
 
-  findForSelect(): { id: string; name: string }[] {
-    return db.prepare('SELECT id, name FROM brands WHERE status = ? ORDER BY sort_order ASC').all('active') as any[];
+  findForSelect(categoryId?: string): { id: string; name: string; category_id?: string }[] {
+    let sql = 'SELECT id, name, category_id FROM brands WHERE status = ?';
+    const params: any[] = ['active'];
+    if (categoryId) {
+      sql += ' AND category_id = ?';
+      params.push(categoryId);
+    }
+    sql += ' ORDER BY sort_order ASC';
+    return db.prepare(sql).all(...params) as any[];
   },
 
   update(id: string, data: Partial<Brand>): Brand | undefined {

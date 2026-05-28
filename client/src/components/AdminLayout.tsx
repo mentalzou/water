@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, UserPlus, Truck, Package,
   ShoppingBag, ArrowRightLeft, MapPin, Settings,
-  Shield, UserCog, LogOut, Tag
+  Shield, UserCog, LogOut, Tag, FolderOpen, CreditCard
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
@@ -39,9 +39,11 @@ const allSidebarItems = [
   { icon: Users, label: '分销商管理', path: '/admin/distributors', permission: 'distributor:manage' },
   { icon: UserPlus, label: '派送员管理', path: '/admin/deliverymen', permission: 'deliveryman:manage' },
   { icon: MapPin, label: '区域管理', path: '/admin/areas', permission: 'area:manage' },
+  { icon: FolderOpen, label: '产品分类', path: '/admin/categories', permission: 'category:manage' },
   { icon: Tag, label: '品牌管理', path: '/admin/brands', permission: 'brand:manage' },
-  { icon: Package, label: '订单管理', path: '/admin/orders', permission: 'order:view' },
   { icon: ShoppingBag, label: '产品管理', path: '/admin/products', permission: 'product:manage' },
+  { icon: Package, label: '订单管理', path: '/admin/orders', permission: 'order:view' },
+  { icon: CreditCard, label: '充值套餐', path: '/admin/recharge-packages', permission: 'recharge:manage' },
   { icon: Settings, label: '系统配置', path: '/admin/config', permission: 'config:manage' },
   { icon: UserCog, label: '用户管理', path: '/admin/users', permission: 'user:view' },
   { icon: Shield, label: '角色管理', path: '/admin/roles', permission: 'role:view' },
