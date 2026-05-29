@@ -44,12 +44,6 @@ export default function OrderPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   useEffect(() => {
-    const token = localStorage.getItem('customer_token');
-    if (!token) {
-      navigate(`/login?from=${encodeURIComponent(window.location.pathname + window.location.search)}`, { replace: true });
-      return;
-    }
-
     loadProducts();
     loadCategories();
 
@@ -109,6 +103,13 @@ export default function OrderPage() {
 
   async function handleSubmit() {
     if (selectedItems.length === 0) return;
+
+    // 未登录时跳转登录页
+    const token = localStorage.getItem('customer_token');
+    if (!token) {
+      navigate(`/login?from=${encodeURIComponent(window.location.pathname + window.location.search)}`, { replace: true });
+      return;
+    }
 
     setSubmitting(true);
     try {
