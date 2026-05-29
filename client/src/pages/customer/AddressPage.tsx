@@ -44,10 +44,11 @@ export default function AddressPage() {
     setLoading(true);
     try {
       let res;
+      const payload = { ...form, is_default: form.is_default ? 1 : 0 };
       if (editing === 'new') {
-        res = await customerApi.addAddress(form);
+        res = await customerApi.addAddress(payload);
       } else {
-        res = await customerApi.updateAddress(editing!, form);
+        res = await customerApi.updateAddress(editing!, payload);
       }
       if ((res as any).code === 200) {
         loadAddresses();

@@ -3,14 +3,10 @@ import api from './client';
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
 
 /** 带认证的请求封装 */
-function authFetch(url: string, options?: RequestInit): Promise<any> {
+function authFetch(url: string, _options?: RequestInit): Promise<any> {
   const token = localStorage.getItem('deliveryman_token');
   return api.get(url.replace(API_BASE + '/', ''), {
-    ...(options || {}),
-    headers: {
-      ...options?.headers,
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` } as Record<string, string>,
   });
 }
 

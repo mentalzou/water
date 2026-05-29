@@ -40,7 +40,7 @@ export default function RechargePage() {
 
   async function loadData() {
     try {
-      const [packagesRes, activeRes, historyRes] = await Promise.all([
+      const [packagesRes, activeRes, historyRes]: any[] = await Promise.all([
         api.get('/customers/recharge/packages'),
         api.get('/customers/recharge/active'),
         api.get('/customers/recharge/my-recharges?page=1&pageSize=10'),
@@ -72,7 +72,7 @@ export default function RechargePage() {
 
     setSubmitting(true);
     try {
-      const res = await api.post('/customers/recharge', {
+      const res: any = await api.post('/customers/recharge', {
         package_id: selectedPackage,
       });
 
