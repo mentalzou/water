@@ -32,7 +32,7 @@ export default function RechargePackageManage() {
 
   async function loadPackages() {
     try {
-      const res: any = await api.get('/admin/recharge/packages');
+      const res = await api.get('/admin/recharge/packages') as any;
       if (res && res.code === 200) {
         setPackages(res.data?.data || res.data || []);
       }

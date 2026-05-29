@@ -40,21 +40,21 @@ export default function RechargePage() {
 
   async function loadData() {
     try {
-      const [packagesRes, activeRes, historyRes]: any[] = await Promise.all([
+      const [packagesRes, activeRes, historyRes] = await Promise.all([
         api.get('/customers/recharge/packages'),
         api.get('/customers/recharge/active'),
         api.get('/customers/recharge/my-recharges?page=1&pageSize=10'),
-      ]);
+      ]) as [any, any, any];
 
-      if (packagesRes.code === 200) {
+      if ((packagesRes as any).code === 200) {
         setPackages(packagesRes.data || []);
       }
 
-      if (activeRes.code === 200 && activeRes.data) {
+      if ((activeRes as any).code === 200 && activeRes.data) {
         setActiveRecharge(activeRes.data);
       }
 
-      if (historyRes.code === 200) {
+      if ((historyRes as any).code === 200) {
         setRechargeHistory(historyRes.data?.data || []);
       }
     } catch (error) {
@@ -72,9 +72,9 @@ export default function RechargePage() {
 
     setSubmitting(true);
     try {
-      const res: any = await api.post('/customers/recharge', {
+      const res = await api.post('/customers/recharge', {
         package_id: selectedPackage,
-      });
+      }) as any;
 
       if (res.code === 200) {
         alert('充值成功！');
