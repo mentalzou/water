@@ -6,7 +6,7 @@ import {
   Shield, UserCog, LogOut, Tag, FolderOpen, CreditCard
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = '/api';
 
 function getToken(): string {
   return localStorage.getItem('admin_token') || '';

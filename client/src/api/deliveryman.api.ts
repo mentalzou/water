@@ -1,6 +1,6 @@
 import api from './client';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = '/api';
 
 /** 带认证的请求封装 */
 function authFetch(url: string, _options?: RequestInit): Promise<any> {

@@ -26,7 +26,7 @@ export default function DistributorDashboard() {
       // 使用 token 认证的 API
       const token = localStorage.getItem('distributor_token') || '';
       const res: any = await fetch(
-        `${import.meta.env.VITE_API_BASE || 'http://localhost:3001/api'}/distributors/${distributorId}/commission/summary`,
+        `/api/distributors/${distributorId}/commission/summary`,
         { headers: { Authorization: `Bearer ${token}` } },
       ).then(r => r.json());
       if (res.code === 200) setSummary(res.data);

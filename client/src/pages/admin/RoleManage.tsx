@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Shield, Plus, Edit3, Trash2, Search, Key, Save, X, AlertTriangle, CheckCircle } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = '/api';
 
 function getToken() {
   return localStorage.getItem('admin_token') || '';

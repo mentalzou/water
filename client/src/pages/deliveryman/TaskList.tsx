@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Truck, Package, CheckCircle2, Clock, MapPin, Phone } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = '/api';
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   assigned: { label: '待接单', color: 'bg-water/10 text-water', icon: Clock },

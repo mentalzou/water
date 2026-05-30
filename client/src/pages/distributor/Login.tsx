@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Droplets, ArrowRight, Eye, EyeOff, Phone, UserCheck } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = '/api';
 
 export default function DistributorLogin() {
   const navigate = useNavigate();

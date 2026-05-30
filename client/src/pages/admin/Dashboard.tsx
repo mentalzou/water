@@ -6,7 +6,7 @@ import {
   Tooltip, ResponsiveContainer, LineChart, Line
 } from 'recharts';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = '/api';
 
 function getToken() {
   return localStorage.getItem('admin_token') || '';
