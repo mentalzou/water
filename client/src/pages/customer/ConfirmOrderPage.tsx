@@ -9,7 +9,7 @@ interface Product {
   name: string;
   price: number;
   unit?: string;
-  image_url?: string;
+  image?: string;
 }
 
 interface OrderItem {
@@ -350,9 +350,9 @@ export default function ConfirmOrderPage() {
               {orderData.items.map((item) => (
                   <div key={item.product.id} className="flex items-center gap-3">
                     <div className="w-16 h-16 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                      {item.product.image_url ? (
+                      {item.product.image ? (
                           <img
-                              src={item.product.image_url}
+                              src={item.product.image}
                               alt={item.product.name}
                               className="w-full h-full object-cover"
                           />

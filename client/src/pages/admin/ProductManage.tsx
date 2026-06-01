@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, X, ShoppingBag, AlertCircle, RotateCcw } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit2, Trash2, X, ShoppingBag, AlertCircle, RotateCcw, Upload, ImageIcon } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -25,6 +25,7 @@ interface Product {
   description: string;
   price: number;
   unit: string;
+  image?: string;
   status: string;
   sort_order: number;
   brand_id?: string;
@@ -40,12 +41,14 @@ export default function ProductManage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', price: '', unit: '瓶', category_id: '', brand_id: '' });
+  const [form, setForm] = useState({ name: '', description: '', price: '', unit: '瓶', category_id: '', brand_id: '', image: '' });
   const [editId, setEditId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [keyword, setKeyword] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadCategories(); loadBrands(); loadProducts(); }, []);
   useEffect(() => { loadProducts(); }, [categoryFilter, brandFilter, keyword]);
@@ -114,12 +117,57 @@ export default function ProductManage() {
     }
   }
 
+  async function handleImageUpload(file: File) {
+    setUploading(true);
+    try {
+      const token = getToken();
+      const fd = new FormData();
+      fd.append('file', file);
+      const res: any = await fetch(`${API_BASE}/admin/products/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      }).then(r => r.text()).then(text => {
+        try { return JSON.parse(text); } catch { return null; }
+      });
+      if (res && res.code === 200) {
+        setForm(prev => ({ ...prev, image: res.data.url }));
+      } else {
+        alert(res?.message || '图片上传失败');
+      }
+    } catch (e: any) {
+      alert(e.message || '图片上传失败');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!allowedExts.includes(ext)) {
+      alert(`仅支持图片格式：${allowedExts.join(', ')}`);
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      alert('图片大小不能超过 50MB');
+      return;
+    }
+
+    handleImageUpload(file);
+    // 重置 input，允许重复选择同一文件
+    e.target.value = '';
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     try {
       const token = getToken();
-      const data = {
+      const data: any = {
         name: form.name,
         description: form.description,
         price: parseFloat(form.price),
@@ -127,6 +175,7 @@ export default function ProductManage() {
         category_id: form.category_id || undefined,
         brand_id: form.brand_id || undefined
       };
+      if (form.image) data.image = form.image;
       const url = editId ? `${API_BASE}/admin/products/${editId}` : `${API_BASE}/admin/products`;
       const method = editId ? 'PUT' : 'POST';
       const res: any = await fetch(url, {
@@ -172,7 +221,7 @@ export default function ProductManage() {
   }
 
   function openCreate() {
-    setForm({ name: '', description: '', price: '', unit: '瓶', category_id: '', brand_id: '' });
+    setForm({ name: '', description: '', price: '', unit: '瓶', category_id: '', brand_id: '', image: '' });
     setEditId(null);
     setShowForm(true);
   }
@@ -185,7 +234,8 @@ export default function ProductManage() {
       price: String(p.price),
       unit: p.unit,
       category_id: p.category_id || '',
-      brand_id: p.brand_id || ''
+      brand_id: p.brand_id || '',
+      image: p.image || ''
     });
     setShowForm(true);
   }
@@ -250,8 +300,12 @@ export default function ProductManage() {
                 </button>
               </div>
 
-              <div className={`w-full aspect-[4/3] rounded-xl mb-4 flex items-center justify-center ${['from-cyan-400/10 to-blue-500/10','from-emerald-400/10 to-teal-500/10','from-purple-400/10 to-pink-500/10'][idx % 3]} bg-gradient-to-br`}>
-                <span className="text-4xl">💧</span>
+              <div className={`w-full aspect-[4/3] rounded-xl mb-4 flex items-center justify-center overflow-hidden ${['from-cyan-400/10 to-blue-500/10','from-emerald-400/10 to-teal-500/10','from-purple-400/10 to-pink-500/10'][idx % 3]} bg-gradient-to-br`}>
+                {p.image ? (
+                  <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="w-10 h-10 text-gray-300" />
+                )}
               </div>
 
               <h3 className="font-semibold text-gray-800">{p.name}</h3>
@@ -275,25 +329,25 @@ export default function ProductManage() {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl my-auto" onClick={e => e.stopPropagation()} style={{ maxHeight: '92vh', overflowY: 'auto' }}>
+            <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold text-gray-800">{editId ? '编辑产品' : '添加产品'}</h2>
               <button onClick={() => setShowForm(false)} className="p-1 rounded-lg hover:bg-gray-100"><X className="w-5 h-5 text-gray-500"/></button>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">产品分类 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">产品分类 *</label>
                 <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value, brand_id: '' })} required
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30">
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm">
                   <option value="">请选择分类</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">品牌</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">品牌</label>
                 <select value={form.brand_id} onChange={e => setForm({ ...form, brand_id: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30">
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm">
                   <option value="">不选择品牌</option>
                   {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
@@ -302,38 +356,70 @@ export default function ProductManage() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">产品名称 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">产品名称 *</label>
                 <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
-                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30"
+                       className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"
                        placeholder="如：纯天然矿泉水"/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">描述（可选）</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">描述（可选）</label>
                 <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 resize-none"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 resize-none text-sm"
                           placeholder="产品描述..."/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">产品图片</label>
+                <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.gif,.webp,.svg" onChange={handleFileChange}
+                       className="hidden" />
+                {form.image ? (
+                  <div className="relative group">
+                    <img src={form.image} alt="产品图片预览" className="w-full h-28 object-cover rounded-xl border border-gray-200" />
+                    <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button type="button" onClick={() => fileInputRef.current?.click()}
+                              className="px-2 py-1 bg-white text-gray-700 rounded-lg text-xs hover:bg-gray-100">
+                        <Upload className="w-3 h-3 inline mr-1" />更换
+                      </button>
+                      <button type="button" onClick={() => setForm({ ...form, image: '' })}
+                              className="px-2 py-1 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600">
+                        <Trash2 className="w-3 h-3 inline mr-1" />删除
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                          className="w-full h-20 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-water hover:text-water transition-colors disabled:opacity-50">
+                    {uploading ? (
+                      <span className="text-sm">上传中...</span>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5" />
+                        <span className="text-xs">点击上传产品图片</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">价格 (¥)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">价格 (¥)</label>
                   <input type="number" step="0.01" min="0" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required
-                         className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30"
+                         className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"
                          placeholder="0.00"/>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">单位</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">单位</label>
                   <input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })}
-                         className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30"
+                         className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"
                          placeholder="瓶/桶"/>
                 </div>
               </div>
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setShowForm(false)}
-                        className="flex-1 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">
+                        className="flex-1 py-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 text-sm">
                   取消
                 </button>
                 <button type="submit" disabled={submitting}
-                        className="flex-1 py-2.5 bg-water text-white rounded-xl hover:bg-water-dark shadow-md disabled:opacity-50">
+                        className="flex-1 py-2.5 bg-water text-white rounded-xl hover:bg-water-dark shadow-md disabled:opacity-50 text-sm">
                   {submitting ? '提交中...' : (editId ? '保存修改' : '添加产品')}
                 </button>
               </div>

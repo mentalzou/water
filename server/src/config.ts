@@ -12,6 +12,8 @@ export default {
     baseDir: process.env.UPLOAD_DIR || path.join(__dirname, '../uploads'),
     /** 广告栏图片/视频子目录 */
     bannerDir: 'banners',
+    /** 产品图片子目录 */
+    productDir: 'products',
     /** 最大文件大小 */
     maxSize: parseInt(process.env.UPLOAD_MAX_SIZE || '52428800', 10), // 50MB
     /** 允许的图片格式 */

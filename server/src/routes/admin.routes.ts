@@ -75,6 +75,7 @@ router.get('/products', adminController.listProducts);
 router.post('/products', adminController.createProduct);
 router.put('/products/:id', adminController.updateProduct);
 router.delete('/products/:id', adminController.deleteProduct);
+router.post('/products/upload', adminController.productUpload.single('file'), adminController.uploadProductImage);
 
 // Orders management
 router.get('/orders', adminController.listAllOrders);

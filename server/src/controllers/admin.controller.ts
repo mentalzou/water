@@ -13,6 +13,11 @@ import { categoryModel } from '../models/category.model';
 import { userRechargeModel } from '../models/userRecharge.model';
 import { balanceTransactionModel } from '../models/balanceTransaction.model';
 import { getDb } from '../utils/db';
+import config from '../config';
+import multer from 'multer';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { changePoints, getUserPointsRecords } from '../services/points.service';
@@ -298,16 +303,56 @@ export function listBrandsForSelect(_req: Request, res: Response): void {
   success(res, brandModel.findForSelect());
 }
 
+// ============ 产品图片上传 ============
+const productUploadDir = path.join(config.upload.baseDir, config.upload.productDir);
+if (!fs.existsSync(productUploadDir)) {
+  fs.mkdirSync(productUploadDir, { recursive: true });
+}
+
+const productStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, productUploadDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${uuidv4()}${ext}`);
+  },
+});
+
+const productFileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (config.upload.imageExts.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`仅支持图片格式：${config.upload.imageExts.join(', ')}`));
+  }
+};
+
+export const productUpload = multer({
+  storage: productStorage,
+  fileFilter: productFileFilter,
+  limits: { fileSize: config.upload.maxSize },
+});
+
+/** 上传产品图片 */
+export function uploadProductImage(req: Request, res: Response): void {
+  if (!req.file) {
+    error(res, '请选择图片文件');
+    return;
+  }
+  const url = `/uploads/${config.upload.productDir}/${req.file.filename}`;
+  success(res, { url }, '上传成功');
+}
+
 // ============ Products ============
 export function createProduct(req: Request, res: Response): void {
   const name = str(req.body.name);
   const price = Number(req.body.price);
   const unit = str(req.body.unit);
   const description = str(req.body.description);
+  const image = str(req.body.image);
   const brandId = req.body.brand_id ? str(req.body.brand_id) : undefined;
   const categoryId = req.body.category_id ? str(req.body.category_id) : undefined;
   if (!name || isNaN(price)) { error(res, '请提供产品名称和价格'); return; }
-  const result = productModel.create({ name, description, price, unit, brand_id: brandId, category_id: categoryId });
+  const result = productModel.create({ name, description, price, unit, image, brand_id: brandId, category_id: categoryId });
   success(res, result, '产品创建成功');
 }
 

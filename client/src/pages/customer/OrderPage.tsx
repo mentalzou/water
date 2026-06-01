@@ -24,7 +24,7 @@ interface Product {
   brand_name?: string;
   category_id?: string;
   category_name?: string;
-  image_url?: string;
+  image?: string;
   sales_count?: number;
 }
 
@@ -321,8 +321,8 @@ export default function OrderPage() {
                     <div key={product.id} className="bg-white rounded-lg p-3 flex gap-3">
                       {/* 产品图片 */}
                       <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                        {product.image_url ? (
-                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover"/>
+                        {product.image ? (
+                            <img src={product.image} alt={product.name} className="w-full h-full object-cover"/>
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                               <ShoppingCart className="w-8 h-8"/>
