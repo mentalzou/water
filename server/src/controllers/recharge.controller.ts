@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { success, error, paginated } from '../utils/response';
 import { rechargePackageModel } from '../models/rechargePackage.model';
 import { userRechargeModel } from '../models/userRecharge.model';
+import { balanceTransactionModel } from '../models/balanceTransaction.model';
 import type { RechargePackage } from '../types';
 
 /** 获取所有充值套餐 */
@@ -13,10 +14,10 @@ export function getPackages(req: Request, res: Response): void {
 
 /** 创建充值套餐（管理员） */
 export function createPackage(req: Request, res: Response): void {
-  const { name, amount, discount_rate, description, sort_order } = req.body;
+  const { name, amount, bonus_amount, description, sort_order } = req.body;
 
-  if (!name || !amount || !discount_rate) {
-    error(res, '请提供套餐名称、金额和折扣率');
+  if (!name || !amount) {
+    error(res, '请提供套餐名称和金额');
     return;
   }
 
@@ -24,7 +25,8 @@ export function createPackage(req: Request, res: Response): void {
     const pkg = rechargePackageModel.create({
       name,
       amount: parseFloat(amount),
-      discount_rate: parseFloat(discount_rate),
+      discount_rate: 0,
+      bonus_amount: parseFloat(bonus_amount) || 0,
       description,
       sort_order: parseInt(sort_order) || 0,
     });
@@ -66,7 +68,7 @@ export function deletePackage(req: Request, res: Response): void {
   success(res, null, '套餐删除成功');
 }
 
-/** 用户充值 */
+/** 用户充值 - 创建待支付充值记录 */
 export function recharge(req: Request, res: Response): void {
   const userId = (req as any).user?.userId;
   const { package_id } = req.body;
@@ -93,27 +95,88 @@ export function recharge(req: Request, res: Response): void {
   }
 
   try {
-    // 计算实际支付金额和余额
-    const paidAmount = pkg.amount; // 实际支付金额
-    const remainingBalance = pkg.amount; // 初始余额等于充值金额
+    const paidAmount = pkg.amount;
+    const remainingBalance = pkg.amount;
+    const bonusAmount = pkg.bonus_amount || 0;
+    const bonusBalance = bonusAmount;
+    const orderNo = `RECHARGE_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     const recharge = userRechargeModel.create({
       user_id: userId,
       package_id: pkg.id,
       amount: pkg.amount,
       discount_rate: pkg.discount_rate,
+      bonus_amount: bonusAmount,
       paid_amount: paidAmount,
       remaining_balance: remainingBalance,
-      transaction_id: `RECHARGE_${Date.now()}`, // 模拟交易号
+      bonus_balance: bonusBalance,
+      transaction_id: orderNo,
     });
 
-    // 在开发模式下直接标记为已支付
-    userRechargeModel.markPaid(recharge.id, recharge.transaction_id!);
-
-    success(res, recharge, '充值成功');
+    success(res, recharge, '充值订单创建成功，请完成支付');
   } catch (err: any) {
     error(res, err.message || '充值失败');
   }
+}
+
+/** 模拟支付充值（开发环境降级方案） */
+export function payForRecharge(req: Request, res: Response): void {
+  const { id } = req.params;
+
+  const recharge = userRechargeModel.findById(id);
+  if (!recharge) {
+    error(res, '充值记录不存在', 404);
+    return;
+  }
+
+  if (recharge.status === 'active') {
+    error(res, '该充值已支付', 400);
+    return;
+  }
+
+  // 幂等性检查：防止重复入账
+  if (balanceTransactionModel.hasRechargeTransaction(id)) {
+    error(res, '该充值已入账，请勿重复操作', 400);
+    return;
+  }
+
+  const transactionId = recharge.transaction_id || `MOCK_TXN_${Date.now()}`;
+  const updated = userRechargeModel.markPaid(id, transactionId);
+  if (!updated) {
+    error(res, '支付失败', 500);
+    return;
+  }
+
+  // 记录流水：本金充值
+  balanceTransactionModel.create({
+    user_id: recharge.user_id,
+    recharge_id: id,
+    tx_type: 'recharge_principal',
+    amount: recharge.amount,
+    principal_after: recharge.remaining_balance,
+    bonus_after: recharge.bonus_balance,
+    description: `充值本金到账 - ¥${recharge.amount.toFixed(2)}`,
+    operator_ip: (req as any).ip || '',
+  });
+
+  // 记录流水：赠送金充值
+  if (recharge.bonus_amount > 0) {
+    balanceTransactionModel.create({
+      user_id: recharge.user_id,
+      recharge_id: id,
+      tx_type: 'recharge_bonus',
+      amount: recharge.bonus_amount,
+      principal_after: recharge.remaining_balance,
+      bonus_after: recharge.bonus_balance + recharge.bonus_amount,
+      description: `充值赠送金到账 - ¥${recharge.bonus_amount.toFixed(2)}`,
+      operator_ip: (req as any).ip || '',
+    });
+  }
+
+  success(res, {
+    ...updated,
+    mockMode: true,
+  }, '支付成功（模拟模式）');
 }
 
 /** 获取用户充值记录 */

@@ -6,13 +6,22 @@ import {
     recharge,
     getMyRecharges,
     getActiveRecharge,
+    payForRecharge,
 } from '../controllers/recharge.controller';
+import * as paymentController from '../controllers/payment.controller';
+import { getActiveBanners } from '../controllers/adBanner.controller';
 
 const router = Router();
 
 // Public Auth (no authentication required)
 router.post('/customers/login', customerController.customerLogin);
 router.post('/customers/register', customerController.customerRegister);
+
+// WeChat OAuth: exchange code for openId
+router.post('/wechat/openid', customerController.getWechatOpenId);
+
+// Public: Banner ads
+router.get('/banners', getActiveBanners);
 
 // Public: Get available products and categories
 router.get('/products', customerController.getProducts);
@@ -22,25 +31,31 @@ router.get('/categories', (_req, res) => {
     success(res, categoryModel.findAll(true));
 });
 
-// Create order
+// Recharge - public (get packages list)
+router.get('/customers/recharge/packages', getPackages);
+
+// Payment callback (no auth needed)
+router.post('/payment/notify', paymentController.paymentNotify);
+
+// Customer Profile (optional auth - works with or without token)
+router.use(optionalAuth);
+
+// Create order (supports both online and balance payment)
 router.post('/orders', customerController.createOrder);
 router.get('/orders/:id', customerController.getOrderById);
 router.get('/my-orders', customerController.getMyOrders);
 
-// Payment (mock)
+// Payment
 router.post('/orders/:id/pay', customerController.payForOrder);
-
-// Recharge - public (get packages list)
-router.get('/customers/recharge/packages', getPackages);
-
-// Customer Profile (optional auth - works with or without token)
-router.use(optionalAuth);
+router.post('/payment/create', paymentController.createPayment);
+router.post('/payment/recharge/create', paymentController.createRechargePayment);
 
 // Password change
 router.put('/customers/password', customerController.changePassword);
 
 // Recharge - protected (need login)
 router.post('/customers/recharge', recharge);
+router.post('/customers/recharge/:id/pay', payForRecharge);
 router.get('/customers/recharge/my-recharges', getMyRecharges);
 router.get('/customers/recharge/active', getActiveRecharge);
 

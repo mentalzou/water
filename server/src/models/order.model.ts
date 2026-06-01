@@ -21,6 +21,9 @@ export const orderModel = {
     total_amount: number;
     distributor_id?: string;
     distributor_commission?: number;
+    pay_method?: string;
+    from_balance?: number;
+    from_bonus?: number;
     items: Array<{
       product_id: string;
       product_name: string;
@@ -34,13 +37,16 @@ export const orderModel = {
     
     // 创建订单主表记录（不含商品信息）
     db.prepare(
-      `INSERT INTO orders (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, distributor_commission)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO orders (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, distributor_commission, pay_method, from_balance, from_bonus)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id, order_no,
       data.customer_phone, data.customer_name, data.address,
       data.total_amount,
-      data.distributor_id || null, data.distributor_commission || 0
+      data.distributor_id || null, data.distributor_commission || 0,
+      data.pay_method || 'online',
+      data.from_balance || 0,
+      data.from_bonus || 0
     );
 
     // 创建订单商品明细

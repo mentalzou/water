@@ -6,6 +6,15 @@ const adminApi = axios.create({
   timeout: 15000,
 });
 
+// 自动附加管理员 Token
+adminApi.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
 adminApi.interceptors.response.use(
   (response: any) => response.data,
   (error: any) => {
@@ -83,3 +92,11 @@ export const updateRechargePackageStatus = (id: string, status: string) =>
     adminApi.put(`/recharge/packages/${id}/status`, { status });
 export const deleteRechargePackage = (id: string) =>
     adminApi.delete(`/recharge/packages/${id}`);
+
+// Recharge Orders & Reports
+export const getRechargeOrders = (params?: { page?: number; pageSize?: number; status?: string }) =>
+    adminApi.get('/recharge/orders', { params });
+export const getRechargeStats = (params?: { start_date?: string; end_date?: string }) =>
+    adminApi.get('/recharge/stats', { params });
+export const getBalanceTransactions = (params: { user_id: string; page?: number; pageSize?: number }) =>
+    adminApi.get('/recharge/transactions', { params });

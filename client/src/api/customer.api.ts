@@ -30,6 +30,9 @@ export const customerApi = {
   // 充值相关
   getRechargePackages: () => api.get('/customers/recharge/packages'),
   recharge: (packageId: string) => api.post('/customers/recharge', { package_id: packageId }),
+  payForRecharge: (rechargeId: string) => api.post(`/customers/recharge/${rechargeId}/pay`),
+  createRechargePayment: (data: { rechargeId: string; openId: string }) =>
+      api.post('/payment/recharge/create', data),
   getMyRecharges: (page = 1, pageSize = 20) =>
       api.get(`/customers/recharge/my-recharges?page=${page}&pageSize=${pageSize}`),
   getActiveRecharge: () => api.get('/customers/recharge/active'),
@@ -47,6 +50,7 @@ export const customerApi = {
     product_id?: string;
     quantity?: number;
     distributor_code?: string;
+    pay_method?: 'online' | 'balance';
   }) => api.post('/orders', data),
 
   getOrderById: (id: string) => api.get(`/orders/${id}`),
@@ -59,4 +63,12 @@ export const customerApi = {
     api.get(`/my-orders?distributor_id=${distributorId}&page=${page}&pageSize=${pageSize}`),
 
   payForOrder: (orderId: string) => api.post(`/orders/${orderId}/pay`),
+
+  // 微信支付
+  createPayment: (data: { orderId: string; openId: string }) =>
+      api.post('/payment/create', data),
+
+  // 微信 OAuth - code 换 openId
+  getWechatOpenId: (code: string, type: string = 'oa') =>
+      api.post('/wechat/openid', { code, type }),
 };

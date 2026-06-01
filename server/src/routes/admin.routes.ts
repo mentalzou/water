@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
 import * as adminController from '../controllers/admin.controller';
+import * as adBannerController from '../controllers/adBanner.controller';
 
 const router = Router();
 
@@ -88,5 +89,18 @@ router.post('/recharge/packages', adminController.createRechargePackage);
 router.put('/recharge/packages/:id', adminController.updateRechargePackage);
 router.put('/recharge/packages/:id/status', adminController.updateRechargePackageStatus);
 router.delete('/recharge/packages/:id', adminController.deleteRechargePackage);
+
+// Recharge Orders & Reports
+router.get('/recharge/orders', adminController.listRechargeOrders);
+router.get('/recharge/stats', adminController.getRechargeStats);
+router.get('/recharge/transactions', adminController.listBalanceTransactions);
+
+// Ad Banners Management
+router.get('/banners', adBannerController.listBanners);
+router.post('/banners/upload', adBannerController.upload.single('file'), adBannerController.uploadFile);
+router.post('/banners', adBannerController.createBanner);
+router.put('/banners/:id', adBannerController.updateBanner);
+router.delete('/banners/:id', adBannerController.deleteBanner);
+
 
 export default router;

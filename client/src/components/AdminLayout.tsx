@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, UserPlus, Truck, Package,
   ShoppingBag, ArrowRightLeft, MapPin, Settings,
-  Shield, UserCog, LogOut, Tag, FolderOpen, CreditCard
+  Shield, UserCog, LogOut, Tag, FolderOpen, CreditCard, Image
 } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -44,6 +44,7 @@ const allSidebarItems = [
   { icon: ShoppingBag, label: '产品管理', path: '/admin/products', permission: 'product:manage' },
   { icon: Package, label: '订单管理', path: '/admin/orders', permission: 'order:view' },
   { icon: CreditCard, label: '充值套餐', path: '/admin/recharge-packages', permission: 'recharge:manage' },
+  { icon: Image, label: '广告栏管理', path: '/admin/ad-banners', permission: 'banner:manage' },
   { icon: Settings, label: '系统配置', path: '/admin/config', permission: 'config:manage' },
   { icon: UserCog, label: '用户管理', path: '/admin/users', permission: 'user:view' },
   { icon: Shield, label: '角色管理', path: '/admin/roles', permission: 'role:view' },

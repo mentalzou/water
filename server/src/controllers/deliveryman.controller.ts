@@ -77,7 +77,7 @@ export function getTaskList(req: Request, res: Response): void {
   const id = str(req.params.id);
   const status = str(req.query.status) || undefined;
 
-  let sql = "SELECT o.*, p.name as product_name FROM orders o LEFT JOIN products p ON o.product_id = p.id WHERE o.deliveryman_id = ?";
+  let sql = "SELECT o.*, (SELECT GROUP_CONCAT(oi.product_name, ', ') FROM order_items oi WHERE oi.order_id = o.id) as product_name FROM orders o WHERE o.deliveryman_id = ?";
   const params: any[] = [id];
   
   if (status) {

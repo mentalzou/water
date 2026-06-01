@@ -16,11 +16,22 @@ const MENU_ITEMS = [
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>({});
+  const isLoggedIn = !!localStorage.getItem('customer_token');
 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem('customer_user') || '{}');
     setUser(u);
   }, []);
+
+  function handleMenuClick(path: string) {
+    // 未登录时跳转登录页
+    const token = localStorage.getItem('customer_token');
+    if (!token) {
+      navigate(`/login?from=${encodeURIComponent(path)}`, { replace: true });
+      return;
+    }
+    navigate(path);
+  }
 
   function handleLogout() {
     if (!confirm('确定要退出当前账户吗？')) return;
@@ -45,8 +56,22 @@ export default function ProfilePage() {
               <User className="w-7 h-7 text-white" />
             </div>
             <div>
-              <p className="text-white font-semibold text-lg">{user.name || '用户'}</p>
-              <p className="text-white/70 text-sm">{user.phone || ''}</p>
+              {isLoggedIn ? (
+                <>
+                  <p className="text-white font-semibold text-lg">{user.name || '用户'}</p>
+                  <p className="text-white/70 text-sm">{user.phone || ''}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-white font-semibold text-lg">未登录</p>
+                  <button
+                    onClick={() => navigate(`/login?from=${encodeURIComponent('/profile')}`)}
+                    className="text-white/80 text-sm underline hover:text-white"
+                  >
+                    点击登录/注册
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -55,7 +80,7 @@ export default function ProfilePage() {
           {/* 功能入口卡片 */}
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4">
             {MENU_ITEMS.map(item => (
-                <button key={item.key} onClick={() => navigate(item.path)}
+                <button key={item.key} onClick={() => handleMenuClick(item.path)}
                         className="w-full flex items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-gray-50 active:bg-gray-100"
                 >
                   <div className="w-10 h-10 rounded-xl bg-water/10 text-water flex items-center justify-center shrink-0">
@@ -70,17 +95,29 @@ export default function ProfilePage() {
             ))}
           </div>
 
-          {/* 退出登录 */}
+          {/* 退出登录 / 登录注册 */}
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <button onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-red-50 active:bg-red-50"
-            >
-              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-400 flex items-center justify-center shrink-0">
-                <LogOut className="w-5 h-5" />
-              </div>
-              <span className="flex-1 text-sm font-medium text-red-500">退出登录</span>
-              <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
-            </button>
+            {isLoggedIn ? (
+              <button onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-red-50 active:bg-red-50"
+              >
+                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-400 flex items-center justify-center shrink-0">
+                  <LogOut className="w-5 h-5" />
+                </div>
+                <span className="flex-1 text-sm font-medium text-red-500">退出登录</span>
+                <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+              </button>
+            ) : (
+              <button onClick={() => navigate(`/login?from=${encodeURIComponent('/profile')}`)}
+                      className="w-full flex items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-water/5 active:bg-water/10"
+              >
+                <div className="w-10 h-10 rounded-xl bg-water/10 text-water flex items-center justify-center shrink-0">
+                  <User className="w-5 h-5" />
+                </div>
+                <span className="flex-1 text-sm font-medium text-water">登录 / 注册</span>
+                <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+              </button>
+            )}
           </div>
         </main>
 

@@ -1,19 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Package, Clock, Truck,
-  CheckCircle2, Send, ArrowLeft
+  Package, ArrowLeft
 } from 'lucide-react';
 import { customerApi } from '../../api/customer.api';
 import BottomNav from '../../components/BottomNav';
 
 const statusTabs = [
   { key: 'all', label: '全部' },
-  { key: 'pending', label: '待付款', icon: Clock },
-  { key: 'paid', label: '待发货', icon: Package },
-  { key: 'assigned', label: '待配送', icon: Send },
-  { key: 'delivering', label: '待收货', icon: Truck },
-  { key: 'completed', label: '已完成', icon: CheckCircle2 },
+  { key: 'pending', label: '待付款' },
+  { key: 'paid', label: '待发货' },
+  { key: 'assigned', label: '待配送' },
+  { key: 'delivering', label: '待收货' },
+  { key: 'completed', label: '已完成' },
 ];
 
 const statusMap: Record<string, { label: string; color: string }> = {
@@ -60,18 +59,12 @@ export default function OrdersPage() {
 
         <main className="px-4 py-4 pb-8">
           {/* 状态筛选 */}
-          <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide mb-4">
+          <div className="grid grid-cols-6 gap-1 mb-4">
             {statusTabs.map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                        className={`flex items-center gap-1 px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeTab === tab.key ? 'bg-water text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
+                        className={`text-center py-1.5 rounded-full text-[11px] font-medium transition-all ${activeTab === tab.key ? 'bg-water text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
                 >
-                  {tab.icon && <tab.icon className="w-3 h-3" />}
                   {tab.label}
-                  {tab.key !== 'all' && (
-                      <span className="ml-0.5 text-[10px] opacity-70">
-                  ({orders.filter(o => o.status === tab.key).length})
-                </span>
-                  )}
                 </button>
             ))}
           </div>

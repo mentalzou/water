@@ -110,6 +110,9 @@ export interface Order {
   deliveryman_id?: string;
   status: 'pending' | 'paid' | 'assigned' | 'delivering' | 'completed' | 'cancelled';
   pay_status: 'unpaid' | 'paid' | 'refunded';
+  pay_method: 'online' | 'balance' | 'mixed';
+  from_balance: number;
+  from_bonus: number;
   transaction_id?: string;
   remark?: string;
   created_at: string;
@@ -159,6 +162,7 @@ export interface RechargePackage {
   name: string;
   amount: number;
   discount_rate: number;
+  bonus_amount: number;
   description?: string;
   status: 'active' | 'inactive';
   sort_order?: number;
@@ -171,14 +175,30 @@ export interface UserRecharge {
   package_id: string;
   amount: number;
   discount_rate: number;
+  bonus_amount: number;
   paid_amount: number;
   remaining_balance: number;
+  bonus_balance: number;
   status: 'active' | 'expired' | 'refunded';
   transaction_id?: string;
   remark?: string;
   created_at?: string;
   paid_at?: string;
   package?: RechargePackage;
+}
+
+export interface BalanceTransaction {
+  id: string;
+  user_id: string;
+  recharge_id?: string;
+  order_id?: string;
+  tx_type: 'recharge_principal' | 'recharge_bonus' | 'consume_bonus' | 'consume_principal' | 'refund' | 'adjust' | 'expire';
+  amount: number;
+  principal_after: number;
+  bonus_after: number;
+  description: string;
+  operator_ip?: string;
+  created_at: string;
 }
 
 export interface ApiResponse<T = any> {
@@ -200,3 +220,17 @@ export type JwtPayload = {
   userId: string;
   role: User['role'];
 };
+
+export interface AdBanner {
+  id: string;
+  title: string;
+  subtitle: string;
+  type: 'image' | 'video';
+  src: string;
+  link_url: string;
+  bg_color: string;
+  sort_order: number;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}

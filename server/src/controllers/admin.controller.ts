@@ -10,6 +10,8 @@ import { userModel } from '../models/user.model';
 import { roleModel } from '../models/role.model';
 import { brandModel } from '../models/brand.model';
 import { categoryModel } from '../models/category.model';
+import { userRechargeModel } from '../models/userRecharge.model';
+import { balanceTransactionModel } from '../models/balanceTransaction.model';
 import { getDb } from '../utils/db';
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
@@ -39,8 +41,9 @@ export function getDashboard(_req: Request, res: Response): void {
 
   // Recent orders
   const recentOrders = db.prepare(
-      `SELECT o.order_no, o.customer_name, o.customer_phone, o.total_amount, o.status, p.name as product_name
-       FROM orders o LEFT JOIN products p ON o.product_id = p.id
+      `SELECT o.order_no, o.customer_name, o.customer_phone, o.total_amount, o.status,
+              (SELECT GROUP_CONCAT(oi.product_name, ', ') FROM order_items oi WHERE oi.order_id = o.id) as product_name
+       FROM orders o
        ORDER BY o.created_at DESC LIMIT 10`
   ).all();
 
@@ -684,10 +687,10 @@ export function listRechargePackages(_req: Request, res: Response): void {
 }
 
 export function createRechargePackage(req: Request, res: Response): void {
-  const { name, amount, discount_rate, description, sort_order } = req.body;
+  const { name, amount, bonus_amount, description, sort_order } = req.body;
 
-  if (!name || !amount || !discount_rate) {
-    error(res, '请提供套餐名称、金额和折扣率');
+  if (!name || !amount) {
+    error(res, '请提供套餐名称和金额');
     return;
   }
 
@@ -695,8 +698,8 @@ export function createRechargePackage(req: Request, res: Response): void {
     const id = uuidv4();
     const db = getDb();
     db.prepare(
-        'INSERT INTO recharge_packages (id, name, amount, discount_rate, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(id, name, parseFloat(amount), parseFloat(discount_rate), description || '', parseInt(sort_order) || 0);
+        'INSERT INTO recharge_packages (id, name, amount, discount_rate, bonus_amount, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, name, parseFloat(amount), 0, parseFloat(bonus_amount) || 0, description || '', parseInt(sort_order) || 0);
 
     const pkg = db.prepare('SELECT * FROM recharge_packages WHERE id = ?').get(id);
     success(res, pkg, '充值套餐创建成功');
@@ -707,7 +710,7 @@ export function createRechargePackage(req: Request, res: Response): void {
 
 export function updateRechargePackage(req: Request, res: Response): void {
   const { id } = req.params;
-  const { name, amount, discount_rate, description, sort_order } = req.body;
+  const { name, amount, bonus_amount, description, sort_order } = req.body;
 
   try {
     const db = getDb();
@@ -722,9 +725,9 @@ export function updateRechargePackage(req: Request, res: Response): void {
       updates.push('amount = ?');
       values.push(parseFloat(amount));
     }
-    if (discount_rate !== undefined) {
-      updates.push('discount_rate = ?');
-      values.push(parseFloat(discount_rate));
+    if (bonus_amount !== undefined) {
+      updates.push('bonus_amount = ?');
+      values.push(parseFloat(bonus_amount));
     }
     if (description !== undefined) {
       updates.push('description = ?');
@@ -791,4 +794,52 @@ export function deleteRechargePackage(req: Request, res: Response): void {
   } catch (err: any) {
     error(res, err.message || '删除失败');
   }
+}
+
+// ============ 充值订单明细查询 ============
+export function listRechargeOrders(req: Request, res: Response): void {
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.pageSize as string) || 20;
+  const status = req.query.status as string || '';
+
+  const db = getDb();
+  let sql = 'SELECT ur.*, u.name as user_name, u.phone as user_phone, rp.name as package_name FROM user_recharges ur LEFT JOIN users u ON ur.user_id = u.id LEFT JOIN recharge_packages rp ON ur.package_id = rp.id WHERE 1=1';
+  const params: any[] = [];
+
+  if (status) {
+    sql += ' AND ur.status = ?';
+    params.push(status);
+  }
+
+  const countSql = sql.replace('SELECT ur.*, u.name as user_name, u.phone as user_phone, rp.name as package_name', 'SELECT COUNT(*) as count');
+  const total = (db.prepare(countSql).get(...params) as { count: number }).count;
+
+  sql += ' ORDER BY ur.created_at DESC LIMIT ? OFFSET ?';
+  params.push(pageSize, (page - 1) * pageSize);
+  const data = db.prepare(sql).all(...params);
+
+  paginated(res, data, page, pageSize, total);
+}
+
+// ============ 充值活动效益统计 ============
+export function getRechargeStats(req: Request, res: Response): void {
+  const startDate = req.query.start_date as string || '';
+  const endDate = req.query.end_date as string || '';
+  const stats = balanceTransactionModel.getRechargeStats(startDate || undefined, endDate || undefined);
+  success(res, stats);
+}
+
+// ============ 账户变动流水查询 ============
+export function listBalanceTransactions(req: Request, res: Response): void {
+  const userId = req.query.user_id as string || '';
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.pageSize as string) || 20;
+
+  if (!userId) {
+    error(res, '请提供用户ID');
+    return;
+  }
+
+  const { data, total } = balanceTransactionModel.findByUserId(userId, page, pageSize);
+  paginated(res, data, page, pageSize, total);
 }

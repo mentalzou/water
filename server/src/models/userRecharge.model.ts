@@ -10,22 +10,26 @@ export const userRechargeModel = {
     package_id: string;
     amount: number;
     discount_rate: number;
+    bonus_amount: number;
     paid_amount: number;
     remaining_balance: number;
+    bonus_balance: number;
     transaction_id?: string;
     remark?: string;
   }): UserRecharge {
     const id = uuidv4();
     db.prepare(
-        'INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, paid_amount, remaining_balance, transaction_id, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, transaction_id, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
         id,
         data.user_id,
         data.package_id,
         data.amount,
         data.discount_rate,
+        data.bonus_amount,
         data.paid_amount,
         data.remaining_balance,
+        data.bonus_balance,
         data.transaction_id || '',
         data.remark || ''
     );
@@ -78,6 +82,13 @@ export const userRechargeModel = {
   updateRemainingBalance(id: string, usedAmount: number): UserRecharge | undefined {
     db.prepare(
         'UPDATE user_recharges SET remaining_balance = remaining_balance - ? WHERE id = ?'
+    ).run(usedAmount, id);
+    return this.findById(id);
+  },
+
+  updateBonusBalance(id: string, usedAmount: number): UserRecharge | undefined {
+    db.prepare(
+        'UPDATE user_recharges SET bonus_balance = bonus_balance - ? WHERE id = ?'
     ).run(usedAmount, id);
     return this.findById(id);
   },

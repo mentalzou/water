@@ -121,6 +121,9 @@ export function initTables(database: Database.Database): void {
       deliveryman_id TEXT REFERENCES deliverymen(id),
       status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','assigned','delivering','completed','cancelled')),
       pay_status TEXT DEFAULT 'unpaid' CHECK(pay_status IN ('unpaid','paid','refunded')),
+      pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
+      from_balance REAL DEFAULT 0,
+      from_bonus REAL DEFAULT 0,
       transaction_id TEXT DEFAULT '',
       remark TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now')),
@@ -189,30 +192,62 @@ export function initTables(database: Database.Database): void {
       );
 
     CREATE TABLE IF NOT EXISTS recharge_packages (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        amount REAL NOT NULL,
-        discount_rate REAL NOT NULL,
-        description TEXT DEFAULT '',
-        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        sort_order INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
-        );
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL,
+      discount_rate REAL NOT NULL,
+      bonus_amount REAL DEFAULT 0,
+      description TEXT DEFAULT '',
+      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+      );
 
     CREATE TABLE IF NOT EXISTS user_recharges (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        package_id TEXT NOT NULL REFERENCES recharge_packages(id),
-        amount REAL NOT NULL,
-        discount_rate REAL NOT NULL,
-        paid_amount REAL NOT NULL,
-        remaining_balance REAL NOT NULL,
-        status TEXT DEFAULT 'active' CHECK(status IN ('active','expired','refunded')),
-        transaction_id TEXT DEFAULT '',
-        remark TEXT DEFAULT '',
-        created_at TEXT DEFAULT (datetime('now')),
-        paid_at TEXT DEFAULT ''
-        );
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      package_id TEXT NOT NULL REFERENCES recharge_packages(id),
+      amount REAL NOT NULL,
+      discount_rate REAL NOT NULL,
+      bonus_amount REAL DEFAULT 0,
+      paid_amount REAL NOT NULL,
+      remaining_balance REAL NOT NULL,
+      bonus_balance REAL DEFAULT 0,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active','expired','refunded')),
+      transaction_id TEXT DEFAULT '',
+      remark TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now')),
+      paid_at TEXT DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS balance_transactions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recharge_id TEXT REFERENCES user_recharges(id),
+      order_id TEXT REFERENCES orders(id),
+      tx_type TEXT NOT NULL CHECK(tx_type IN ('recharge_principal','recharge_bonus','consume_bonus','consume_principal','refund','adjust','expire')),
+      amount REAL NOT NULL,
+      principal_after REAL DEFAULT 0,
+      bonus_after REAL DEFAULT 0,
+      description TEXT DEFAULT '',
+      operator_ip TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS ad_banners (
+      id TEXT PRIMARY KEY,
+      title TEXT DEFAULT '',
+      subtitle TEXT DEFAULT '',
+      type TEXT DEFAULT 'image' CHECK(type IN ('image','video')),
+      src TEXT DEFAULT '',
+      link_url TEXT DEFAULT '',
+      bg_color TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+      );
+
   `);
 
   // 兼容性迁移：为已存在的数据库添加新表和字段
@@ -377,18 +412,130 @@ function migrateDatabase(db: Database.Database): void {
   // 创建 points_records 表（如果不存在）
   const hasPointsRecords = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='points_records'").get();
   if (!hasPointsRecords) {
-    db.exec(`     
-     CREATE TABLE IF NOT EXISTS points_records (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS points_records (
+                                                  id TEXT PRIMARY KEY,
+                                                  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         order_id TEXT REFERENCES orders(id),
         change_type TEXT NOT NULL CHECK(change_type IN ('earn', 'spend', 'refund', 'adjust', 'expire')),
         change_amount INTEGER NOT NULL,
         balance_after INTEGER NOT NULL,
         description TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now'))
+        )
+    `);
+  }
+
+  // 迁移 recharge_packages：添加 bonus_amount 字段
+  try {
+    const rpCols = db.prepare('PRAGMA table_info(recharge_packages)').all() as any[];
+    const hasBonusAmount = rpCols.some((c: any) => c.name === 'bonus_amount');
+    if (!hasBonusAmount) {
+      console.log('[Migration] Adding bonus_amount column to recharge_packages...');
+      db.exec("ALTER TABLE recharge_packages ADD COLUMN bonus_amount REAL DEFAULT 0");
+      console.log('[Migration] bonus_amount column added to recharge_packages');
+    }
+  } catch (e: any) {
+    console.error('[Migration] Failed to add bonus_amount to recharge_packages:', e.message);
+  }
+
+  // 迁移 user_recharges：添加 bonus_amount 和 bonus_balance 字段
+  try {
+    const urCols = db.prepare('PRAGMA table_info(user_recharges)').all() as any[];
+    const hasBonusAmount = urCols.some((c: any) => c.name === 'bonus_amount');
+    const hasBonusBalance = urCols.some((c: any) => c.name === 'bonus_balance');
+    if (!hasBonusAmount) {
+      console.log('[Migration] Adding bonus_amount column to user_recharges...');
+      db.exec("ALTER TABLE user_recharges ADD COLUMN bonus_amount REAL DEFAULT 0");
+      console.log('[Migration] bonus_amount column added to user_recharges');
+    }
+    if (!hasBonusBalance) {
+      console.log('[Migration] Adding bonus_balance column to user_recharges...');
+      db.exec("ALTER TABLE user_recharges ADD COLUMN bonus_balance REAL DEFAULT 0");
+      console.log('[Migration] bonus_balance column added to user_recharges');
+    }
+  } catch (e: any) {
+    console.error('[Migration] Failed to add columns to user_recharges:', e.message);
+  }
+
+  const hasAdBanners = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ad_banners'").get();
+  if (!hasAdBanners) {
+    console.log('[Migration] Creating ad_banners table...');
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS ad_banners (
+        id TEXT PRIMARY KEY,
+        title TEXT DEFAULT '',
+        subtitle TEXT DEFAULT '',
+        type TEXT DEFAULT 'image' CHECK(type IN ('image','video')),
+        src TEXT DEFAULT '',
+        link_url TEXT DEFAULT '',
+        bg_color TEXT DEFAULT '',
+        sort_order INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
       )
     `);
+    console.log('[Migration] ad_banners table created');
+  }
+
+  // 添加 open_id 字段到 users 表
+  try {
+    const userCols = db.prepare('PRAGMA table_info(users)').all() as any[];
+    const hasOpenId = userCols.some((c: any) => c.name === 'open_id');
+    if (!hasOpenId) {
+      console.log('[Migration] Adding open_id column to users...');
+      db.exec('ALTER TABLE users ADD COLUMN open_id TEXT DEFAULT \'\'');
+      console.log('[Migration] open_id column added to users');
+    }
+  } catch (e: any) {
+    console.error('[Migration] Failed to add open_id to users:', e.message);
+  }
+
+  // 创建 balance_transactions 流水表
+  const hasBalanceTx = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='balance_transactions'").get();
+  if (!hasBalanceTx) {
+    console.log('[Migration] Creating balance_transactions table...');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS balance_transactions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        recharge_id TEXT REFERENCES user_recharges(id),
+        order_id TEXT REFERENCES orders(id),
+        tx_type TEXT NOT NULL CHECK(tx_type IN ('recharge_principal','recharge_bonus','consume_bonus','consume_principal','refund','adjust','expire')),
+        amount REAL NOT NULL,
+        principal_after REAL DEFAULT 0,
+        bonus_after REAL DEFAULT 0,
+        description TEXT DEFAULT '',
+        operator_ip TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    console.log('[Migration] balance_transactions table created');
+  }
+
+  // 为 orders 表添加 pay_method 字段
+  try {
+    const orderCols = db.prepare('PRAGMA table_info(orders)').all() as any[];
+    const hasPayMethod = orderCols.some((c: any) => c.name === 'pay_method');
+    if (!hasPayMethod) {
+      console.log('[Migration] Adding pay_method column to orders...');
+      db.exec("ALTER TABLE orders ADD COLUMN pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed'))");
+      console.log('[Migration] pay_method column added to orders');
+    }
+    // 添加 from_balance / from_bonus 字段（余额抵扣记录）
+    const hasFromBalance = orderCols.some((c: any) => c.name === 'from_balance');
+    if (!hasFromBalance) {
+      db.exec("ALTER TABLE orders ADD COLUMN from_balance REAL DEFAULT 0");
+      console.log('[Migration] from_balance column added to orders');
+    }
+    const hasFromBonus = orderCols.some((c: any) => c.name === 'from_bonus');
+    if (!hasFromBonus) {
+      db.exec("ALTER TABLE orders ADD COLUMN from_bonus REAL DEFAULT 0");
+      console.log('[Migration] from_bonus column added to orders');
+    }
+  } catch (e: any) {
+    console.error('[Migration] Failed to add pay_method/from_balance/from_bonus to orders:', e.message);
   }
 }
 
@@ -551,6 +698,7 @@ function seedDefaultData(database: Database.Database): void {
     insertConfig.run('wx_mch_id', '', 'string', '微信支付商户号', 'payment');
     insertConfig.run('wx_api_key', '', 'string', '微信支付APIv3密钥', 'payment');
     insertConfig.run('wx_app_id', '', 'string', '微信应用AppID', 'payment');
+    insertConfig.run('wx_app_secret', '', 'string', '微信应用AppSecret', 'payment');
     insertConfig.run('admin_password', 'admin123456', 'string', '管理员初始密码', 'auth');
     insertConfig.run('points_earn_rate', '1', 'number', '积分获取比例：1表示消费1元获得1积分', 'points');
     insertConfig.run('points_min_order_amount', '0', 'number', '积分获取最低订单金额：0表示无限制', 'points');
@@ -560,13 +708,13 @@ function seedDefaultData(database: Database.Database): void {
   const packageCount = database.prepare('SELECT COUNT(*) as count FROM recharge_packages').get() as { count: number };
   if (packageCount.count === 0) {
     const insertPackage = database.prepare(
-        'INSERT INTO recharge_packages (id, name, amount, discount_rate, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO recharge_packages (id, name, amount, discount_rate, bonus_amount, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    insertPackage.run('pkg-001', '充值200元套餐', 200, 0.8, '充值200元，订水享受8折优惠', 1);
-    insertPackage.run('pkg-002', '充值500元套餐', 500, 0.7, '充值500元，订水享受7折优惠', 2);
-    insertPackage.run('pkg-003', '充值1000元套餐', 1000, 0.65, '充值1000元，订水享受6.5折优惠', 3);
-    insertPackage.run('pkg-004', '充值2000元套餐', 2000, 0.6, '充值2000元，订水享受6折优惠', 4);
-    insertPackage.run('pkg-005', '充值5000元套餐', 5000, 0.5, '充值5000元，订水享受5折优惠', 5);
+    insertPackage.run('pkg-001', '充值200元套餐', 200, 0, 10, '充值200元送10元，到账210元', 1);
+    insertPackage.run('pkg-002', '充值500元套餐', 500, 0, 30, '充值500元送30元，到账530元', 2);
+    insertPackage.run('pkg-003', '充值1000元套餐', 1000, 0, 80, '充值1000元送80元，到账1080元', 3);
+    insertPackage.run('pkg-004', '充值2000元套餐', 2000, 0, 200, '充值2000元送200元，到账2200元', 4);
+    insertPackage.run('pkg-005', '充值5000元套餐', 5000, 0, 500, '充值5000元送500元，到账5500元', 5);
   }
 
   const adminCount = database.prepare("SELECT COUNT(*) as count FROM users WHERE role='admin'").get() as { count: number };

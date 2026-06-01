@@ -9,6 +9,7 @@ import { createCustomerOrder, processPaymentSuccess } from '../services/order.se
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { getUserPointsRecords, getPointsConfig, changePoints } from '../services/points.service';
+import { getDb } from '../utils/db';
 
 /** 安全提取 req.body 中的字符串值 */
 function str(val: unknown): string {
@@ -58,7 +59,90 @@ export function customerLogin(req: Request, res: Response): void {
     name: user.name,
     phone: user.phone,
     role: user.role,
+    open_id: (user as any).open_id || '',
   }, '登录成功');
+}
+
+/**
+ * 微信 OAuth code 换取 openId
+ * 支持小程序 wx.login() 的 code 和公众号 OAuth 的 code
+ */
+export async function getWechatOpenId(req: Request, res: Response): Promise<void> {
+  try {
+    const code = String(req.body.code || '').trim();
+    const type = String(req.body.type || 'oa').trim(); // 'oa' = 公众号, 'miniprogram' = 小程序
+
+    if (!code) {
+      error(res, '缺少微信授权码(code)');
+      return;
+    }
+
+    // 开发环境快捷模式：code 以 "dev_" 开头则直接作为 openId
+    if (code.startsWith('dev_')) {
+      const devOpenId = code;
+      console.log('[WechatOpenId] Dev mode, using mock openId:', devOpenId);
+      success(res, { openid: devOpenId, open_id: devOpenId }, '获取openId成功(开发模式)');
+      return;
+    }
+
+    const db = getDb();
+    const appId = (db.prepare("SELECT value FROM system_config WHERE key='wx_app_id'").get() as any)?.value || process.env.WECHAT_APP_ID || '';
+    const appSecret = (db.prepare("SELECT value FROM system_config WHERE key='wx_app_secret'").get() as any)?.value || process.env.WECHAT_APP_SECRET || '';
+
+    if (!appId || !appSecret) {
+      error(res, '微信配置未初始化，请在管理后台配置 wx_app_id 和 wx_app_secret');
+      return;
+    }
+
+    let apiUrl: string;
+    if (type === 'miniprogram') {
+      // 小程序: code2session
+      apiUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${appId}&secret=${appSecret}&js_code=${code}&grant_type=authorization_code`;
+    } else {
+      // 公众号: sns/oauth2/access_token
+      apiUrl = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${appId}&secret=${appSecret}&code=${code}&grant_type=authorization_code`;
+    }
+
+    console.log('[WechatOpenId] Requesting:', apiUrl.replace(appSecret, '***'));
+
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+
+    if (data.errcode && data.errcode !== 0) {
+      console.error('[WechatOpenId] WeChat API error:', data);
+      error(res, `获取微信openId失败: ${data.errmsg || 'unknown error'}`);
+      return;
+    }
+
+    const openId = data.openid;
+    if (!openId) {
+      error(res, '未获取到微信openId');
+      return;
+    }
+
+    console.log('[WechatOpenId] Got openId:', openId);
+
+    // 尝试将 openId 更新到当前登录的用户记录中
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      try {
+        const jwt = require('../utils/jwt');
+        const decoded = jwt.verifyToken(token);
+        if (decoded?.userId) {
+          const db2 = getDb();
+          db2.prepare('UPDATE users SET open_id = ? WHERE id = ?').run(openId, decoded.userId);
+          console.log('[WechatOpenId] Updated open_id for user:', decoded.userId);
+        }
+      } catch {
+        // Token 无效或未登录，仅返回 openId
+      }
+    }
+
+    success(res, { openid: openId, open_id: openId }, '获取openId成功');
+  } catch (err: any) {
+    console.error('[WechatOpenId] Error:', err);
+    error(res, err.message || '获取openId失败');
+  }
 }
 
 export function customerRegister(req: Request, res: Response): void {
@@ -110,7 +194,7 @@ export function getProducts(_req: Request, res: Response): void {
 
 // ============ Orders ============
 export function createOrder(req: Request, res: Response): void {
-  const { customer_phone, customer_name, address, items, distributor_code } = req.body;
+  const { customer_phone, customer_name, address, items, distributor_code, pay_method } = req.body;
   
   // 验证必填字段
   if (!customer_phone || !address) {
@@ -137,21 +221,45 @@ export function createOrder(req: Request, res: Response): void {
     if (dist) distributorId = dist.id;
   }
 
-  // 创建订单（支持多商品）
-  const order = createCustomerOrder({
+  const userId = (req as any).user?.userId;
+  const payMethod = (pay_method === 'balance' ? 'balance' : 'online') as 'online' | 'balance';
+
+  // 余额支付需要登录
+  if (payMethod === 'balance' && !userId) {
+    error(res, '请先登录', 401);
+    return;
+  }
+
+  // 创建订单（支持多商品 + 支付方式）
+  const result = createCustomerOrder({
     customer_phone,
     customer_name: customer_name || '',
     address,
     items: orderItems,
     distributor_id: distributorId,
+    user_id: userId,
+    pay_method: payMethod,
   });
 
-  if (!order) {
+  if (!result) {
     error(res, '创建订单失败，请检查商品信息');
     return;
   }
 
-  success(res, order, '订单创建成功');
+  // 余额支付失败（余额不足等）
+  if (result.balanceError) {
+    error(res, result.balanceError, 400);
+    return;
+  }
+
+  // 余额支付成功时，直接标记已支付
+  if (payMethod === 'balance' && result.order) {
+    const paidOrder = processPaymentSuccess(result.order.id, `BALANCE_${Date.now()}`);
+    success(res, paidOrder, '订单创建成功，已从余额扣除');
+    return;
+  }
+
+  success(res, result.order, '订单创建成功');
 }
 
 export function getOrderById(req: Request, res: Response): void {
@@ -162,7 +270,8 @@ export function getOrderById(req: Request, res: Response): void {
 }
 
 export function getMyOrders(req: Request, res: Response): void {
-  const phone = (req as any).user?.userId || req.query.phone;
+  // 优先使用 query 中的 phone，不再用 userId 当手机号
+  const phone = (req.query.phone as string) || '';
   const distributorId = req.query.distributor_id as string;
   
   const page = parseInt(req.query.page as string) || 1;

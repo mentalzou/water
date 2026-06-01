@@ -34,6 +34,15 @@ body {
   border-radius: 2px;
 }
 
+/* Hide scrollbar for horizontal scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Glass morphism utility */
 .glass {
   background: rgba(255, 255, 255, 0.7);

@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Droplets, ShoppingCart, CheckCircle2, MapPin, Plus, Minus, Home, User } from 'lucide-react';
+import { Droplets, ShoppingCart, CheckCircle2, MapPin, Plus, Minus, Home, User, Trash2, X, Gift, FileText, ClipboardList, CreditCard, HeadphonesIcon } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { customerApi } from '../../api/customer.api';
 import { useAppStore } from '../../stores/store';
 import BottomNav from "../../components/BottomNav.tsx";
+import AdBanner from '../../components/AdBanner';
 
 interface Category {
   id: string;
@@ -42,6 +44,7 @@ export default function OrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [showCartDetail, setShowCartDetail] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -50,6 +53,22 @@ export default function OrderPage() {
     const code = searchParams.get('distributor_code');
     if (code) {
       setDistributorCode(code);
+    }
+
+    // 从登录页返回后恢复购物车
+    const pendingData = localStorage.getItem('pending_order_data');
+    if (pendingData) {
+      try {
+        const parsed = JSON.parse(pendingData);
+        if (parsed.items && Array.isArray(parsed.items)) {
+          const restored: Record<string, number> = {};
+          parsed.items.forEach((item: any) => {
+            restored[item.productId] = item.quantity || 1;
+          });
+          setItemQuantities(restored);
+        }
+      } catch {}
+      localStorage.removeItem('pending_order_data');
     }
   }, []);
 
@@ -100,45 +119,44 @@ export default function OrderPage() {
       return { ...prev, [productId]: next };
     });
   }
+  function removeFromCart(productId: string) {
+    setItemQuantities(prev => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+  }
 
-  async function handleSubmit() {
+  function clearCart() {
+    if (!confirm('确定清空购物车吗？')) return;
+    setItemQuantities({});
+    setShowCartDetail(false);
+  }
+
+  function handleSubmit() {
     if (selectedItems.length === 0) return;
 
     // 未登录时跳转登录页
     const token = localStorage.getItem('customer_token');
     if (!token) {
+      // 先保存购物车数据，登录回来后恢复
+      localStorage.setItem('pending_order_data', JSON.stringify({
+        items: selectedItems.map(i => ({ productId: i.product.id, quantity: i.quantity })),
+        totalAmount,
+        distributorCode: distributorCode || undefined,
+      }));
       navigate(`/login?from=${encodeURIComponent(window.location.pathname + window.location.search)}`, { replace: true });
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
+    // 保存订单数据到 localStorage
+    localStorage.setItem('confirm_order_data', JSON.stringify({
+      items: selectedItems,
+      totalAmount,
+      distributorCode: distributorCode || undefined,
+    }));
 
-      const orderItems = selectedItems.map(item => ({
-        product_id: item.product.id,
-        quantity: item.quantity,
-      }));
-
-      const orderRes: any = await customerApi.createOrder({
-        customer_phone: user.phone,
-        customer_name: user.name || '',
-        address: '自提',
-        items: orderItems,
-        distributor_code: distributorCode || undefined,
-      });
-
-      if (orderRes.data?.id) {
-        const payRes: any = await customerApi.payForOrder(orderRes.data.id);
-        setOrderResult(payRes.data || orderRes.data);
-      } else {
-        alert(orderRes.message || '下单失败');
-      }
-    } catch (err: any) {
-      alert(err.message || '下单失败');
-    } finally {
-      setSubmitting(false);
-    }
+    navigate('/order/confirm');
   }
 
   if (orderResult) {
@@ -159,26 +177,50 @@ export default function OrderPage() {
     );
   }
 
+  const location = useLocation();
+  const orderSuccessData = location.state?.result;
+
+  if (orderSuccessData) {
+    return (
+        <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex flex-col items-center justify-center p-6">
+          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-6">
+            <CheckCircle2 className="w-10 h-10 text-green-500" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">购买成功</h2>
+          <p className="text-gray-500 text-sm mb-8">订单已创建并支付成功</p>
+          <button onClick={() => navigate('/orders')} className="w-full max-w-sm bg-gradient-to-r from-water-light to-water text-white py-3.5 rounded-2xl font-medium shadow-lg shadow-water/30 active:scale-[0.98] transition-transform">
+            查看订单
+          </button>
+          <button onClick={() => navigate('/', { state: {} })} className="mt-4 text-water font-medium">
+            继续购买
+          </button>
+        </div>
+    );
+  }
+
   const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
 
   return (
       <div className="flex flex-col h-screen bg-gray-50">
-        {/* Header - 地址提示 */}
-        <header className="relative pt-12 pb-20 px-5 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-water-light via-water to-teal-400"/>
+        {/* Header - 跑马灯广告栏 */}
+        <header className="relative pt-12 pb-20 overflow-hidden">
+          {/* 广告跑马灯背景 */}
+          <div className="absolute inset-0">
+            <AdBanner/>
+          </div>
+
+          {/* 波浪过渡 */}
           <div className="absolute bottom-0 left-0 right-0">
             <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M0,64 C360,120 720,40 1080,80 C1260,96 1380,88 1440,84 L1440,120 L0,120 Z" fill="#F0FDFA"/>
             </svg>
           </div>
+
+          {/* 覆盖层：品牌 + 用户按钮 */}
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
                 <Droplets className="w-7 h-7 text-white"/>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white tracking-wide">好水到家</h1>
-                <p className="text-white/80 text-xs mt-0.5">源自天然，健康生活</p>
               </div>
             </div>
             <button onClick={() => navigate('/profile')}
@@ -188,10 +230,51 @@ export default function OrderPage() {
           </div>
         </header>
 
+        {/* 快捷菜单栏 */}
+        <nav className="bg-white border-b border-gray-100">
+          <div className="flex justify-between px-1.5 py-2">
+            <button
+              onClick={() => navigate('/free-trial')}
+              className="flex items-center gap-0.5 px-1.5 rounded-full text-[11px] font-medium text-gray-600 hover:bg-water/5 hover:text-water active:bg-water/10 transition-colors flex-shrink-0"
+            >
+              <Gift className="w-3 h-3" />
+              免费试喝
+            </button>
+            <button
+              onClick={() => navigate('/quality-report')}
+              className="flex items-center gap-0.5 px-1.5 rounded-full text-[11px] font-medium text-gray-600 hover:bg-water/5 hover:text-water active:bg-water/10 transition-colors flex-shrink-0"
+            >
+              <FileText className="w-3 h-3" />
+              质检报告
+            </button>
+            <button
+              onClick={() => navigate('/purchase-notice')}
+              className="flex items-center gap-0.5 px-1.5 rounded-full text-[11px] font-medium text-gray-600 hover:bg-water/5 hover:text-water active:bg-water/10 transition-colors flex-shrink-0"
+            >
+              <ClipboardList className="w-3 h-3" />
+              购买须知
+            </button>
+            <button
+              onClick={() => navigate('/profile/recharge')}
+              className="flex items-center gap-0.5 px-1.5 rounded-full text-[11px] font-medium text-gray-600 hover:bg-water/5 hover:text-water active:bg-water/10 transition-colors flex-shrink-0"
+            >
+              <CreditCard className="w-3 h-3" />
+              我要充值
+            </button>
+            <button
+              onClick={() => navigate('/customer-service')}
+              className="flex items-center gap-0.5 px-1.5 rounded-full text-[11px] font-medium text-gray-600 hover:bg-water/5 hover:text-water active:bg-water/10 transition-colors flex-shrink-0"
+            >
+              <HeadphonesIcon className="w-3 h-3" />
+              我的客服
+            </button>
+          </div>
+        </nav>
+
         {/* Main Content - 左侧分类 + 右侧产品 */}
         <div className="flex-1 flex overflow-hidden pb-16">
           {/* 左侧分类导航 */}
-          <aside className="w-24 bg-gray-100 overflow-y-auto flex-shrink-0">
+          <aside className="w-24 bg-gray-80 overflow-y-auto flex-shrink-0">
             <nav className="py-2">
               <button
                   onClick={() => setSelectedCategory('')}
@@ -311,30 +394,108 @@ export default function OrderPage() {
 
         {/* 底部结算栏 */}
         {selectedItems.length > 0 && (
-            <div
-                className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between z-10 shadow-lg">
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <ShoppingCart className="w-6 h-6 text-gray-600"/>
-                  {selectedItems.length > 0 && (
-                      <span
-                          className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
-                  {selectedItems.length}
+            <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 z-10 shadow-lg">
+              {/* 结算栏主体 */}
+              {/* 购物车详情 - 展开显示已选商品 */}
+              {showCartDetail && (
+                  <div className="border-t border-gray-100 bg-gray-50 max-h-64 overflow-y-auto">
+                    <div
+                        className="px-4 py-2 flex items-center justify-between bg-white border-b border-gray-100 sticky top-0">
+                <span className="text-sm font-medium text-gray-700">
+                  已选商品 ({selectedItems.length}种)
                 </span>
-                  )}
+                      <button
+                          onClick={clearCart}
+                          className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3"/>
+                        清空
+                      </button>
+                    </div>
+
+                    <div className="divide-y divide-gray-100">
+                      {selectedItems.map(item => (
+                          <div key={item.product.id} className="px-4 py-3 flex items-center justify-between bg-white">
+                            <div className="flex-1 min-w-0 mr-3">
+                              <p className="text-sm font-medium text-gray-800 truncate">
+                                {item.product.name}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                ¥{item.product.price.toFixed(2)}{item.product.unit ? `/${item.product.unit}` : ''}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              {/* 数量控制 */}
+                              <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => updateQty(item.product.id, -1)}
+                                    className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                >
+                                  <Minus className="w-3 h-3"/>
+                                </button>
+                                <span className="w-6 text-center font-semibold text-sm">
+                          {item.quantity}
+                        </span>
+                                <button
+                                    type="button"
+                                    onClick={() => updateQty(item.product.id, 1)}
+                                    className="w-6 h-6 rounded-full bg-water text-white flex items-center justify-center hover:bg-water/90"
+                                >
+                                  <Plus className="w-3 h-3"/>
+                                </button>
+                              </div>
+
+                              {/* 删除按钮 */}
+                              <button
+                                  onClick={() => removeFromCart(item.product.id)}
+                                  className="text-gray-400 hover:text-red-500 transition-colors"
+                                  title="移除商品"
+                              >
+                                <X className="w-5 h-5"/>
+                              </button>
+                            </div>
+                          </div>
+                      ))}
+                    </div>
+                  </div>
+              )}
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  {/* 购物车图标 - 可点击展开详情 */}
+                  <button
+                      onClick={() => setShowCartDetail(!showCartDetail)}
+                      className="relative flex-shrink-0"
+                  >
+                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                      <ShoppingCart className="w-5 h-5 text-gray-600"/>
+                    </div>
+                    {selectedItems.length > 0 && (
+                        <span
+                            className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {selectedItems.reduce((sum, item) => sum + item.quantity, 0)}
+                  </span>
+                    )}
+                  </button>
+
+                  {/* 金额信息 */}
+                  <div>
+                    <p className="text-xs text-gray-500">合计</p>
+                    <p className="text-lg font-bold text-red-500">¥{totalAmount.toFixed(2)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">合计</p>
-                  <p className="text-lg font-bold text-red-500">¥{totalAmount.toFixed(2)}</p>
-                </div>
+
+                {/* 结算按钮 */}
+                <button
+                    onClick={handleSubmit}
+                    disabled={submitting || selectedItems.length === 0}
+                    className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold text-base hover:bg-green-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? '处理中...' : '结算'}
+                </button>
               </div>
-              <button
-                  onClick={handleSubmit}
-                  disabled={submitting || selectedItems.length === 0}
-                  className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold text-base hover:bg-green-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? '处理中...' : '结算'}
-              </button>
+
             </div>
         )}
 

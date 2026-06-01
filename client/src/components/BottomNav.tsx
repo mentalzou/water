@@ -3,7 +3,7 @@ import { ShoppingCart, Package, User } from 'lucide-react';
 
 const navItems = [
   { path: '/', icon: ShoppingCart, label: '订购' },
-  { path: '/orders', icon: Package, label: '订单' },
+  { path: '/profile/recharge', icon: Package, label: '充值套餐' },
   { path: '/profile', icon: User, label: '我的' },
 ];
 

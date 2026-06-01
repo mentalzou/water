@@ -19,13 +19,14 @@ export const rechargePackageModel = {
     name: string;
     amount: number;
     discount_rate: number;
+    bonus_amount?: number;
     description?: string;
     sort_order?: number;
   }): RechargePackage {
     const id = uuidv4();
     db.prepare(
-        'INSERT INTO recharge_packages (id, name, amount, discount_rate, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(id, data.name, data.amount, data.discount_rate, data.description || '', data.sort_order || 0);
+        'INSERT INTO recharge_packages (id, name, amount, discount_rate, bonus_amount, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, data.name, data.amount, data.discount_rate, data.bonus_amount || 0, data.description || '', data.sort_order || 0);
 
     return this.findById(id)!;
   },
