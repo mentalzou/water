@@ -67,6 +67,7 @@ export default function Login() {
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="请输入管理员手机号"
+              autoComplete="tel"
               className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
             />
           </div>
@@ -77,6 +78,7 @@ export default function Login() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="请输入密码"
+              autoComplete="current-password"
               autoFocus
               className="w-full pl-12 pr-12 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
             />

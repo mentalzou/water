@@ -52,6 +52,7 @@ export default function PasswordPage() {
               <div className="relative">
                 <input type={showOld ? 'text' : 'password'} value={oldPwd} onChange={e => setOldPwd(e.target.value)}
                        placeholder="当前密码" required autoFocus
+                       autoComplete="current-password"
                        className="w-full px-4 py-3 pr-11 bg-white rounded-xl border border-gray-200 outline-none focus:border-water transition-colors" />
                 <button type="button" onClick={() => setShowOld(!showOld)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                   {showOld ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -60,6 +61,7 @@ export default function PasswordPage() {
               <div className="relative">
                 <input type={showNew ? 'text' : 'password'} value={newPwd} onChange={e => setNewPwd(e.target.value)}
                        placeholder="新密码（至少6位）" required
+                       autoComplete="new-password"
                        className="w-full px-4 py-3 pr-11 bg-white rounded-xl border border-gray-200 outline-none focus:border-water transition-colors" />
                 <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                   {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -67,6 +69,7 @@ export default function PasswordPage() {
               </div>
               <input type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)}
                      placeholder="确认新密码" required
+                     autoComplete="new-password"
                      className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 outline-none focus:border-water transition-colors" />
 
               {msg && (

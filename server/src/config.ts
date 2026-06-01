@@ -17,6 +17,6 @@ export default {
     /** 允许的图片格式 */
     imageExts: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'],
     /** 允许的视频格式 */
-    videoExts: ['.mp4', '.webm', '.ogg'],
+    videoExts: ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'],
   },
 };

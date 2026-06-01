@@ -295,6 +295,7 @@ export default function DeliverymanManage() {
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input value={form.password} onChange={e => setForm({...form, password: e.target.value})} required type="password" minLength={6}
+                        autoComplete="new-password"
                         className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30" placeholder="请设置登录密码（至少6位）" />
                     </div>
                     <p className="text-xs text-gray-400 mt-1">派送员将使用手机号 + 此密码登录后台</p>

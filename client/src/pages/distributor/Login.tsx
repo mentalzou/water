@@ -67,6 +67,7 @@ export default function DistributorLogin() {
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="请输入手机号"
+              autoComplete="tel"
               className="w-full pl-12 pr-4 py-3.5 bg-white rounded-xl text-gray-800 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-white/50 transition-all shadow-lg"
             />
           </div>
@@ -77,6 +78,7 @@ export default function DistributorLogin() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="请输入密码"
+              autoComplete="current-password"
               autoFocus
               className="w-full pl-12 pr-12 py-3.5 bg-white rounded-xl text-gray-800 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-white/50 transition-all shadow-lg"
             />

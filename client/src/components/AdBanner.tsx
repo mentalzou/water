@@ -180,7 +180,12 @@ export default function AdBanner({
                                 muted
                                 loop
                                 playsInline
-                                preload="auto"
+                                preload="metadata"
+                                crossOrigin="anonymous"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  console.warn('视频加载失败:', ad.src, target.error?.message);
+                                }}
                             />
                         ) : ad.src ? (
                             <img

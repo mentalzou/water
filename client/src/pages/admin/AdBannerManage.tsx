@@ -81,6 +81,24 @@ export default function AdBannerManage() {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // 检查文件大小（50MB）
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert(`文件大小不能超过 50MB，当前文件大小：${(file.size / 1024 / 1024).toFixed(1)}MB`);
+      e.target.value = '';
+      return;
+    }
+
+    // 检查视频格式
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+    if (!allowedExts.includes(ext)) {
+      alert(`不支持的文件格式 ".${ext}"，支持的格式：${allowedExts.join(', ')}`);
+      e.target.value = '';
+      return;
+    }
+
     setUploading(true);
     try {
       const fd = new FormData();
@@ -94,12 +112,13 @@ export default function AdBannerManage() {
       if (res.code === 200) {
         setFormData(prev => ({ ...prev, src: res.data.url }));
       } else {
-        alert(res.message || '上传失败');
+        alert(res.message || '上传失败，请检查文件格式或重试');
       }
     } catch (err: any) {
-      alert(err.message || '上传失败');
+      alert(err.message || '上传失败，请检查网络连接');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   }
 
@@ -163,7 +182,7 @@ export default function AdBannerManage() {
                     <div key={b.id} className="flex-shrink-0 w-64 rounded-lg overflow-hidden border border-gray-200">
                       {b.src ? (
                           b.type === 'video'
-                              ? <video src={b.src} className="w-full h-32 object-cover" muted />
+                              ? <video src={b.src} className="w-full h-32 object-cover" muted playsInline preload="metadata" crossOrigin="anonymous" />
                               : <img src={b.src} className="w-full h-32 object-cover" alt={b.title} />
                       ) : (
                           <div className={`w-full h-32 bg-gradient-to-br ${b.bg_color || 'from-water-light via-water to-teal-400'} flex items-center justify-center`}>
@@ -198,7 +217,7 @@ export default function AdBannerManage() {
                     <div className="h-36 relative bg-gray-100">
                       {b.src ? (
                           b.type === 'video'
-                              ? <video src={b.src} className="w-full h-full object-cover" muted />
+                              ? <video src={b.src} className="w-full h-full object-cover" muted playsInline preload="metadata" crossOrigin="anonymous" />
                               : <img src={b.src} className="w-full h-full object-cover" alt={b.title} />
                       ) : (
                           <div className={`w-full h-full bg-gradient-to-br ${b.bg_color || 'from-gray-300 to-gray-400'} flex items-center justify-center`}>
