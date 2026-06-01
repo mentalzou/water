@@ -53,11 +53,11 @@ export default function RechargePage() {
           customerApi.getMyRecharges(),
         ]);
 
-        if (activeRes.code === 200 && activeRes.data) {
+        if ((activeRes as any).code === 200 && activeRes.data) {
           setActiveRecharge(activeRes.data);
         }
 
-        if (historyRes.code === 200) {
+        if ((historyRes as any).code === 200) {
           setRechargeHistory(historyRes.data?.data || []);
         }
       }

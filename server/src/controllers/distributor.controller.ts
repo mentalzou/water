@@ -36,7 +36,8 @@ export function distributorLogin(req: Request, res: Response): void {
   }
 
   // 状态校验：停用/冻结不允许登录
-  if (user.status === 'inactive' || user.status === 'frozen' || (distributor as any).status === 'inactive' || (distributor as any).status === 'frozen') {
+  // User: active|inactive|locked; Distributor: active|inactive|frozen
+  if (user.status === 'inactive' || user.status === 'locked' || distributor.status === 'inactive' || distributor.status === 'frozen') {
     error(res, '账号已停用或冻结，请联系管理员', 403);
     return;
   }

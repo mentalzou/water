@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, MapPin, Phone, Clock, MessageSquare, Wallet, CreditCard } from 'lucide-react';
+import { ChevronLeft, MapPin, Clock, MessageSquare, Wallet, CreditCard } from 'lucide-react';
 import { customerApi } from '../../api/customer.api';
 import BottomNav from '../../components/BottomNav';
 
@@ -32,13 +32,13 @@ export default function ConfirmOrderPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [contactPhone, setContactPhone] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('明天');
   const [deliveryTime, setDeliveryTime] = useState('');
   const [remark, setRemark] = useState('');
-  const [useCoupon, setUseCoupon] = useState(false);
+  // const [useCoupon, setUseCoupon] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [payMethod, setPayMethod] = useState<'online' | 'balance'>('online');
   const [balanceInfo, setBalanceInfo] = useState<{ principal: number; bonus: number; total: number } | null>(null);
@@ -233,7 +233,7 @@ export default function ConfirmOrderPage() {
         document.addEventListener('WeixinJSBridgeReady', () => {
           onBridgeReady(params, orderId);
         }, false);
-      } else if (document.attachEvent) {
+      } else if ((document as any).attachEvent) {
         (document as any).attachEvent('WeixinJSBridgeReady', () => {
           onBridgeReady(params, orderId);
         });

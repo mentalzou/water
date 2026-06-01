@@ -69,7 +69,7 @@ export default function AddressPage() {
     try {
       let res;
       if (editing === 'new') {
-        res = await customerApi.addAddress(form);
+        res = await customerApi.addAddress({ ...form, is_default: form.is_default ? 1 : 0 });
       } else {
         res = await customerApi.updateAddress(editing!, form);
       }
