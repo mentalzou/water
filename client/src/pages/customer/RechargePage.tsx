@@ -51,13 +51,13 @@ export default function RechargePage() {
         const [activeRes, historyRes] = await Promise.all([
           customerApi.getActiveRecharge(),
           customerApi.getMyRecharges(),
-        ]);
+        ]) as [any, any];
 
-        if (activeRes.code === 200 && activeRes.data) {
+        if ((activeRes as any).code === 200 && activeRes.data) {
           setActiveRecharge(activeRes.data);
         }
 
-        if (historyRes.code === 200) {
+        if ((historyRes as any).code === 200) {
           setRechargeHistory(historyRes.data?.data || []);
         }
       }

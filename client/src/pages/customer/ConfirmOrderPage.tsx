@@ -233,7 +233,7 @@ export default function ConfirmOrderPage() {
         document.addEventListener('WeixinJSBridgeReady', () => {
           onBridgeReady(params, orderId);
         }, false);
-      } else if (document.attachEvent) {
+      } else if ((document as any).attachEvent) {
         (document as any).attachEvent('WeixinJSBridgeReady', () => {
           onBridgeReady(params, orderId);
         });
