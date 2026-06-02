@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, AlertCircle, Package, FileText, BarChart3 } from 'lucide-react';
-import api from '../../api/client';
-import { getRechargeOrders, getRechargeStats } from '../../api/admin.api';
+import {
+  getRechargeOrders,
+  getRechargeStats,
+  getRechargePackages,
+  createRechargePackage,
+  updateRechargePackage,
+  updateRechargePackageStatus,
+  deleteRechargePackage,
+} from '../../api/admin.api';
 
 interface RechargePackage {
   id: string;
@@ -68,9 +75,9 @@ export default function RechargePackageManage() {
   async function loadPackages() {
     setLoading(true);
     try {
-      const res = await api.get('/admin/recharge/packages') as any;
+      const res: any = await getRechargePackages();
       if (res && res.code === 200) {
-        setPackages(res.data?.data || res.data || []);
+        setPackages(res.data || []);
       }
     } catch (error) {
       console.error('加载充值套餐失败:', error);
@@ -142,12 +149,10 @@ export default function RechargePackageManage() {
 
     try {
       if (editingPackage) {
-        // 更新套餐
-        await api.put(`/admin/recharge/packages/${editingPackage.id}`, formData);
+        await updateRechargePackage(editingPackage.id, formData);
         alert('更新成功');
       } else {
-        // 创建套餐
-        await api.post('/admin/recharge/packages', formData);
+        await createRechargePackage(formData);
         alert('创建成功');
       }
 
@@ -161,7 +166,7 @@ export default function RechargePackageManage() {
   async function handleToggleStatus(pkg: RechargePackage) {
     try {
       const newStatus = pkg.status === 'active' ? 'inactive' : 'active';
-      await api.put(`/admin/recharge/packages/${pkg.id}/status`, { status: newStatus });
+      await updateRechargePackageStatus(pkg.id, newStatus);
       await loadPackages();
     } catch (error: any) {
       alert(error.message || '操作失败');
@@ -172,7 +177,7 @@ export default function RechargePackageManage() {
     if (!confirm('确定要删除这个套餐吗？')) return;
 
     try {
-      await api.delete(`/admin/recharge/packages/${id}`);
+      await deleteRechargePackage(id);
       await loadPackages();
       alert('删除成功');
     } catch (error: any) {

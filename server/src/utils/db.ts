@@ -341,21 +341,54 @@ function migrateDatabase(db: Database.Database): void {
   // 创建 user_recharges 表（如果不存在）
   const hasUserRecharges = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_recharges'").get();
   if (!hasUserRecharges) {
-    db.exec(`      CREATE TABLE IF NOT EXISTS user_recharges (
+    db.exec(`CREATE TABLE IF NOT EXISTS user_recharges (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           package_id TEXT NOT NULL REFERENCES recharge_packages(id),
           amount REAL NOT NULL,
           discount_rate REAL NOT NULL,
+          bonus_amount REAL DEFAULT 0,
           paid_amount REAL NOT NULL,
           remaining_balance REAL NOT NULL,
-          status TEXT DEFAULT 'active' CHECK(status IN ('active','expired','refunded')),
+          bonus_balance REAL DEFAULT 0,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
           transaction_id TEXT DEFAULT '',
           remark TEXT DEFAULT '',
           created_at TEXT DEFAULT (datetime('now')),
           paid_at TEXT DEFAULT ''
           )
     `);
+  } else {
+    // 迁移旧表：添加 bonus_amount/bonus_balance 列 + 修正 status 约束支持 'pending'
+    try { db.prepare("ALTER TABLE user_recharges ADD COLUMN bonus_amount REAL DEFAULT 0").run(); } catch (_) { /* 已存在 */ }
+    try { db.prepare("ALTER TABLE user_recharges ADD COLUMN bonus_balance REAL DEFAULT 0").run(); } catch (_) { /* 已存在 */ }
+
+    // 检查旧约束是否缺少 'pending'，若缺少则重建表
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_recharges'").get() as { sql: string } | undefined;
+    if (tableInfo && !tableInfo.sql.includes('pending')) {
+      db.exec(`
+        CREATE TABLE user_recharges_new (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          package_id TEXT NOT NULL REFERENCES recharge_packages(id),
+          amount REAL NOT NULL,
+          discount_rate REAL NOT NULL,
+          bonus_amount REAL DEFAULT 0,
+          paid_amount REAL NOT NULL,
+          remaining_balance REAL NOT NULL,
+          bonus_balance REAL DEFAULT 0,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
+          transaction_id TEXT DEFAULT '',
+          remark TEXT DEFAULT '',
+          created_at TEXT DEFAULT (datetime('now')),
+          paid_at TEXT DEFAULT ''
+        );
+        INSERT INTO user_recharges_new SELECT id, user_id, package_id, amount, discount_rate, COALESCE(bonus_amount,0), paid_amount, remaining_balance, COALESCE(bonus_balance,0), status, transaction_id, remark, created_at, paid_at FROM user_recharges;
+        DROP TABLE user_recharges;
+        ALTER TABLE user_recharges_new RENAME TO user_recharges;
+      `);
+      console.log('[DB] user_recharges 表已迁移，支持 pending 状态');
+    }
   }
 
   // 创建 order_items 表（如果不存在）

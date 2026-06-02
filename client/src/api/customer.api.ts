@@ -36,6 +36,7 @@ export const customerApi = {
   getMyRecharges: (page = 1, pageSize = 20) =>
       api.get(`/customers/recharge/my-recharges?page=${page}&pageSize=${pageSize}`),
   getActiveRecharge: () => api.get('/customers/recharge/active'),
+  getUserBalance: () => api.get('/customers/recharge/balance'),
 
   // 商品和分类
   getProducts: () => api.get('/products'),

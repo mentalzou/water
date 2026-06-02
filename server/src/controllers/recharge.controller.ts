@@ -207,3 +207,21 @@ export function getActiveRecharge(req: Request, res: Response): void {
   const recharge = userRechargeModel.findActiveByUserId(userId);
   success(res, recharge);
 }
+
+/** 获取用户账户余额（汇总所有有效充值） */
+export function getUserBalance(req: Request, res: Response): void {
+  const userId = (req as any).user?.userId;
+
+  if (!userId) {
+    error(res, '请先登录', 401);
+    return;
+  }
+
+  const balance = userRechargeModel.getTotalBalanceByUserId(userId);
+  const activeRecharges = userRechargeModel.findAllActiveByUserId(userId);
+
+  success(res, {
+    ...balance,
+    active_recharges: activeRecharges,
+  });
+}

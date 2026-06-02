@@ -61,12 +61,17 @@ export function createCustomerOrder(data: {
   let fromBonus = 0;
 
   if (payMethod === 'balance' && data.user_id) {
-    const activeRecharge = userRechargeModel.findActiveByUserId(data.user_id);
-    if (!activeRecharge) {
+    // 获取所有有效充值记录（按创建时间升序，先充的先消费）
+    const activeRecharges = userRechargeModel.findAllActiveByUserId(data.user_id);
+    if (activeRecharges.length === 0) {
       return { order: null as any, balanceError: '您暂无生效的充值余额，请先充值或选择在线支付' };
     }
 
-    const totalBalance = (activeRecharge.remaining_balance || 0) + (activeRecharge.bonus_balance || 0);
+    // 计算总余额
+    let totalBalance = 0;
+    for (const r of activeRecharges) {
+      totalBalance += (r.remaining_balance || 0) + (r.bonus_balance || 0);
+    }
 
     if (totalBalance < totalAmount) {
       return {
@@ -75,61 +80,72 @@ export function createCustomerOrder(data: {
       };
     }
 
-    // 优先从赠送金抵扣
+    // 优先消费赠送金（逐条充值、按时间顺序），再消费本金
     let remainingToPay = totalAmount;
-    if (activeRecharge.bonus_balance && activeRecharge.bonus_balance > 0) {
-      fromBonus = Math.min(activeRecharge.bonus_balance, remainingToPay);
-      userRechargeModel.updateBonusBalance(activeRecharge.id, fromBonus);
-      remainingToPay = Math.round((remainingToPay - fromBonus) * 100) / 100;
+
+    // 第一轮：优先从赠送金抵扣（按充值时间升序）
+    for (const recharge of activeRecharges) {
+      if (remainingToPay <= 0) break;
+      if (recharge.bonus_balance && recharge.bonus_balance > 0) {
+        const deduct = Math.min(recharge.bonus_balance, remainingToPay);
+        userRechargeModel.updateBonusBalance(recharge.id, deduct);
+        fromBonus += deduct;
+        remainingToPay = Math.round((remainingToPay - deduct) * 100) / 100;
+
+        balanceTransactionModel.create({
+          user_id: data.user_id,
+          recharge_id: recharge.id,
+          tx_type: 'consume_bonus',
+          amount: deduct,
+          principal_after: recharge.remaining_balance,
+          bonus_after: recharge.bonus_balance - deduct,
+          description: `消费抵扣 - 赠送金 - ¥${deduct.toFixed(2)}`,
+        });
+      }
     }
 
-    // 剩余从本金余额抵扣
-    if (remainingToPay > 0 && activeRecharge.remaining_balance > 0) {
-      fromBalance = Math.min(activeRecharge.remaining_balance, remainingToPay);
-      userRechargeModel.updateRemainingBalance(activeRecharge.id, fromBalance);
-      remainingToPay = Math.round((remainingToPay - fromBalance) * 100) / 100;
+    // 第二轮：剩余从本金抵扣（按充值时间升序）
+    for (const recharge of activeRecharges) {
+      if (remainingToPay <= 0) break;
+      if (recharge.remaining_balance && recharge.remaining_balance > 0) {
+        const deduct = Math.min(recharge.remaining_balance, remainingToPay);
+        userRechargeModel.updateRemainingBalance(recharge.id, deduct);
+        fromBalance += deduct;
+        remainingToPay = Math.round((remainingToPay - deduct) * 100) / 100;
+
+        balanceTransactionModel.create({
+          user_id: data.user_id,
+          recharge_id: recharge.id,
+          tx_type: 'consume_principal',
+          amount: deduct,
+          principal_after: recharge.remaining_balance - deduct,
+          bonus_after: recharge.bonus_balance,
+          description: `消费抵扣 - 本金 - ¥${deduct.toFixed(2)}`,
+        });
+      }
+    }
+
+    // 每笔用完的充值标记为过期
+    for (const recharge of activeRecharges) {
+      const refetched = userRechargeModel.findById(recharge.id);
+      if (refetched) {
+        const remainingTotal = (refetched.remaining_balance || 0) + (refetched.bonus_balance || 0);
+        if (remainingTotal <= 0) {
+          userRechargeModel.expireRecharge(recharge.id);
+          balanceTransactionModel.create({
+            user_id: data.user_id,
+            recharge_id: recharge.id,
+            tx_type: 'expire',
+            amount: 0,
+            principal_after: 0,
+            bonus_after: 0,
+            description: '余额用尽，充值套餐自动过期',
+          });
+        }
+      }
     }
 
     finalAmount = remainingToPay;
-
-    // 记录流水
-    if (fromBonus > 0) {
-      balanceTransactionModel.create({
-        user_id: data.user_id,
-        recharge_id: activeRecharge.id,
-        tx_type: 'consume_bonus',
-        amount: fromBonus,
-        principal_after: activeRecharge.remaining_balance - fromBalance,
-        bonus_after: activeRecharge.bonus_balance - fromBonus,
-        description: `消费抵扣 - 赠送金 - ¥${fromBonus.toFixed(2)}`,
-      });
-    }
-    if (fromBalance > 0) {
-      balanceTransactionModel.create({
-        user_id: data.user_id,
-        recharge_id: activeRecharge.id,
-        tx_type: 'consume_principal',
-        amount: fromBalance,
-        principal_after: activeRecharge.remaining_balance - fromBalance,
-        bonus_after: activeRecharge.bonus_balance - fromBonus,
-        description: `消费抵扣 - 本金 - ¥${fromBalance.toFixed(2)}`,
-      });
-    }
-
-    // 如果余额全部用完，标记为过期
-    const remainingTotal = (activeRecharge.remaining_balance - fromBalance) + (activeRecharge.bonus_balance - fromBonus);
-    if (remainingTotal <= 0) {
-      userRechargeModel.expireRecharge(activeRecharge.id);
-      balanceTransactionModel.create({
-        user_id: data.user_id,
-        recharge_id: activeRecharge.id,
-        tx_type: 'expire',
-        amount: 0,
-        principal_after: 0,
-        bonus_after: 0,
-        description: '余额用尽，充值套餐自动过期',
-      });
-    }
   }
 
   // 计算佣金（基于折后金额）

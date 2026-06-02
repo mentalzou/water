@@ -19,7 +19,7 @@ export const userRechargeModel = {
   }): UserRecharge {
     const id = uuidv4();
     db.prepare(
-        'INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, transaction_id, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, status, transaction_id, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
         id,
         data.user_id,
@@ -30,6 +30,7 @@ export const userRechargeModel = {
         data.paid_amount,
         data.remaining_balance,
         data.bonus_balance,
+        'pending',
         data.transaction_id || '',
         data.remark || ''
     );
@@ -70,6 +71,37 @@ export const userRechargeModel = {
     const pkg = db.prepare('SELECT * FROM recharge_packages WHERE id = ?').get(recharge.package_id) as any;
 
     return { ...recharge, package: pkg };
+  },
+
+  /** 获取用户所有有效充值记录（按创建时间升序，先充的先消费） */
+  findAllActiveByUserId(userId: string): (UserRecharge & { package?: any })[] {
+    const recharges = db.prepare(
+        "SELECT * FROM user_recharges WHERE user_id = ? AND status = 'active' ORDER BY created_at ASC"
+    ).all(userId) as UserRecharge[];
+
+    return recharges.map(recharge => {
+      const pkg = db.prepare('SELECT * FROM recharge_packages WHERE id = ?').get(recharge.package_id) as any;
+      return { ...recharge, package: pkg };
+    });
+  },
+
+  /** 获取用户账户总余额汇总 */
+  getTotalBalanceByUserId(userId: string): {
+    total_principal: number;
+    total_bonus: number;
+    total_balance: number;
+    recharge_count: number;
+  } {
+    const result = db.prepare(
+        "SELECT COALESCE(SUM(remaining_balance), 0) as total_principal, COALESCE(SUM(bonus_balance), 0) as total_bonus, COUNT(*) as recharge_count FROM user_recharges WHERE user_id = ? AND status = 'active'"
+    ).get(userId) as { total_principal: number; total_bonus: number; recharge_count: number };
+
+    return {
+      total_principal: result.total_principal,
+      total_bonus: result.total_bonus,
+      total_balance: result.total_principal + result.total_bonus,
+      recharge_count: result.recharge_count,
+    };
   },
 
   markPaid(id: string, transactionId: string): UserRecharge | undefined {

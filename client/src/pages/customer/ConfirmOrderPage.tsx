@@ -99,13 +99,12 @@ export default function ConfirmOrderPage() {
 
   async function loadBalance() {
     try {
-      const res: any = await customerApi.getActiveRecharge();
+      const res: any = await customerApi.getUserBalance();
       if (res.code === 200 && res.data) {
-        const recharge = res.data;
         setBalanceInfo({
-          principal: recharge.remaining_balance || 0,
-          bonus: recharge.bonus_balance || 0,
-          total: (recharge.remaining_balance || 0) + (recharge.bonus_balance || 0),
+          principal: res.data.total_principal || 0,
+          bonus: res.data.total_bonus || 0,
+          total: res.data.total_balance || 0,
         });
       }
     } catch (err) {

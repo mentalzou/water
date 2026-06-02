@@ -26,10 +26,19 @@ interface UserRecharge {
   package: RechargePackage;
 }
 
+interface UserBalance {
+  total_principal: number;
+  total_bonus: number;
+  total_balance: number;
+  recharge_count: number;
+  active_recharges: UserRecharge[];
+}
+
 export default function RechargePage() {
   const navigate = useNavigate();
   const [packages, setPackages] = useState<RechargePackage[]>([]);
   const [activeRecharge, setActiveRecharge] = useState<UserRecharge | null>(null);
+  const [userBalance, setUserBalance] = useState<UserBalance | null>(null);
   const [rechargeHistory, setRechargeHistory] = useState<UserRecharge[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPackage, setSelectedPackage] = useState<string>('');
@@ -48,13 +57,16 @@ export default function RechargePage() {
 
       const token = localStorage.getItem('customer_token');
       if (token) {
-        const [activeRes, historyRes] = await Promise.all([
-          customerApi.getActiveRecharge(),
+        const [balanceRes, historyRes] = await Promise.all([
+          customerApi.getUserBalance(),
           customerApi.getMyRecharges(),
         ]) as [any, any];
 
-        if ((activeRes as any).code === 200 && activeRes.data) {
-          setActiveRecharge(activeRes.data);
+        if ((balanceRes as any).code === 200 && balanceRes.data) {
+          setUserBalance(balanceRes.data);
+          if (balanceRes.data.active_recharges?.length > 0) {
+            setActiveRecharge(balanceRes.data.active_recharges[0]);
+          }
         }
 
         if ((historyRes as any).code === 200) {
@@ -194,22 +206,26 @@ export default function RechargePage() {
       <main className="px-4 py-4 space-y-4">
 
         {/* 当前余额卡片 */}
-        {activeRecharge && (
+        {userBalance && userBalance.total_balance > 0 && (
           <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-white/70 text-xs">账户余额</span>
+              <span className="text-white/70 text-xs">
+                账户余额
+                {userBalance.recharge_count > 1 && (
+                  <span className="ml-1">（{userBalance.recharge_count}笔充值累加）</span>
+                )}
+              </span>
               <span className="px-2.5 py-0.5 bg-white/20 rounded-full text-[11px]">生效中</span>
             </div>
             <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-3xl font-bold">¥{activeRecharge.remaining_balance.toFixed(2)}</span>
-              {activeRecharge.bonus_balance > 0 && (
-                <span className="text-yellow-200 text-xs">含赠送 ¥{activeRecharge.bonus_balance.toFixed(2)}</span>
+              <span className="text-3xl font-bold">¥{userBalance.total_balance.toFixed(2)}</span>
+              {userBalance.total_bonus > 0 && (
+                <span className="text-yellow-200 text-xs">含赠送 ¥{userBalance.total_bonus.toFixed(2)}</span>
               )}
             </div>
             <div className="flex items-center gap-4 text-xs text-white/60">
-              <span>套餐：{activeRecharge.package?.name}</span>
-              <span>本金 ¥{activeRecharge.remaining_balance.toFixed(0)}</span>
-              <span>赠送 ¥{activeRecharge.bonus_balance.toFixed(0)}</span>
+              <span>本金 ¥{userBalance.total_principal.toFixed(0)}</span>
+              <span>赠送 ¥{userBalance.total_bonus.toFixed(0)}</span>
             </div>
           </div>
         )}
