@@ -752,12 +752,19 @@ function seedDefaultData(database: Database.Database): void {
 
   const adminCount = database.prepare("SELECT COUNT(*) as count FROM users WHERE role='admin'").get() as { count: number };
   if (adminCount.count === 0) {
-    database.prepare("INSERT INTO users (id, phone, name, role, status) VALUES ('admin-001', '13800000000', '系统管理员', 'admin', 'active')").run();
-    const insertUser = database.prepare(
+    database.prepare(
         'INSERT INTO users (id, phone, name, role, password_hash, avatar, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(
+        'admin-001',
+        '13800000000',
+        '系统管理员',
+        'admin',
+        'pbkdf2_sha256$260000$94276ea53064985dc60f91157603838a$ca87f115c59d2e42f98c3c7c79a08179e12c10101ac4f24fea130b20b0a13396',
+        '',
+        'active',
+        '2026-05-10 03:19:28',
+        '2026-05-10 03:19:35'
     );
-    insertUser.run('admin-001', '13800000000', '系统管理员', 'admin', 'pbkdf2_sha256$260000$94276ea53064985dc60f91157603838a$ca87f115c59d2e42f98c3c7c79a08179e12c10101ac4f24fea130b20b0a13396',
-        '', 'active', '2026-05-10 03:19:28', '2026-05-10 03:19:35');
   }
 
   const roleCount = database.prepare('SELECT COUNT(*) as count FROM roles').get() as { count: number };

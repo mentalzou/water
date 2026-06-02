@@ -48,8 +48,19 @@ if [ -d "$PROJECT_DIR" ]; then
     git pull origin main || {
         echo "git pull 失败，尝试重新克隆..."
         cd ..
+        # 备份 data 目录（生产数据库）
+        if [ -d "$PROJECT_DIR/data" ]; then
+            cp -r "$PROJECT_DIR/data" /tmp/water_data_backup
+            echo "已备份 data 目录"
+        fi
         rm -rf "$PROJECT_DIR"
         git clone "$MIRROR/https://github.com/mentalzou/water.git" "$PROJECT_DIR"
+        # 恢复 data 目录
+        if [ -d /tmp/water_data_backup ]; then
+            cp -r /tmp/water_data_backup "$PROJECT_DIR/data"
+            rm -rf /tmp/water_data_backup
+            echo "已恢复 data 目录"
+        fi
     }
 else
     # 尝试多个镜像源
