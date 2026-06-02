@@ -32,7 +32,7 @@ export default function ConfirmOrderPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [setAddresses] = useState<Address[]>([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [contactPhone, setContactPhone] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('明天');
