@@ -183,16 +183,29 @@ export default function ConfirmOrderPage() {
       // 在线支付流程
       console.log('user.open_id:', user.open_id);
       console.log('user.openId:', user.openId);
-      const openId = user.open_id || user.openId || '';
+      let openId = user.open_id || user.openId || '';
+
+      // 无 openId 时尝试自动获取
+      if (!openId) {
+        try {
+          // 开发环境：使用 dev_ 前缀自动生成模拟 openId
+          const devOpenId = 'dev_' + (user.phone || 'test') + '_' + Date.now();
+          const openIdRes: any = await customerApi.getWechatOpenId(devOpenId, 'oa');
+          if (openIdRes.code === 200 && openIdRes.data?.openid) {
+            openId = openIdRes.data.openid;
+            // 更新本地存储
+            const updatedUser = { ...user, open_id: openId };
+            localStorage.setItem('customer_user', JSON.stringify(updatedUser));
+            console.log('[Payment] 自动获取 openId:', openId);
+          }
+        } catch (e) {
+          console.error('[Payment] 获取 openId 失败:', e);
+        }
+      }
 
       if (!openId) {
-        // 无 openId，降级为模拟支付（开发环境）
-        const payRes: any = await customerApi.payForOrder(orderId);
-        localStorage.removeItem('confirm_order_data');
-        navigate('/order/result/' + orderId, {
-          state: { result: payRes.data || orderRes.data },
-          replace: true,
-        });
+        alert('在线支付需要微信授权，请确保在微信环境中打开，或联系管理员获取 openId');
+        setSubmitting(false);
         return;
       }
 

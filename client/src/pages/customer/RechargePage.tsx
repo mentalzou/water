@@ -103,20 +103,31 @@ export default function RechargePage() {
 
       const rechargeId = rechargeRes.data.id;
       const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
-      const openId = user.open_id || user.openId || '';
+      let openId = user.open_id || user.openId || '';
+
+      // 无 openId 时尝试自动获取
+      if (!openId) {
+        try {
+          const devOpenId = 'dev_' + (user.phone || 'test') + '_' + Date.now();
+          const openIdRes: any = await customerApi.getWechatOpenId(devOpenId, 'oa');
+          if (openIdRes.code === 200 && openIdRes.data?.openid) {
+            openId = openIdRes.data.openid;
+            const updatedUser = { ...user, open_id: openId };
+            localStorage.setItem('customer_user', JSON.stringify(updatedUser));
+            console.log('[Recharge] 自动获取 openId:', openId);
+          }
+        } catch (e) {
+          console.error('[Recharge] 获取 openId 失败:', e);
+        }
+      }
 
       if (!openId) {
-        const payRes: any = await customerApi.payForRecharge(rechargeId);
-        if (payRes.code === 200) {
-          alert('充值成功！（模拟模式）');
-          await loadData();
-          setSelectedPackage('');
-        } else {
-          alert(payRes.message || '支付失败');
-        }
+        alert('在线支付需要微信授权，请确保在微信环境中打开，或联系管理员获取 openId');
         setSubmitting(false);
         return;
       }
+
+
 
       const payRes: any = await customerApi.createRechargePayment({
         rechargeId,

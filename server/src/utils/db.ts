@@ -248,404 +248,325 @@ export function initTables(database: Database.Database): void {
       updated_at TEXT DEFAULT (datetime('now'))
       );
 
+    CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER PRIMARY KEY,
+      description TEXT DEFAULT '',
+      applied_at TEXT DEFAULT (datetime('now'))
+    );
+
   `);
 
-  // 兼容性迁移：为已存在的数据库添加新表和字段
-  migrateDatabase(database);
+  // 基于版本号的增量迁移（只看版本号，不再靠表结构猜测）
+  applyMigrations(database);
 
   seedDefaultData(database);
 }
 
-/** 数据库迁移：增量更新已有数据库的表结构 */
-function migrateDatabase(db: Database.Database): void {
-  // 创建 brands 表（如果不存在）
-  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='brands'").get() as any;
-  if (!tables) {
-    db.exec(`
-      CREATE TABLE brands (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
-        logo TEXT DEFAULT '',
-        description TEXT DEFAULT '',
-        category_id TEXT DEFAULT '' REFERENCES product_categories(id),
-        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        sort_order INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-  } else {
-    // 为已存在的 brands 表添加 category_id 字段
-    try {
-      const brandCols = db.prepare('PRAGMA table_info(brands)').all() as any[];
-      const hasCategoryId = brandCols.some((c: any) => c.name === 'category_id');
-      if (!hasCategoryId) {
-        console.log('[Migration] Adding category_id column to brands table...');
-        db.exec("ALTER TABLE brands ADD COLUMN category_id TEXT DEFAULT '' REFERENCES product_categories(id)");
-        console.log('[Migration] category_id column added to brands table successfully');
-      }
-    } catch (e: any) {
-      console.error('[Migration] Failed to add category_id to brands table:', e.message);
-    }
-  }
+/** 获取当前数据库 schema 版本号 */
+function getCurrentVersion(db: Database.Database): number {
+  const hasVersionTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'").get();
+  if (!hasVersionTable) return 0;
+  const row = db.prepare('SELECT MAX(version) as v FROM schema_version').get() as { v: number | null };
+  return row?.v ?? 0;
+}
 
-  // 创建 product_categories 表（如果不存在）
-  const hasCategories = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='product_categories'").get();
-  if (!hasCategories) {
-    db.exec(`      CREATE TABLE IF NOT EXISTS product_categories (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      code TEXT NOT NULL UNIQUE,
-      description TEXT DEFAULT '',
-      icon TEXT DEFAULT '',
-      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-      sort_order INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-  }
-
-  // 为 products 表添加 brand_id 字段（如果不存在）
-  // 为 products 表添加 category_id 字段（如果不存在）
-  try {
-    const cols = db.prepare('PRAGMA table_info(products)').all() as any[];
-
-    const hasCategoryId = cols.some((c: any) => c.name === 'category_id');
-    if (!hasCategoryId) {
-      db.exec("ALTER TABLE products ADD COLUMN category_id TEXT DEFAULT '' REFERENCES product_categories(id)");
-    }
-
-    const hasBrandId = cols.some((c: any) => c.name === 'brand_id');
-    if (!hasBrandId) {
-      db.exec("ALTER TABLE products ADD COLUMN brand_id TEXT DEFAULT '' REFERENCES brands(id)");
-    }
-  } catch (e: any) {
-    console.error('[Migration] Failed to add columns to products table:', e.message);
-  }
-
-  // 创建 recharge_packages 表（如果不存在）
-  const hasRechargePackages = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='recharge_packages'").get();
-  if (!hasRechargePackages) {
-    db.exec(`      CREATE TABLE IF NOT EXISTS recharge_packages (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      amount REAL NOT NULL,
-      discount_rate REAL NOT NULL,
-      description TEXT DEFAULT '',
-      status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-      sort_order INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-  }
-
-  // 创建 user_recharges 表（如果不存在）
-  const hasUserRecharges = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_recharges'").get();
-  if (!hasUserRecharges) {
-    db.exec(`CREATE TABLE IF NOT EXISTS user_recharges (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          package_id TEXT NOT NULL REFERENCES recharge_packages(id),
-          amount REAL NOT NULL,
-          discount_rate REAL NOT NULL,
-          bonus_amount REAL DEFAULT 0,
-          paid_amount REAL NOT NULL,
-          remaining_balance REAL NOT NULL,
-          bonus_balance REAL DEFAULT 0,
-          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
-          transaction_id TEXT DEFAULT '',
-          remark TEXT DEFAULT '',
-          created_at TEXT DEFAULT (datetime('now')),
-          paid_at TEXT DEFAULT ''
-          )
-    `);
-  } else {
-    // 迁移旧表：添加 bonus_amount/bonus_balance 列 + 修正 status 约束支持 'pending'
-    try { db.prepare("ALTER TABLE user_recharges ADD COLUMN bonus_amount REAL DEFAULT 0").run(); } catch (_) { /* 已存在 */ }
-    try { db.prepare("ALTER TABLE user_recharges ADD COLUMN bonus_balance REAL DEFAULT 0").run(); } catch (_) { /* 已存在 */ }
-
-    // 检查旧约束是否缺少 'pending'，若缺少则重建表
-    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_recharges'").get() as { sql: string } | undefined;
-    if (tableInfo && !tableInfo.sql.includes('pending')) {
-      db.exec(`
-        CREATE TABLE user_recharges_new (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          package_id TEXT NOT NULL REFERENCES recharge_packages(id),
-          amount REAL NOT NULL,
-          discount_rate REAL NOT NULL,
-          bonus_amount REAL DEFAULT 0,
-          paid_amount REAL NOT NULL,
-          remaining_balance REAL NOT NULL,
-          bonus_balance REAL DEFAULT 0,
-          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
-          transaction_id TEXT DEFAULT '',
-          remark TEXT DEFAULT '',
-          created_at TEXT DEFAULT (datetime('now')),
-          paid_at TEXT DEFAULT ''
-        );
-        INSERT INTO user_recharges_new SELECT id, user_id, package_id, amount, discount_rate, COALESCE(bonus_amount,0), paid_amount, remaining_balance, COALESCE(bonus_balance,0), status, transaction_id, remark, created_at, paid_at FROM user_recharges;
-        DROP TABLE user_recharges;
-        ALTER TABLE user_recharges_new RENAME TO user_recharges;
-      `);
-      console.log('[DB] user_recharges 表已迁移，支持 pending 状态');
-    }
-  }
-
-  // 创建 order_items 表（如果不存在）
-  const hasOrderItems = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='order_items'").get();
-  if (!hasOrderItems) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS order_items (
-        id TEXT PRIMARY KEY,
-        order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-        product_id TEXT NOT NULL REFERENCES products(id),
-        product_name TEXT NOT NULL,
-        quantity INTEGER NOT NULL DEFAULT 1,
-        unit_price REAL NOT NULL,
-        subtotal REAL NOT NULL,
-        unit TEXT DEFAULT '瓶',
-        created_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-    
-    // 迁移现有订单数据到 order_items 表
-    migrateOrdersToItems(db);
-  }
-
-  // 迁移 orders 表：将 product_id, quantity, unit_price 设为可空（支持多商品订单）
-  migrateOrdersTableSchema(db);
-
-  // 创建 addresses 表（如果不存在）
-  const hasAddresses = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='addresses'").get();
-  if (!hasAddresses) {
-    db.exec(`      CREATE TABLE IF NOT EXISTS addresses (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      contact_name TEXT NOT NULL,
-      contact_phone TEXT NOT NULL,
-      province TEXT DEFAULT '',
-      city TEXT DEFAULT '',
-      district TEXT DEFAULT '',
-      detail TEXT NOT NULL,
-      is_default INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-  }
-  // 为 users 表添加 points 字段（如果不存在）
-  try {
-    const userCols = db.prepare('PRAGMA table_info(users)').all() as any[];
-    const hasPoints = userCols.some((c: any) => c.name === 'points');
-    if (!hasPoints) {
-      db.exec("ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0");
-    }
-  } catch { /* ignore */ }
-
-  // 创建 points_records 表（如果不存在）
-  const hasPointsRecords = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='points_records'").get();
-  if (!hasPointsRecords) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS points_records (
-                                                  id TEXT PRIMARY KEY,
-                                                  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        order_id TEXT REFERENCES orders(id),
-        change_type TEXT NOT NULL CHECK(change_type IN ('earn', 'spend', 'refund', 'adjust', 'expire')),
-        change_amount INTEGER NOT NULL,
-        balance_after INTEGER NOT NULL,
-        description TEXT DEFAULT '',
-        created_at TEXT DEFAULT (datetime('now'))
-        )
-    `);
-  }
-
-  // 迁移 recharge_packages：添加 bonus_amount 字段
-  try {
-    const rpCols = db.prepare('PRAGMA table_info(recharge_packages)').all() as any[];
-    const hasBonusAmount = rpCols.some((c: any) => c.name === 'bonus_amount');
-    if (!hasBonusAmount) {
-      console.log('[Migration] Adding bonus_amount column to recharge_packages...');
-      db.exec("ALTER TABLE recharge_packages ADD COLUMN bonus_amount REAL DEFAULT 0");
-      console.log('[Migration] bonus_amount column added to recharge_packages');
-    }
-  } catch (e: any) {
-    console.error('[Migration] Failed to add bonus_amount to recharge_packages:', e.message);
-  }
-
-  // 迁移 user_recharges：添加 bonus_amount 和 bonus_balance 字段
-  try {
-    const urCols = db.prepare('PRAGMA table_info(user_recharges)').all() as any[];
-    const hasBonusAmount = urCols.some((c: any) => c.name === 'bonus_amount');
-    const hasBonusBalance = urCols.some((c: any) => c.name === 'bonus_balance');
-    if (!hasBonusAmount) {
-      console.log('[Migration] Adding bonus_amount column to user_recharges...');
-      db.exec("ALTER TABLE user_recharges ADD COLUMN bonus_amount REAL DEFAULT 0");
-      console.log('[Migration] bonus_amount column added to user_recharges');
-    }
-    if (!hasBonusBalance) {
-      console.log('[Migration] Adding bonus_balance column to user_recharges...');
-      db.exec("ALTER TABLE user_recharges ADD COLUMN bonus_balance REAL DEFAULT 0");
-      console.log('[Migration] bonus_balance column added to user_recharges');
-    }
-  } catch (e: any) {
-    console.error('[Migration] Failed to add columns to user_recharges:', e.message);
-  }
-
-  const hasAdBanners = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ad_banners'").get();
-  if (!hasAdBanners) {
-    console.log('[Migration] Creating ad_banners table...');
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS ad_banners (
-        id TEXT PRIMARY KEY,
-        title TEXT DEFAULT '',
-        subtitle TEXT DEFAULT '',
-        type TEXT DEFAULT 'image' CHECK(type IN ('image','video')),
-        src TEXT DEFAULT '',
-        link_url TEXT DEFAULT '',
-        bg_color TEXT DEFAULT '',
-        sort_order INTEGER DEFAULT 0,
-        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-    console.log('[Migration] ad_banners table created');
-  }
-
-  // 添加 open_id 字段到 users 表
-  try {
-    const userCols = db.prepare('PRAGMA table_info(users)').all() as any[];
-    const hasOpenId = userCols.some((c: any) => c.name === 'open_id');
-    if (!hasOpenId) {
-      console.log('[Migration] Adding open_id column to users...');
-      db.exec('ALTER TABLE users ADD COLUMN open_id TEXT DEFAULT \'\'');
-      console.log('[Migration] open_id column added to users');
-    }
-  } catch (e: any) {
-    console.error('[Migration] Failed to add open_id to users:', e.message);
-  }
-
-  // 创建 balance_transactions 流水表
-  const hasBalanceTx = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='balance_transactions'").get();
-  if (!hasBalanceTx) {
-    console.log('[Migration] Creating balance_transactions table...');
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS balance_transactions (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        recharge_id TEXT REFERENCES user_recharges(id),
-        order_id TEXT REFERENCES orders(id),
-        tx_type TEXT NOT NULL CHECK(tx_type IN ('recharge_principal','recharge_bonus','consume_bonus','consume_principal','refund','adjust','expire')),
-        amount REAL NOT NULL,
-        principal_after REAL DEFAULT 0,
-        bonus_after REAL DEFAULT 0,
-        description TEXT DEFAULT '',
-        operator_ip TEXT DEFAULT '',
-        created_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-    console.log('[Migration] balance_transactions table created');
-  }
-
-  // 为 orders 表添加 pay_method 字段
-  try {
-    const orderCols = db.prepare('PRAGMA table_info(orders)').all() as any[];
-    const hasPayMethod = orderCols.some((c: any) => c.name === 'pay_method');
-    if (!hasPayMethod) {
-      console.log('[Migration] Adding pay_method column to orders...');
-      db.exec("ALTER TABLE orders ADD COLUMN pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed'))");
-      console.log('[Migration] pay_method column added to orders');
-    }
-    // 添加 from_balance / from_bonus 字段（余额抵扣记录）
-    const hasFromBalance = orderCols.some((c: any) => c.name === 'from_balance');
-    if (!hasFromBalance) {
-      db.exec("ALTER TABLE orders ADD COLUMN from_balance REAL DEFAULT 0");
-      console.log('[Migration] from_balance column added to orders');
-    }
-    const hasFromBonus = orderCols.some((c: any) => c.name === 'from_bonus');
-    if (!hasFromBonus) {
-      db.exec("ALTER TABLE orders ADD COLUMN from_bonus REAL DEFAULT 0");
-      console.log('[Migration] from_bonus column added to orders');
-    }
-  } catch (e: any) {
-    console.error('[Migration] Failed to add pay_method/from_balance/from_bonus to orders:', e.message);
-  }
+/** 标记迁移版本已执行 */
+function recordMigration(db: Database.Database, version: number, description: string): void {
+  db.prepare('INSERT INTO schema_version (version, description) VALUES (?, ?)').run(version, description);
+  console.log(`[Migration] v${version}: ${description} - 完成`);
 }
 
 /**
- * 迁移 orders 表结构：
- * 由于 SQLite 不支持直接 ALTER COLUMN 或 DROP COLUMN，
- * 需要重建表来支持多商品模式
+ * 基于版本号的增量迁移系统
+ * - 每个迁移只执行一次（由 schema_version 表记录）
+ * - 每个迁移包裹在事务中，原子执行
+ * - 对已有数据的老数据库，每个迁移步骤都做幂等检查
  */
-function migrateOrdersTableSchema(db: Database.Database): void {
-  // 检查是否已经迁移过
-  const migrated = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='orders_new_schema_v2'").get();
-  if (migrated) return; // 已迁移
+function applyMigrations(db: Database.Database): void {
+  const currentVersion = getCurrentVersion(db);
+  console.log(`[Migration] 当前数据库版本: v${currentVersion}`);
 
-  try {
-    // 获取当前表结构
-    const orderCols = db.prepare('PRAGMA table_info(orders)').all() as any[];
-    const hasOldFields = orderCols.some((c: any) => ['product_id', 'quantity', 'unit_price'].includes(c.name));
+  // === v1: brands 表 + category_id 字段 ===
+  if (currentVersion < 1) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS brands (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, logo TEXT DEFAULT '',
+        description TEXT DEFAULT '', category_id TEXT DEFAULT '' REFERENCES product_categories(id),
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 1, 'brands 表');
+    });
+    txn();
+  }
 
-    if (hasOldFields) {
-      console.log('[Migration] Migrating orders table to support multi-item orders...');
+  // === v2: product_categories 表 + products 品牌/分类字段 ===
+  if (currentVersion < 2) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS product_categories (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, code TEXT NOT NULL UNIQUE,
+        description TEXT DEFAULT '', icon TEXT DEFAULT '',
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      // 幂等加列
+      const cols = db.prepare('PRAGMA table_info(products)').all() as any[];
+      if (!cols.some((c: any) => c.name === 'category_id')) {
+        db.exec("ALTER TABLE products ADD COLUMN category_id TEXT DEFAULT '' REFERENCES product_categories(id)");
+      }
+      if (!cols.some((c: any) => c.name === 'brand_id')) {
+        db.exec("ALTER TABLE products ADD COLUMN brand_id TEXT DEFAULT '' REFERENCES brands(id)");
+      }
+      // brands 表也可能缺 category_id（老版本创建时没有）
+      const brandCols = db.prepare('PRAGMA table_info(brands)').all() as any[];
+      if (!brandCols.some((c: any) => c.name === 'category_id')) {
+        db.exec("ALTER TABLE brands ADD COLUMN category_id TEXT DEFAULT '' REFERENCES product_categories(id)");
+      }
+      recordMigration(db, 2, 'product_categories 表 + products/brands 关联字段');
+    });
+    txn();
+  }
 
-      // 1. 先迁移现有数据到 order_items
+  // === v3: recharge_packages 表 ===
+  if (currentVersion < 3) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS recharge_packages (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, amount REAL NOT NULL,
+        discount_rate REAL NOT NULL, bonus_amount REAL DEFAULT 0,
+        description TEXT DEFAULT '',
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 3, 'recharge_packages 表');
+    });
+    txn();
+  }
+
+  // === v4: user_recharges 表（完整 schema 含 pending 状态） ===
+  if (currentVersion < 4) {
+    const txn = db.transaction(() => {
+      const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='user_recharges'").get();
+      if (!exists) {
+        // 全新创建
+        db.exec(`CREATE TABLE user_recharges (
+          id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          package_id TEXT NOT NULL REFERENCES recharge_packages(id),
+          amount REAL NOT NULL, discount_rate REAL NOT NULL,
+          bonus_amount REAL DEFAULT 0, paid_amount REAL NOT NULL,
+          remaining_balance REAL NOT NULL, bonus_balance REAL DEFAULT 0,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
+          transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
+          created_at TEXT DEFAULT (datetime('now')), paid_at TEXT DEFAULT ''
+        )`);
+      } else {
+        // 老表存在：先加缺失列
+        try { db.exec("ALTER TABLE user_recharges ADD COLUMN bonus_amount REAL DEFAULT 0"); } catch (_) { /* 已存在 */ }
+        try { db.exec("ALTER TABLE user_recharges ADD COLUMN bonus_balance REAL DEFAULT 0"); } catch (_) { /* 已存在 */ }
+        // 修正 CHECK 约束（加 pending）
+        const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_recharges'").get() as { sql: string } | undefined;
+        if (tableInfo && !tableInfo.sql.includes('pending')) {
+          // 清理可能残留的临时表
+          db.exec('DROP TABLE IF EXISTS user_recharges_new');
+          db.exec(`CREATE TABLE user_recharges_new (
+            id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            package_id TEXT NOT NULL REFERENCES recharge_packages(id),
+            amount REAL NOT NULL, discount_rate REAL NOT NULL,
+            bonus_amount REAL DEFAULT 0, paid_amount REAL NOT NULL,
+            remaining_balance REAL NOT NULL, bonus_balance REAL DEFAULT 0,
+            status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
+            transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now')), paid_at TEXT DEFAULT ''
+          )`);
+          db.exec(`INSERT INTO user_recharges_new
+            SELECT id,user_id,package_id,amount,discount_rate,
+              COALESCE(bonus_amount,0),paid_amount,remaining_balance,
+              COALESCE(bonus_balance,0),status,transaction_id,remark,created_at,paid_at
+            FROM user_recharges`);
+          db.exec('DROP TABLE user_recharges');
+          db.exec('ALTER TABLE user_recharges_new RENAME TO user_recharges');
+        }
+      }
+      recordMigration(db, 4, 'user_recharges 表（支持 pending 状态）');
+    });
+    txn();
+  }
+
+  // === v5: order_items 表 + orders 表多商品改造 ===
+  if (currentVersion < 5) {
+    const txn = db.transaction(() => {
+      // 创建 order_items 表
+      db.exec(`CREATE TABLE IF NOT EXISTS order_items (
+        id TEXT PRIMARY KEY, order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        product_id TEXT NOT NULL REFERENCES products(id),
+        product_name TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 1,
+        unit_price REAL NOT NULL, subtotal REAL NOT NULL, unit TEXT DEFAULT '瓶',
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
+
+      // 迁移 orders 旧数据到 order_items
       migrateOrdersToItems(db);
 
-      // 2. 创建新的 orders 表（不含旧的商品字段）
-      db.exec(`
-        CREATE TABLE orders_new_schema_v2 (
-          id TEXT PRIMARY KEY,
-          order_no TEXT NOT NULL UNIQUE,
-          customer_phone TEXT NOT NULL,
-          customer_name TEXT DEFAULT '',
-          address TEXT NOT NULL,
-          total_amount REAL NOT NULL,
-          distributor_id TEXT,
-          distributor_commission REAL DEFAULT 0,
+      // 重建 orders 表去掉旧商品字段（仅当旧字段存在时）
+      const orderCols = db.prepare('PRAGMA table_info(orders)').all() as any[];
+      const hasOldFields = orderCols.some((c: any) => ['product_id', 'quantity', 'unit_price'].includes(c.name));
+      if (hasOldFields) {
+        db.exec('DROP TABLE IF EXISTS orders_new_schema_v2');
+        db.exec(`CREATE TABLE orders_new_schema_v2 (
+          id TEXT PRIMARY KEY, order_no TEXT NOT NULL UNIQUE,
+          customer_phone TEXT NOT NULL, customer_name TEXT DEFAULT '',
+          address TEXT NOT NULL, total_amount REAL NOT NULL,
+          distributor_id TEXT, distributor_commission REAL DEFAULT 0,
           deliveryman_id TEXT,
           status TEXT DEFAULT 'pending',
           pay_status TEXT DEFAULT 'unpaid',
-          transaction_id TEXT DEFAULT '',
-          remark TEXT DEFAULT '',
-          created_at TEXT DEFAULT (datetime('now')),
-          updated_at TEXT DEFAULT (datetime('now')),
-          paid_at TEXT DEFAULT '',
-          assigned_at TEXT DEFAULT '',
-          delivered_at TEXT DEFAULT ''
-        );
-      `);
+          transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
+          created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+          paid_at TEXT DEFAULT '', assigned_at TEXT DEFAULT '', delivered_at TEXT DEFAULT ''
+        )`);
+        db.exec(`INSERT INTO orders_new_schema_v2
+          (id,order_no,customer_phone,customer_name,address,total_amount,distributor_id,
+           distributor_commission,deliveryman_id,status,pay_status,transaction_id,remark,
+           created_at,updated_at,paid_at,assigned_at,delivered_at)
+          SELECT id,order_no,customer_phone,customer_name,address,total_amount,distributor_id,
+            distributor_commission,deliveryman_id,status,pay_status,transaction_id,remark,
+            created_at,updated_at,paid_at,assigned_at,delivered_at
+          FROM orders`);
+        db.exec('DROP TABLE orders');
+        db.exec('ALTER TABLE orders_new_schema_v2 RENAME TO orders');
+      }
+      recordMigration(db, 5, 'order_items 表 + orders 多商品改造');
+    });
+    txn();
+  }
 
-      // 3. 复制数据到新表（忽略旧字段）
-      db.exec(`
-        INSERT INTO orders_new_schema_v2
-        (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id,
-         distributor_commission, deliveryman_id, status, pay_status, transaction_id, remark,
-         created_at, updated_at, paid_at, assigned_at, delivered_at)
-        SELECT
-          id, order_no, customer_phone, customer_name, address, total_amount, distributor_id,
-          distributor_commission, deliveryman_id, status, pay_status, transaction_id, remark,
-          created_at, updated_at, paid_at, assigned_at, delivered_at
-        FROM orders;
-      `);
+  // === v6: addresses 表 ===
+  if (currentVersion < 6) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS addresses (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        contact_name TEXT NOT NULL, contact_phone TEXT NOT NULL,
+        province TEXT DEFAULT '', city TEXT DEFAULT '', district TEXT DEFAULT '',
+        detail TEXT NOT NULL, is_default INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 6, 'addresses 表');
+    });
+    txn();
+  }
 
-      // 4. 删除旧表
-      db.exec('DROP TABLE orders;');
+  // === v7: users.points + points_records 表 ===
+  if (currentVersion < 7) {
+    const txn = db.transaction(() => {
+      const userCols = db.prepare('PRAGMA table_info(users)').all() as any[];
+      if (!userCols.some((c: any) => c.name === 'points')) {
+        db.exec('ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0');
+      }
+      db.exec(`CREATE TABLE IF NOT EXISTS points_records (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        order_id TEXT REFERENCES orders(id),
+        change_type TEXT NOT NULL CHECK(change_type IN ('earn','spend','refund','adjust','expire')),
+        change_amount INTEGER NOT NULL, balance_after INTEGER NOT NULL,
+        description TEXT DEFAULT '', created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 7, 'users.points + points_records 表');
+    });
+    txn();
+  }
 
-      // 5. 重命名新表
-      db.exec('ALTER TABLE orders_new_schema_v2 RENAME TO orders;');
+  // === v8: recharge_packages.bonus_amount + user_recharges bonus 列 ===
+  if (currentVersion < 8) {
+    const txn = db.transaction(() => {
+      const rpCols = db.prepare('PRAGMA table_info(recharge_packages)').all() as any[];
+      if (!rpCols.some((c: any) => c.name === 'bonus_amount')) {
+        db.exec('ALTER TABLE recharge_packages ADD COLUMN bonus_amount REAL DEFAULT 0');
+      }
+      // user_recharges bonus 列（幂等，v4 可能已处理，这里兜底）
+      const urCols = db.prepare('PRAGMA table_info(user_recharges)').all() as any[];
+      if (!urCols.some((c: any) => c.name === 'bonus_amount')) {
+        db.exec('ALTER TABLE user_recharges ADD COLUMN bonus_amount REAL DEFAULT 0');
+      }
+      if (!urCols.some((c: any) => c.name === 'bonus_balance')) {
+        db.exec('ALTER TABLE user_recharges ADD COLUMN bonus_balance REAL DEFAULT 0');
+      }
+      recordMigration(db, 8, 'bonus_amount/bonus_balance 字段');
+    });
+    txn();
+  }
 
-      console.log('[Migration] Orders table migration completed successfully!');
-    }
-  } catch (e) {
-    console.error('[Migration] Failed to migrate orders table:', e);
+  // === v9: ad_banners 表 ===
+  if (currentVersion < 9) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS ad_banners (
+        id TEXT PRIMARY KEY, title TEXT DEFAULT '', subtitle TEXT DEFAULT '',
+        type TEXT DEFAULT 'image' CHECK(type IN ('image','video')),
+        src TEXT DEFAULT '', link_url TEXT DEFAULT '', bg_color TEXT DEFAULT '',
+        sort_order INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+        created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 9, 'ad_banners 表');
+    });
+    txn();
+  }
+
+  // === v10: users.open_id ===
+  if (currentVersion < 10) {
+    const txn = db.transaction(() => {
+      const userCols = db.prepare('PRAGMA table_info(users)').all() as any[];
+      if (!userCols.some((c: any) => c.name === 'open_id')) {
+        db.exec("ALTER TABLE users ADD COLUMN open_id TEXT DEFAULT ''");
+      }
+      recordMigration(db, 10, 'users.open_id');
+    });
+    txn();
+  }
+
+  // === v11: balance_transactions 表 ===
+  if (currentVersion < 11) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS balance_transactions (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        recharge_id TEXT REFERENCES user_recharges(id),
+        order_id TEXT REFERENCES orders(id),
+        tx_type TEXT NOT NULL CHECK(tx_type IN ('recharge_principal','recharge_bonus','consume_bonus','consume_principal','refund','adjust','expire')),
+        amount REAL NOT NULL, principal_after REAL DEFAULT 0, bonus_after REAL DEFAULT 0,
+        description TEXT DEFAULT '', operator_ip TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 11, 'balance_transactions 表');
+    });
+    txn();
+  }
+
+  // === v12: orders pay_method / from_balance / from_bonus ===
+  if (currentVersion < 12) {
+    const txn = db.transaction(() => {
+      const orderCols = db.prepare('PRAGMA table_info(orders)').all() as any[];
+      if (!orderCols.some((c: any) => c.name === 'pay_method')) {
+        db.exec("ALTER TABLE orders ADD COLUMN pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed'))");
+      }
+      if (!orderCols.some((c: any) => c.name === 'from_balance')) {
+        db.exec('ALTER TABLE orders ADD COLUMN from_balance REAL DEFAULT 0');
+      }
+      if (!orderCols.some((c: any) => c.name === 'from_bonus')) {
+        db.exec('ALTER TABLE orders ADD COLUMN from_bonus REAL DEFAULT 0');
+      }
+      recordMigration(db, 12, 'orders pay_method/from_balance/from_bonus');
+    });
+    txn();
   }
 }
 
 /** 将旧订单数据迁移到 order_items 表 */
 function migrateOrdersToItems(db: Database.Database): void {
   try {
+    // 检查 orders 表是否有旧字段，没有则无需迁移
+    const orderCols = db.prepare('PRAGMA table_info(orders)').all() as any[];
+    if (!orderCols.some((c: any) => c.name === 'product_id')) {
+      console.log('[Migration] orders 表已为新架构，跳过迁移');
+      return;
+    }
+
     const oldOrders = db.prepare(`
       SELECT id, product_id, quantity, unit_price
       FROM orders

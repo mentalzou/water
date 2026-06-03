@@ -184,6 +184,7 @@ export function customerRegister(req: Request, res: Response): void {
     name: user.name,
     phone: user.phone,
     role: user.role,
+    open_id: '',
   }, '注册成功');
 }
 
