@@ -98,7 +98,7 @@ cat > .env << 'EOF'
 NODE_ENV=production
 PORT=3001
 JWT_SECRET=CHANGE_ME_TO_A_RANDOM_SECRET_KEY_AT_LEAST_32_CHARS
-DATABASE_PATH=/var/www/water/data/water.db
+DB_PATH=/var/www/water/data/water.db
 FRONTEND_URL=http://你的服务器公网IP
 EOF
 
