@@ -32,7 +32,7 @@ function validateConfig(): void {
     errors.push('HELIPAY_AUTH_CODE 未配置（.env 文件中仍是占位符）');
   }
 
-  console.log('HELIPAY_aesKey:', helipayConfig.aesKey);
+  console.log('HELIPAY_AES_KEY:', helipayConfig.aesKey);
   if (!helipayConfig.aesKey || placeholders.some(p => helipayConfig.aesKey.includes(p))) {
     errors.push('HELIPAY_AES_KEY 未配置（.env 文件中仍是占位符）');
   }
@@ -59,6 +59,8 @@ async function generateTerminal(): Promise<string> {
   console.log('生成终端请求参数:', requestBody);
 
   const fullUrl = `${helipayConfig.baseUrl.replace(/\/+$/, '')}${API_ENDPOINTS.terminalGenerate}`;
+  console.log('生成终端请求URL:', fullUrl);
+  console.log('helipayConfig.authCode :', helipayConfig.authCode);
   const response = await sendPostRequest(fullUrl, requestBody, helipayConfig.authCode);
 
   console.log('生成终端响应:', JSON.stringify(response));
