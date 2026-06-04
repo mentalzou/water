@@ -106,7 +106,7 @@ export async function getWechatOpenId(req: Request, res: Response): Promise<void
     console.log('[WechatOpenId] Requesting:', apiUrl.replace(appSecret, '***'));
 
     const response = await fetch(apiUrl);
-    const data = await response.json();
+    const data: any = await response.json();
 
     if (data.errcode && data.errcode !== 0) {
       console.error('[WechatOpenId] WeChat API error:', data);
@@ -264,7 +264,7 @@ export function createOrder(req: Request, res: Response): void {
 }
 
 export function getOrderById(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = str(req.params.id);
   const order = orderModel.findByIdDetailed(id);
   if (!order) { error(res, '订单不存在', 404); return; }
   success(res, order);
@@ -293,7 +293,7 @@ export function getMyOrders(req: Request, res: Response): void {
 
 // ============ Payment (Mock) ============
 export function payForOrder(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = str(req.params.id);
   const order = orderModel.findById(id);
   if (!order) { error(res, '订单不存在', 404); return; }
 

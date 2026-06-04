@@ -38,7 +38,7 @@ export function createPackage(req: Request, res: Response): void {
 
 /** 更新套餐状态（管理员） */
 export function updatePackageStatus(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { status } = req.body;
 
   if (!status || !['active', 'inactive'].includes(status)) {
@@ -57,7 +57,7 @@ export function updatePackageStatus(req: Request, res: Response): void {
 
 /** 删除套餐（管理员） */
 export function deletePackage(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const deleted = rechargePackageModel.delete(id);
 
   if (!deleted) {
@@ -121,7 +121,7 @@ export function recharge(req: Request, res: Response): void {
 
 /** 模拟支付充值（开发环境降级方案） */
 export function payForRecharge(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = String(req.params.id);
 
   const recharge = userRechargeModel.findById(id);
   if (!recharge) {

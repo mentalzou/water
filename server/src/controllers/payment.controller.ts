@@ -229,7 +229,7 @@ export async function paymentNotify(req: Request, res: Response): Promise<void> 
  * 支付订单（兼容旧的mock接口）
  */
 export function payForOrder(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const order = orderModel.findById(id);
   if (!order) { error(res, '订单不存在', 404); return; }
 

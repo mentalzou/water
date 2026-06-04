@@ -43,9 +43,7 @@ const DistributorLogin = lazy(() => import('./pages/distributor/Login'))
 const DistributorLayout = lazy(() => import('./components/DistributorLayout'))
 const DeliverymanLogin = lazy(() => import('./pages/deliveryman/Login'))
 const DeliverymanLayout = lazy(() => import('./components/DeliverymanLayout'))
-import { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { customerApi } from './api/customer.api';
+import { useWechatOAuth } from './hooks/useWechatOAuth';
 
 function LoadingSpinner() {
     return (
@@ -64,48 +62,9 @@ function App() {
 }
 
 function AppContent() {
-    const [searchParams] = useSearchParams();
-
-    useEffect(() => {
-        // 从小程序 web-view URL 参数获取 wx_code，换取 openId
-        // 公众号 OAuth 回调: URL 参数为 code
-        const wxCode = searchParams.get('wx_code');
-        const oaCode = searchParams.get('code');
-        const code = wxCode || oaCode;
-        
-        if (code) {
-            const codeType = wxCode ? 'miniprogram' : 'oa';
-            console.log('微信 code 检测到:', code, '类型:', codeType);
-            
-            customerApi.getWechatOpenId(code, codeType)
-                .then((res: any) => {
-                    if (res.code === 200 && (res.data?.openid || res.data?.open_id)) {
-                        const openId = res.data.openid || res.data.open_id;
-                        console.log('获取到微信 openId:', openId);
-                        // 更新 localStorage 中的用户信息
-                        const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
-                        user.open_id = openId;
-                        user.openId = openId;
-                        localStorage.setItem('customer_user', JSON.stringify(user));
-                    }
-                })
-                .catch((err) => {
-                    console.error('获取微信 openId 失败:', err);
-                });
-        }
-        
-        // 公众号环境下，如果没有 code 也没有 openId，则发起 OAuth 重定向
-        const ua = navigator.userAgent.toLowerCase();
-        const isWechat = ua.includes('micromessenger');
-        if (isWechat && !code) {
-            const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
-            if (!user.open_id && !user.openId) {
-                // 需要公众号 OAuth 授权，但需要配置好 redirect_uri
-                // 此处预留逻辑，实际需要在管理后台配置 wx_app_id 后生效
-                console.log('微信环境，未检测到 openId，需 OAuth 授权');
-            }
-        }
-    }, [searchParams]);
+    // 微信 OAuth 授权：自动检测微信环境，获取 code → 换取 openId
+    // 若无 openId 且无 code，自动跳转微信授权页
+    useWechatOAuth();
 
     return (
         <Routes>

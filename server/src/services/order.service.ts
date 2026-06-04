@@ -10,6 +10,7 @@ import type { Order } from '../types';
 export interface OrderItemInput {
   product_id: string;
   quantity: number;
+  unit?: string;
 }
 
 export interface CreateOrderResult {

@@ -109,7 +109,7 @@ export function createBanner(req: Request, res: Response): void {
 
 /** 更新广告栏 */
 export function updateBanner(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = str(req.params.id);
   const data: Record<string, any> = {};
 
   if (req.body.title !== undefined) data.title = str(req.body.title);
@@ -135,7 +135,7 @@ export function updateBanner(req: Request, res: Response): void {
 
 /** 删除广告栏 */
 export function deleteBanner(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = str(req.params.id);
   const deleted = adBannerModel.delete(id);
   if (!deleted) {
     error(res, '广告栏不存在', 404);

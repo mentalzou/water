@@ -21,7 +21,6 @@ import fs from 'fs';
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { changePoints, getUserPointsRecords } from '../services/points.service';
-import { v4 as uuidv4 } from 'uuid';
 
 /** 安全提取 req.body 中的字符串值 */
 function str(val: unknown): string {
@@ -640,7 +639,7 @@ export function deleteRole(req: Request, res: Response): void {
  * 获取用户积分信息
  */
 export function getUserPoints(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = str(req.params.id);
 
   const user = userModel.findById(id);
   if (!user) {
@@ -660,7 +659,7 @@ export function getUserPoints(req: Request, res: Response): void {
  * 调整用户积分
  */
 export function adjustUserPoints(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = str(req.params.id);
   const { amount, description } = req.body;
 
   if (!amount || typeof amount !== 'number') {
@@ -696,7 +695,7 @@ export function adjustUserPoints(req: Request, res: Response): void {
  * 获取用户积分记录
  */
 export function getUserPointsHistory(req: Request, res: Response): void {
-  const { id } = req.params;
+  const id = str(req.params.id);
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.pageSize as string) || 20;
 

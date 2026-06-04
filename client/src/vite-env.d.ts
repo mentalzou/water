@@ -1,5 +1,13 @@
 /// <reference types="vite/client" />
-// Î¢ÐÅ JS-SDK È«¾ÖÀàÐÍÉùÃ÷
+// Vite ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+interface ImportMetaEnv {
+  readonly VITE_WECHAT_APP_ID: string;
+}
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
+// Î¢ï¿½ï¿½ JS-SDK È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 interface WeixinJSBridgeInvokeResult {
     err_msg: string;
     [key: string]: any;
