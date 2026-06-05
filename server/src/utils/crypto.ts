@@ -5,6 +5,11 @@ import CryptoJS from 'crypto-js';
  */
 export function aesDecrypt(encryptedData: string, aesKey: string): string {
   try {
+    console.log('[AES] 密文(hex):', encryptedData);
+    console.log('[AES] 密文长度:', encryptedData.length, '字符,', encryptedData.length / 2, '字节');
+    console.log('[AES] AES密钥(字符串):', aesKey);
+    console.log('[AES] AES密钥长度:', aesKey.length, '字符 → 按UTF-8解析为', aesKey.length, '字节 (AES-' + aesKey.length * 8 + ')');
+
     const key = CryptoJS.enc.Utf8.parse(aesKey);
     const encrypted = CryptoJS.enc.Hex.parse(encryptedData);
     const decrypted = CryptoJS.AES.decrypt(
@@ -15,6 +20,9 @@ export function aesDecrypt(encryptedData: string, aesKey: string): string {
           padding: CryptoJS.pad.Pkcs7,
         }
     );
+    // 调试：打印解密结果的hex
+    console.log('[AES] 解密结果(hex):', decrypted.toString());
+    console.log('[AES] 解密结果sigBytes:', decrypted.sigBytes);
     return decrypted.toString(CryptoJS.enc.Utf8);
   } catch (error) {
     console.error('AES解密失败:', error);
