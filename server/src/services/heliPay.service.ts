@@ -65,8 +65,9 @@ async function generateTerminal(): Promise<string> {
 
   console.log('生成终端响应:', JSON.stringify(response));
 
-  if (response.responseCode === '0000' && response.data) {
-    const snNo = response.data.snNo;
+  if (response.responseCode === '0000') {
+    // snNo 可能在顶层或 data 下，做兼容
+    const snNo = (response as any).snNo || (response as any).sn || response.data?.snNo || response.data?.sn;
     console.log('终端序列号:', snNo);
     return snNo;
   } else {
@@ -93,9 +94,9 @@ async function requestKeys(snNo: string): Promise<void> {
     throw new Error(`密钥获取失败: ${response.responseMessage}`);
   }
 
-  // 解密密钥
-  const encryptedSecretKey = response.data?.secretKey;
-  const encryptedSignKey = response.data?.signKey;
+  // 解密密钥（secretKey/signKey 在响应顶层，不在 data 下）
+  const encryptedSecretKey = (response as any).secretKey;
+  const encryptedSignKey = (response as any).signKey;
 
   if (!encryptedSecretKey || !encryptedSignKey) {
     throw new Error('密钥数据缺失');

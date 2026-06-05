@@ -15,13 +15,14 @@ export async function sendPostRequest(
     authCode: string
 ): Promise<ApiResponse> {
   try {
+    const ts = () => new Date().toISOString();
     // 打印请求日志
-    console.log('[HTTP] POST', url);
-    console.log('[HTTP] Headers:', JSON.stringify({
+    console.log(`[${ts()}] [HTTP] POST`, url);
+    console.log(`[${ts()}] [HTTP] Headers:`, JSON.stringify({
       'Content-Type': 'application/json; charset=UTF-8',
       'Authorization': authCode.substring(0, 200) + '...', // 脱敏打印
     }));
-    console.log('[HTTP] Body:', jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody);
+    console.log(`[${ts()}] [HTTP] Body:`, jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody);
 
     const response = await axios.post(url, jsonBody, {
       headers: {
@@ -30,8 +31,8 @@ export async function sendPostRequest(
       },
       timeout: 30000,
     });
-    console.log('[HTTP] Response status:', response.status);
-    console.log('[HTTP] Response body:', JSON.stringify(response.data).substring(0, 500));
+    console.log(`[${ts()}] [HTTP] Response status:`, response.status);
+    console.log(`[${ts()}] [HTTP] Response body:`, JSON.stringify(response.data).substring(0, 500));
     return response.data as ApiResponse;
   } catch (error: any) {
     console.error('HTTP请求失败:', error.message);
