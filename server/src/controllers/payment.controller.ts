@@ -10,6 +10,19 @@ import { desedeDecrypt, verifyMd5Sign } from '../utils/crypto';
 import { getMerchantKeys } from '../config/helipay';
 
 /**
+ * 从请求中获取客户端真实IP
+ */
+function getClientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const first = (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',')[0].trim();
+    if (first && first !== '::1') return first;
+  }
+  const ip = req.ip || req.socket.remoteAddress || '127.0.0.1';
+  return ip === '::1' ? '127.0.0.1' : ip;
+}
+
+/**
  * 创建支付订单（JSAPI）- 订单支付
  */
 export async function createPayment(req: Request, res: Response): Promise<void> {
@@ -47,12 +60,14 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
     });
 
     // 调用支付服务
+    const clientIp = getClientIp(req);
     const payResult = await createJsApiOrder(
         order.id,
         order.order_no,
         order.total_amount,
         `好水到家订单-${order.order_no}`,
-        openId
+        openId,
+        clientIp
     );
 
     success(res, payResult, '支付订单创建成功');
@@ -103,12 +118,14 @@ export async function createRechargePayment(req: Request, res: Response): Promis
     });
 
     // 调用支付服务
+    const clientIp = getClientIp(req);
     const payResult = await createJsApiOrder(
         recharge.id,
         recharge.transaction_id || `RECHARGE_${Date.now()}`,
         recharge.amount,
         description,
-        openId
+        openId,
+        clientIp
     );
 
     success(res, payResult, '充值支付订单创建成功');

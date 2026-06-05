@@ -141,7 +141,8 @@ export async function createJsApiOrder(
     orderNo: string,
     totalAmount: number,
     description: string,
-    openId: string
+    openId: string,
+    orderIp: string
 ): Promise<WxPayResult> {
   try {
     // 初始化支付配置
@@ -162,7 +163,7 @@ export async function createJsApiOrder(
       openId,
       appId: helipayConfig.appId,
       payRemarks: description || '好水到家订单',
-      orderIp: '127.0.0.1',
+      orderIp,
       notifyUrl: helipayConfig.notifyUrl,
     };
 
