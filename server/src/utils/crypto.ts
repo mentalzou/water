@@ -6,7 +6,7 @@ import CryptoJS from 'crypto-js';
 export function aesDecrypt(encryptedData: string, aesKey: string): string {
   try {
     const key = CryptoJS.enc.Utf8.parse(aesKey);
-    const encrypted = CryptoJS.enc.Base64.parse(encryptedData);
+    const encrypted = CryptoJS.enc.Hex.parse(encryptedData);
     const decrypted = CryptoJS.AES.decrypt(
         { ciphertext: encrypted } as any,
         key,
