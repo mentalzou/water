@@ -214,4 +214,16 @@ export const orderModel = {
       .run(transactionId, id);
     return this.findById(id);
   },
+
+  markRefunding(id: string, refundOrderNo: string): Order | undefined {
+    db.prepare("UPDATE orders SET status = 'refunding', remark = '退款订单号:' || ? || CASE WHEN remark IS NOT NULL AND remark != '' THEN ';' || remark ELSE '' END, updated_at = datetime('now') WHERE id = ?")
+      .run(refundOrderNo, id);
+    return this.findById(id);
+  },
+
+  markRefunded(id: string): Order | undefined {
+    db.prepare("UPDATE orders SET status = 'refunded', pay_status = 'refunded', updated_at = datetime('now') WHERE id = ?")
+      .run(id);
+    return this.findById(id);
+  },
 };

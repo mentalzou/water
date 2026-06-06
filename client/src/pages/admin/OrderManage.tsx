@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Package, Eye, Filter, RefreshCw } from 'lucide-react';
+import { Search, Package, Eye, Filter, RefreshCw, Undo2, SearchCheck } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -10,6 +10,8 @@ function getToken(): string {
 const statusMap: Record<string, { label: string; color: string }> = {
   pending: { label: '待支付', color: 'bg-gray-100 text-gray-700' },
   paid: { label: '已付款', color: 'bg-blue-100 text-blue-700' },
+  refunding: { label: '退款中', color: 'bg-yellow-100 text-yellow-700' },
+  refunded: { label: '已退款', color: 'bg-red-100 text-red-700' },
   assigned: { label: '待配送', color: 'bg-orange-100 text-orange-700' },
   delivering: { label: '配送中', color: 'bg-indigo-100 text-indigo-700' },
   completed: { label: '已完成', color: 'bg-green-100 text-green-700' },
@@ -31,6 +33,10 @@ export default function OrderManage() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   // 交易查询中
   const [queryingOrders, setQueryingOrders] = useState<Set<string>>(new Set());
+  // 退款中
+  const [refundingOrders, setRefundingOrders] = useState<Set<string>>(new Set());
+  // 退款查询中
+  const [refundQueryingOrders, setRefundQueryingOrders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadOrders();
@@ -94,6 +100,72 @@ export default function OrderManage() {
         setDeliverymen((res.data.data || res.data).map((d: any) => ({ id: d.id, name: d.name })));
       }
     } catch { /* ignore */ }
+  }
+
+  /** 向合利宝查询退款状态 */
+  async function queryRefund(order: any) {
+    const token = getToken();
+    setRefundQueryingOrders(prev => new Set(prev).add(order.id));
+    try {
+      const res: any = await fetch(`${API_BASE}/admin/orders/${order.id}/query-refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      }).then(r => r.text()).then(text => {
+        try { return JSON.parse(text); } catch { return null; }
+      });
+      if (res && res.code === 200) {
+        alert(res.data?.message || res.message || '查询完成');
+        if (res.data?.localStatus === 'refunded') {
+          loadOrders();
+        }
+      } else {
+        alert(res?.message || '退款查询失败');
+      }
+    } catch (e: any) {
+      alert('退款查询失败: ' + (e.message || '网络错误'));
+    } finally {
+      setRefundQueryingOrders(prev => {
+        const next = new Set(prev);
+        next.delete(order.id);
+        return next;
+      });
+    }
+  }
+
+  /** 向合利宝发起退款 */
+  async function requestRefund(order: any) {
+    if (!confirm(`确定要对该订单发起退款吗？\n\n订单号：${order.order_no}\n金额：¥${Number(order.total_amount || 0).toFixed(2)}\n\n退款请求提交后将不可撤销。`)) return;
+
+    const token = getToken();
+    setRefundingOrders(prev => new Set(prev).add(order.id));
+    try {
+      const res: any = await fetch(`${API_BASE}/admin/orders/${order.id}/refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      }).then(r => r.text()).then(text => {
+        try { return JSON.parse(text); } catch { return null; }
+      });
+      if (res && res.code === 200) {
+        alert(res.data?.message || res.message || '退款请求已提交');
+        loadOrders();
+      } else {
+        alert(res?.message || '退款请求失败');
+      }
+    } catch (e: any) {
+      alert('退款请求失败: ' + (e.message || '网络错误'));
+    } finally {
+      setRefundingOrders(prev => {
+        const next = new Set(prev);
+        next.delete(order.id);
+        return next;
+      });
+    }
   }
 
   /** 向合利宝查询交易状态 */
@@ -169,6 +241,8 @@ export default function OrderManage() {
             <option value="">全部状态</option>
             <option value="pending">待支付</option>
             <option value="paid">已付款</option>
+            <option value="refunding">退款中</option>
+            <option value="refunded">已退款</option>
             <option value="assigned">待配送</option>
             <option value="delivering">配送中</option>
             <option value="completed">已完成</option>
@@ -212,6 +286,34 @@ export default function OrderManage() {
                             <div className="w-4 h-4 border-2 border-orange-300 border-t-orange-500 rounded-full animate-spin" />
                           ) : (
                             <RefreshCw className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                      {o.status === 'paid' && (
+                        <button
+                          onClick={() => requestRefund(o)}
+                          disabled={refundingOrders.has(o.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="向合利宝发起退款"
+                        >
+                          {refundingOrders.has(o.id) ? (
+                            <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+                          ) : (
+                            <Undo2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                      {o.status === 'refunding' && (
+                        <button
+                          onClick={() => queryRefund(o)}
+                          disabled={refundQueryingOrders.has(o.id)}
+                          className="p-1.5 rounded-lg hover:bg-yellow-50 text-yellow-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="向合利宝查询退款状态"
+                        >
+                          {refundQueryingOrders.has(o.id) ? (
+                            <div className="w-4 h-4 border-2 border-yellow-300 border-t-yellow-500 rounded-full animate-spin" />
+                          ) : (
+                            <SearchCheck className="w-4 h-4" />
                           )}
                         </button>
                       )}

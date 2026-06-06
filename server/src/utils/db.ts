@@ -126,7 +126,7 @@ export function initTables(database: Database.Database): void {
       distributor_id TEXT REFERENCES distributors(id),
       distributor_commission REAL DEFAULT 0,
       deliveryman_id TEXT REFERENCES deliverymen(id),
-      status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','assigned','delivering','completed','cancelled')),
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','refunding','refunded','assigned','delivering','completed','cancelled')),
       pay_status TEXT DEFAULT 'unpaid' CHECK(pay_status IN ('unpaid','paid','refunded')),
       pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
       from_balance REAL DEFAULT 0,
@@ -559,6 +559,78 @@ function applyMigrations(db: Database.Database): void {
         db.exec('ALTER TABLE orders ADD COLUMN from_bonus REAL DEFAULT 0');
       }
       recordMigration(db, 12, 'orders pay_method/from_balance/from_bonus');
+    });
+    txn();
+  }
+
+  // === v13: orders 状态增加 refunding（退款中） ===
+  if (currentVersion < 13) {
+    const txn = db.transaction(() => {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'").get() as { sql: string } | undefined;
+      if (tableInfo && !tableInfo.sql.includes('refunding')) {
+        db.exec('DROP TABLE IF EXISTS orders_new');
+        db.exec(`CREATE TABLE orders_new (
+          id TEXT PRIMARY KEY, order_no TEXT NOT NULL UNIQUE,
+          customer_phone TEXT NOT NULL, customer_name TEXT DEFAULT '',
+          address TEXT NOT NULL, total_amount REAL NOT NULL,
+          distributor_id TEXT REFERENCES distributors(id),
+          distributor_commission REAL DEFAULT 0,
+          deliveryman_id TEXT,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','refunding','refunded','assigned','delivering','completed','cancelled')),
+          pay_status TEXT DEFAULT 'unpaid' CHECK(pay_status IN ('unpaid','paid','refunded')),
+          pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
+          from_balance REAL DEFAULT 0, from_bonus REAL DEFAULT 0,
+          transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
+          created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+          paid_at TEXT DEFAULT '', assigned_at TEXT DEFAULT '', delivered_at TEXT DEFAULT ''
+        )`);
+        db.exec(`INSERT INTO orders_new SELECT
+          id,order_no,customer_phone,customer_name,address,total_amount,
+          distributor_id,distributor_commission,deliveryman_id,
+          status,pay_status,pay_method,from_balance,from_bonus,
+          transaction_id,remark,created_at,updated_at,
+          paid_at,assigned_at,delivered_at
+        FROM orders`);
+        db.exec('DROP TABLE orders');
+        db.exec('ALTER TABLE orders_new RENAME TO orders');
+      }
+      recordMigration(db, 13, 'orders 状态新增 refunding（退款中）');
+    });
+    txn();
+  }
+
+  // === v14: orders 状态增加 refunded（已退款） ===
+  if (currentVersion < 14) {
+    const txn = db.transaction(() => {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'").get() as { sql: string } | undefined;
+      if (tableInfo && !tableInfo.sql.includes('refunded')) {
+        db.exec('DROP TABLE IF EXISTS orders_new');
+        db.exec(`CREATE TABLE orders_new (
+          id TEXT PRIMARY KEY, order_no TEXT NOT NULL UNIQUE,
+          customer_phone TEXT NOT NULL, customer_name TEXT DEFAULT '',
+          address TEXT NOT NULL, total_amount REAL NOT NULL,
+          distributor_id TEXT REFERENCES distributors(id),
+          distributor_commission REAL DEFAULT 0,
+          deliveryman_id TEXT,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','refunding','refunded','assigned','delivering','completed','cancelled')),
+          pay_status TEXT DEFAULT 'unpaid' CHECK(pay_status IN ('unpaid','paid','refunded')),
+          pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
+          from_balance REAL DEFAULT 0, from_bonus REAL DEFAULT 0,
+          transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
+          created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+          paid_at TEXT DEFAULT '', assigned_at TEXT DEFAULT '', delivered_at TEXT DEFAULT ''
+        )`);
+        db.exec(`INSERT INTO orders_new SELECT
+          id,order_no,customer_phone,customer_name,address,total_amount,
+          distributor_id,distributor_commission,deliveryman_id,
+          status,pay_status,pay_method,from_balance,from_bonus,
+          transaction_id,remark,created_at,updated_at,
+          paid_at,assigned_at,delivered_at
+        FROM orders`);
+        db.exec('DROP TABLE orders');
+        db.exec('ALTER TABLE orders_new RENAME TO orders');
+      }
+      recordMigration(db, 14, 'orders 状态新增 refunded（已退款）');
     });
     txn();
   }

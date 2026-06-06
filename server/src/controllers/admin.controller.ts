@@ -441,6 +441,111 @@ export async function queryOrderPayment(req: Request, res: Response): Promise<vo
   }
 }
 
+// ============ 订单退款（向合利宝发起退款） ============
+export async function refundOrder(req: Request, res: Response): Promise<void> {
+  const id = str(req.params.id);
+
+  // 查询订单
+  const order = orderModel.findById(id);
+  if (!order) {
+    notFound(res);
+    return;
+  }
+
+  // 只有已付款状态才能退款
+  if (order.status !== 'paid') {
+    error(res, '仅已付款状态的订单支持退款');
+    return;
+  }
+
+  if (!order.order_no) {
+    error(res, '订单缺少订单号');
+    return;
+  }
+
+  const refundAmount = order.total_amount;
+  if (!refundAmount || refundAmount <= 0) {
+    error(res, '订单金额无效');
+    return;
+  }
+
+  try {
+    const { requestRefund } = require('../services/heliPay.service');
+    const result = await requestRefund(order.order_no, refundAmount);
+
+    console.log(`[退款] 订单 ${order.order_no} 退款请求已受理, 退款订单号: ${result.refundOrderNo}, 状态: ${result.orderStatus}`);
+
+    // 退款请求受理成功，订单状态变更为退款中
+    orderModel.markRefunding(order.id, result.refundOrderNo);
+
+    success(res, {
+      orderNo: result.orderNo,
+      refundOrderNo: result.refundOrderNo,
+      orderStatus: result.orderStatus,
+      message: `退款请求已受理，退款订单号: ${result.refundOrderNo}，合利宝状态: ${result.orderStatus}`,
+    });
+  } catch (err: any) {
+    error(res, err.message || '退款请求失败');
+  }
+}
+
+// ============ 退款订单查询（向合利宝查询退款状态） ============
+export async function queryRefundOrder(req: Request, res: Response): Promise<void> {
+  const id = str(req.params.id);
+
+  // 查询订单
+  const order = orderModel.findById(id);
+  if (!order) {
+    notFound(res);
+    return;
+  }
+
+  // 只有退款中状态才能查询退款
+  if (order.status !== 'refunding') {
+    error(res, '仅退款中状态的订单支持退款查询');
+    return;
+  }
+
+  // 从 remark 中解析退款订单号
+  const remark = order.remark || '';
+  const match = remark.match(/退款订单号:(\d+)/);
+  if (!match || !match[1]) {
+    error(res, '订单备注中缺少退款订单号，无法查询');
+    return;
+  }
+  const refundOrderNo = match[1];
+
+  try {
+    const { queryRefundStatus } = require('../services/heliPay.service');
+    const result = await queryRefundStatus(refundOrderNo);
+
+    console.log(`[退款查询] 退款订单号 ${refundOrderNo}, 合利宝状态: ${result.orderStatus}`);
+
+    // 退款成功 → 订单状态变更为已退款
+    if (result.orderStatus === 'SUCCESS') {
+      orderModel.markRefunded(order.id);
+      console.log(`[退款查询] 订单 ${order.order_no} 已自动标记为已退款`);
+      success(res, {
+        orderNo: result.orderNo,
+        refundOrderNo: result.refundOrderNo,
+        helipayStatus: result.orderStatus,
+        localStatus: 'refunded',
+        message: '退款查询成功，退款已完成，订单已更新为已退款',
+      });
+    } else {
+      success(res, {
+        orderNo: result.orderNo,
+        refundOrderNo: result.refundOrderNo,
+        helipayStatus: result.orderStatus,
+        localStatus: order.status,
+        message: `退款查询完成，当前合利宝状态: ${result.orderStatus}`,
+      });
+    }
+  } catch (err: any) {
+    error(res, err.message || '退款查询失败');
+  }
+}
+
 // ============ 合利宝终端信息 ============
 
 /** 获取合利宝终端信息（密钥脱敏） */

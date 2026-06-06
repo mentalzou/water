@@ -108,7 +108,7 @@ export interface Order {
   distributor_id?: string;
   distributor_commission?: number;
   deliveryman_id?: string;
-  status: 'pending' | 'paid' | 'assigned' | 'delivering' | 'completed' | 'cancelled';
+  status: 'pending' | 'paid' | 'refunding' | 'refunded' | 'assigned' | 'delivering' | 'completed' | 'cancelled';
   pay_status: 'unpaid' | 'paid' | 'refunded';
   pay_method: 'online' | 'balance' | 'mixed';
   from_balance: number;

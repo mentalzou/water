@@ -80,6 +80,8 @@ router.post('/products/upload', adminController.productUpload.single('file'), ad
 // Orders management
 router.get('/orders', adminController.listAllOrders);
 router.post('/orders/:id/query-payment', adminController.queryOrderPayment);
+router.post('/orders/:id/refund', adminController.refundOrder);
+router.post('/orders/:id/query-refund', adminController.queryRefundOrder);
 
 // Helipay terminal info
 router.get('/helipay/terminal', adminController.getHelipayTerminalInfo);

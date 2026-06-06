@@ -27,6 +27,8 @@ export const API_ENDPOINTS = {
     orderSubmit: '/trx/brand/order/passive',
     orderJsapi: '/trx/brand/order/jsapi',
     orderQuery: '/trx/brand/order/query',
+    orderRefund: '/trx/brand/order/refund',
+    orderRefundQuery: '/trx/brand/order/refundQuery',
 };
 
 /** 终端信息（生成终端接口返回） */
