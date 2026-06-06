@@ -1,3 +1,4 @@
+import './utils/logger';  // 必须最先导入，为所有后续 console 调用添加时间戳
 import 'dotenv/config';
 import app from './app';
 import config from './config';
