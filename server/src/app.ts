@@ -66,7 +66,7 @@ app.post('/api/upload/quality', qualityUpload.array('files', 10), (req, res) => 
 });
 
 // 临时上传页（浏览器直接拖拽上传）
-app.get('/upload-quality', (_req, res) => {
+app.get('/api/upload-quality', (_req, res) => {
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>上传证书图片</title><style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px}#drop{border:3px dashed #ccc;border-radius:16px;padding:60px 20px;text-align:center;cursor:pointer;transition:.2s}#drop.dragover{background:#e8f4ff;border-color:#1890ff}.btn{margin-top:16px;padding:12px 40px;background:#1890ff;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}#result{margin-top:20px;white-space:pre-wrap;background:#f6f6f6;padding:12px;border-radius:8px;font-size:13px}</style></head><body><h2>资质证书图片上传</h2><p>支持 jpg/png 格式，可一次选多张</p><div id="drop" onclick="input.click()"><p style="font-size:40px;margin:0">📁</p><p style="color:#999">点击选择文件 或 拖拽到此处</p><input type="file" id="input" accept="image/*" multiple hidden></div><div style="margin-top:12px;color:#999;font-size:13px" id="filelist"></div><button class="btn" id="uploadBtn" disabled onclick="upload()">开始上传</button><pre id="result"></pre><script>
 let selectedFiles=[];
 const input=document.getElementById("input"),drop=document.getElementById("drop"),btn=document.getElementById("uploadBtn"),list=document.getElementById("filelist"),result=document.getElementById("result");
