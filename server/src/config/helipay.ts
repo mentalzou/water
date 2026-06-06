@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
     keyRequest: '/trx/brand/key/get',
     orderSubmit: '/trx/brand/order/passive',
     orderJsapi: '/trx/brand/order/jsapi',
+    orderQuery: '/trx/brand/order/query',
 };
 
 // 密钥存储（实际项目中应该使用Redis或数据库）

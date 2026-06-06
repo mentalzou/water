@@ -341,6 +341,70 @@ function processEncryptedResponse(
 }
 
 /**
+ * 查询合利宝交易状态
+ * @returns { status: 'INIT' | 'SUCCESS' | ..., rawResponse }
+ */
+export async function queryOrderStatus(orderNo: string): Promise<{
+  status: string;
+  orderNo: string;
+  merchantNo: string;
+  rawResponse: any;
+}> {
+  try {
+    // 初始化支付配置
+    await initPayment();
+
+    const keys = getMerchantKeys();
+    if (!keys) {
+      throw new Error('支付密钥未初始化');
+    }
+
+    const params: Record<string, any> = {
+      snNo: keys.snNo,
+      merchantNo: helipayConfig.merchantNo,
+      orderNo,
+      appPayType: 'WXPAY',
+    };
+
+    console.log('[交易查询] 请求参数:', JSON.stringify(params));
+
+    // 构建加密请求
+    const requestBody = buildEncryptedRequest(params, keys.secretKey, keys.signKey, keys.snNo);
+    console.log('[交易查询] 加密请求体:', JSON.stringify(requestBody));
+
+    // 发送请求
+    const fullUrl = `${helipayConfig.baseUrl.replace(/\/+$/, '')}${API_ENDPOINTS.orderQuery}`;
+    const response = await sendPostRequest(
+        fullUrl,
+        JSON.stringify(requestBody),
+        helipayConfig.authCode
+    );
+
+    console.log('[交易查询] 原始响应:', JSON.stringify(response));
+
+    // 处理加密响应
+    const processedResponse = processEncryptedResponse(response, keys.secretKey, keys.signKey);
+    console.log('[交易查询] 解密响应:', JSON.stringify(processedResponse));
+
+    if (processedResponse.responseCode !== '0000') {
+      throw new Error(`交易查询失败: ${processedResponse.responseMessage}`);
+    }
+
+    const data = processedResponse.data || processedResponse;
+
+    return {
+      status: data.status || 'UNKNOWN',
+      orderNo: data.orderNo || orderNo,
+      merchantNo: data.merchantNo || '',
+      rawResponse: processedResponse,
+    };
+  } catch (error: any) {
+    console.error('[交易查询] 失败:', error);
+    throw new Error(`交易查询失败: ${error.message}`);
+  }
+}
+
+/**
  * 解析小利云交易通知报文（3DES解密 + RSA验签）
  * 报文格式：{ data, agentNo, sign, merchantNo }
  * - data 用 secretKey 做 3DES ECB ZeroPadding 解密

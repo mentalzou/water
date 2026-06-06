@@ -79,6 +79,7 @@ router.post('/products/upload', adminController.productUpload.single('file'), ad
 
 // Orders management
 router.get('/orders', adminController.listAllOrders);
+router.post('/orders/:id/query-payment', adminController.queryOrderPayment);
 
 // System config
 router.get('/configs', adminController.getConfigs);

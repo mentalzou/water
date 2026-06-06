@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Package, Eye, Filter } from 'lucide-react';
+import { Search, Package, Eye, Filter, RefreshCw } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -29,6 +29,8 @@ export default function OrderManage() {
   const [deliverymanFilter, setDeliverymanFilter] = useState('');
   // 详情弹窗
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  // 交易查询中
+  const [queryingOrders, setQueryingOrders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadOrders();
@@ -92,6 +94,40 @@ export default function OrderManage() {
         setDeliverymen((res.data.data || res.data).map((d: any) => ({ id: d.id, name: d.name })));
       }
     } catch { /* ignore */ }
+  }
+
+  /** 向合利宝查询交易状态 */
+  async function queryPayment(order: any) {
+    const token = getToken();
+    setQueryingOrders(prev => new Set(prev).add(order.id));
+    try {
+      const res: any = await fetch(`${API_BASE}/admin/orders/${order.id}/query-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      }).then(r => r.text()).then(text => {
+        try { return JSON.parse(text); } catch { return null; }
+      });
+      if (res && res.code === 200) {
+        alert(res.data?.message || res.message || '查询完成');
+        // 如果支付成功，刷新列表
+        if (res.data?.localStatus === 'paid') {
+          loadOrders();
+        }
+      } else {
+        alert(res?.message || '查询失败');
+      }
+    } catch (e: any) {
+      alert('查询失败: ' + (e.message || '网络错误'));
+    } finally {
+      setQueryingOrders(prev => {
+        const next = new Set(prev);
+        next.delete(order.id);
+        return next;
+      });
+    }
   }
 
   /** 筛选条件变化时重新请求 */
@@ -162,7 +198,25 @@ export default function OrderManage() {
                   <td className="px-4 py-3.5 text-sm text-purple-600">{o.distributor_name || o.distributor?.name || '-'}</td>
                   <td className="px-4 py-3.5 text-sm text-cyan-600">{o.deliveryman_name || o.deliveryman?.name || '-'}</td>
                   <td className="px-4 py-3.5"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusMap[o.status]?.color}`}>{statusMap[o.status]?.label || o.status}</span></td>
-                  <td className="px-4 py-3.5"><button onClick={() => setSelectedOrder(o)} className="p-1.5 rounded-lg hover:bg-water/10 text-water transition-colors"><Eye className="w-4 h-4"/></button></td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setSelectedOrder(o)} className="p-1.5 rounded-lg hover:bg-water/10 text-water transition-colors" title="查看详情"><Eye className="w-4 h-4"/></button>
+                      {o.status === 'pending' && (
+                        <button
+                          onClick={() => queryPayment(o)}
+                          disabled={queryingOrders.has(o.id)}
+                          className="p-1.5 rounded-lg hover:bg-orange-50 text-orange-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="向合利宝查询交易状态"
+                        >
+                          {queryingOrders.has(o.id) ? (
+                            <div className="w-4 h-4 border-2 border-orange-300 border-t-orange-500 rounded-full animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

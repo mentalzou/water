@@ -12,6 +12,7 @@ import { brandModel } from '../models/brand.model';
 import { categoryModel } from '../models/category.model';
 import { userRechargeModel } from '../models/userRecharge.model';
 import { balanceTransactionModel } from '../models/balanceTransaction.model';
+import { queryOrderStatus } from '../services/heliPay.service';
 import { getDb } from '../utils/db';
 import config from '../config';
 import multer from 'multer';
@@ -388,6 +389,56 @@ export function listAllOrders(req: Request, res: Response): void {
   if (req.query.deliveryman_id) options.deliveryman_id = str(req.query.deliveryman_id);
   const { data, total } = orderModel.findAll(page, pageSize, status, options);
   paginated(res, data, page, pageSize, total);
+}
+
+// ============ 订单交易查询（向合利宝查询交易状态） ============
+export async function queryOrderPayment(req: Request, res: Response): Promise<void> {
+  const id = str(req.params.id);
+
+  // 查询订单
+  const order = orderModel.findById(id);
+  if (!order) {
+    notFound(res);
+    return;
+  }
+
+  // 只有待支付状态才能查询
+  if (order.status !== 'pending') {
+    error(res, '仅待支付状态的订单支持交易查询');
+    return;
+  }
+
+  if (!order.order_no) {
+    error(res, '订单缺少订单号');
+    return;
+  }
+
+  try {
+    const result = await queryOrderStatus(order.order_no);
+
+    console.log(`[交易查询] 订单 ${order.order_no} 状态: ${result.status}`);
+
+    // 根据合利宝返回状态更新本地订单
+    if (result.status === 'SUCCESS') {
+      orderModel.markPaid(order.id, '');
+      console.log(`[交易查询] 订单 ${order.order_no} 已自动标记为已支付`);
+      success(res, {
+        orderNo: result.orderNo,
+        helipayStatus: result.status,
+        localStatus: 'paid',
+        message: '交易查询成功，订单已自动更新为已支付',
+      });
+    } else {
+      success(res, {
+        orderNo: result.orderNo,
+        helipayStatus: result.status,
+        localStatus: order.status,
+        message: `交易查询完成，当前合利宝状态: ${result.status}`,
+      });
+    }
+  } catch (err: any) {
+    error(res, err.message || '交易查询失败');
+  }
 }
 
 // ============ Config ============
