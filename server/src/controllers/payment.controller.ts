@@ -39,6 +39,13 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
       return;
     }
 
+    // 拒绝开发环境的模拟 openId，防止缓存残留导致合利宝报错
+    if (String(openId).startsWith('dev_')) {
+      console.error('[支付] 拒绝模拟 openId:', openId);
+      error(res, '检测到模拟openId，请在微信中重新打开页面完成授权');
+      return;
+    }
+
     // 查询订单
     const order = orderModel.findById(orderId);
     if (!order) {
@@ -91,6 +98,13 @@ export async function createRechargePayment(req: Request, res: Response): Promis
 
     if (!openId) {
       error(res, '微信OpenID不能为空');
+      return;
+    }
+
+    // 拒绝开发环境的模拟 openId
+    if (String(openId).startsWith('dev_')) {
+      console.error('[充值支付] 拒绝模拟 openId:', openId);
+      error(res, '检测到模拟openId，请在微信中重新打开页面完成授权');
       return;
     }
 

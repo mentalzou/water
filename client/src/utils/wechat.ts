@@ -22,11 +22,18 @@ export function isMiniProgram(): boolean {
       (window as any).__wxjs_environment === 'miniprogram');
 }
 
-/** 从 localStorage 获取已存储的 openId */
+/** 从 localStorage 获取已存储的 openId（自动过滤 dev_ 模拟值） */
 export function getStoredOpenId(): string {
   try {
     const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
-    return user.open_id || user.openId || '';
+    const raw = user.open_id || user.openId || '';
+    // 开发环境遗留的 mock openId，视为无效，触发重新 OAuth
+    if (raw && raw.startsWith('dev_')) {
+      console.log('[OAuth] 检测到旧的 dev_ 模拟 openId，已清除:', raw);
+      clearStoredOpenId();
+      return '';
+    }
+    return raw;
   } catch {
     return '';
   }
@@ -38,6 +45,18 @@ export function setStoredOpenId(openId: string): void {
     const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
     user.open_id = openId;
     user.openId = openId;
+    localStorage.setItem('customer_user', JSON.stringify(user));
+  } catch {
+    // ignore
+  }
+}
+
+/** 清除 localStorage 中的 openId */
+export function clearStoredOpenId(): void {
+  try {
+    const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
+    delete user.open_id;
+    delete user.openId;
     localStorage.setItem('customer_user', JSON.stringify(user));
   } catch {
     // ignore

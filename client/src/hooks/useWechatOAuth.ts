@@ -83,11 +83,11 @@ export function useWechatOAuth() {
     // ---------- Step 2: 没有 code，检查是否已有 openId ----------
     const storedOpenId = getStoredOpenId();
     if (storedOpenId) {
-      console.log('[OAuth] 已有 openId，无需重新授权');
+      console.log('[OAuth] 已有有效 openId，无需重新授权');
       return;
     }
 
-    // ---------- Step 3: 无 openId 且无 code，发起 OAuth 重定向 ----------
+    // ---------- Step 3: 无有效 openId 且无 code，发起 OAuth 重定向 ----------
     const appId = getWechatAppId();
     if (!appId) {
       console.warn('[OAuth] VITE_WECHAT_APP_ID 未配置，无法发起微信授权');

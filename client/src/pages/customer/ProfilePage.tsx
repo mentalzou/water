@@ -4,6 +4,7 @@ import {
   User, Package, Lock, MapPin, LogOut, ChevronRight, Gift, CreditCard
 } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const MENU_ITEMS = [
   { key: 'orders', label: '我的订单', icon: Package, path: '/profile/orders', desc: '查看全部订单状态' },
@@ -16,6 +17,7 @@ const MENU_ITEMS = [
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>({});
+  const [showLogout, setShowLogout] = useState(false);
   const isLoggedIn = !!localStorage.getItem('customer_token');
 
   useEffect(() => {
@@ -34,7 +36,6 @@ export default function ProfilePage() {
   }
 
   function handleLogout() {
-    if (!confirm('确定要退出当前账户吗？')) return;
     localStorage.removeItem('customer_token');
     localStorage.removeItem('customer_user');
     navigate('/', { replace: true });
@@ -98,7 +99,7 @@ export default function ProfilePage() {
           {/* 退出登录 / 登录注册 */}
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             {isLoggedIn ? (
-              <button onClick={handleLogout}
+              <button onClick={() => setShowLogout(true)}
                       className="w-full flex items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-red-50 active:bg-red-50"
               >
                 <div className="w-10 h-10 rounded-xl bg-red-50 text-red-400 flex items-center justify-center shrink-0">
@@ -122,6 +123,17 @@ export default function ProfilePage() {
         </main>
 
         <BottomNav />
+
+        {/* 退出登录确认弹窗 — 按钮位置统一（取消在左，确认在右） */}
+        <ConfirmDialog
+          open={showLogout}
+          title="退出登录"
+          message="确定要退出当前账户吗？"
+          confirmText="确定"
+          cancelText="取消"
+          onConfirm={handleLogout}
+          onCancel={() => setShowLogout(false)}
+        />
       </div>
   );
 }
