@@ -115,9 +115,13 @@ export default function OrderPage() {
   function updateQty(productId: string, delta: number) {
     setItemQuantities(prev => {
       const current = prev[productId] || 0;
-      const next = Math.max(0, current + delta);
+      const next = Math.min(999, Math.max(0, current + delta));
       return { ...prev, [productId]: next };
     });
+  }
+  function setQty(productId: string, value: number) {
+    const clamped = Math.min(999, Math.max(0, Math.round(value) || 0));
+    setItemQuantities(prev => ({ ...prev, [productId]: clamped }));
   }
   function removeFromCart(productId: string) {
     setItemQuantities(prev => {
@@ -350,19 +354,28 @@ export default function OrderPage() {
 
                           {/* 数量控制 */}
                           {qty > 0 ? (
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
                                 <button
                                     type="button"
                                     onClick={() => updateQty(product.id, -1)}
-                                    className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors"
+                                    className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors shrink-0"
                                 >
                                   <Minus className="w-4 h-4"/>
                                 </button>
-                                <span className="w-8 text-center font-semibold text-base">{qty}</span>
+                                <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={1}
+                                    max={999}
+                                    value={qty}
+                                    onChange={e => setQty(product.id, parseInt(e.target.value) || 1)}
+                                    className="w-12 h-8 text-center text-sm font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-water [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
                                 <button
                                     type="button"
                                     onClick={() => updateQty(product.id, 1)}
-                                    className="w-7 h-7 rounded-full bg-water text-white flex items-center justify-center hover:bg-water/90 transition-colors"
+                                    disabled={qty >= 999}
+                                    className="w-7 h-7 rounded-full bg-water text-white flex items-center justify-center hover:bg-water/90 transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   <Plus className="w-4 h-4"/>
                                 </button>
@@ -427,21 +440,28 @@ export default function OrderPage() {
 
                             <div className="flex items-center gap-3">
                               {/* 数量控制 */}
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
                                 <button
                                     type="button"
                                     onClick={() => updateQty(item.product.id, -1)}
-                                    className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                    className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 shrink-0"
                                 >
                                   <Minus className="w-3 h-3"/>
                                 </button>
-                                <span className="w-6 text-center font-semibold text-sm">
-                          {item.quantity}
-                        </span>
+                                <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={1}
+                                    max={999}
+                                    value={item.quantity}
+                                    onChange={e => setQty(item.product.id, parseInt(e.target.value) || 1)}
+                                    className="w-10 h-7 text-center text-xs font-semibold border border-gray-200 rounded-md focus:outline-none focus:border-water [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
                                 <button
                                     type="button"
                                     onClick={() => updateQty(item.product.id, 1)}
-                                    className="w-6 h-6 rounded-full bg-water text-white flex items-center justify-center hover:bg-water/90"
+                                    disabled={item.quantity >= 999}
+                                    className="w-6 h-6 rounded-full bg-water text-white flex items-center justify-center hover:bg-water/90 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   <Plus className="w-3 h-3"/>
                                 </button>
