@@ -201,6 +201,7 @@ export async function createJsApiOrder(
       orderNo: orderNo || `WD${Date.now()}`,
       appPayType: 'WXPAY',
       orderAmount: totalAmount.toFixed(2),
+      total_fee: Math.round(totalAmount * 100), // 合利宝JSAPI要求：金额，单位分
       openId,
       payRemarks: description || '武夷屿都山水订单',
       orderIp,
