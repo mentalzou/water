@@ -217,17 +217,17 @@ export default function OrderPage() {
           </div>
 
           {/* 覆盖层：品牌 + 用户按钮 */}
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                <Droplets className="w-7 h-7 text-white"/>
-              </div>
-            </div>
-            <button onClick={() => navigate('/profile')}
-                    className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center active:scale-95 transition-transform">
-              <User className="w-5 h-5 text-white"/>
-            </button>
-          </div>
+          {/*<div className="relative z-10 flex items-center justify-between">*/}
+          {/*  <div className="flex items-center gap-3">*/}
+          {/*    <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">*/}
+          {/*      <Droplets className="w-7 h-7 text-white"/>*/}
+          {/*    </div>*/}
+          {/*  </div>*/}
+          {/*  <button onClick={() => navigate('/profile')}*/}
+          {/*          className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center active:scale-95 transition-transform">*/}
+          {/*    <User className="w-5 h-5 text-white"/>*/}
+          {/*  </button>*/}
+          {/*</div>*/}
         </header>
 
         {/* 快捷菜单栏 */}

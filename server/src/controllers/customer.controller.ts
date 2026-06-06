@@ -77,14 +77,6 @@ export async function getWechatOpenId(req: Request, res: Response): Promise<void
       return;
     }
 
-    // 开发环境快捷模式：code 以 "dev_" 开头则直接作为 openId
-    if (code.startsWith('dev_')) {
-      const devOpenId = code;
-      console.log('[WechatOpenId] Dev mode, using mock openId:', devOpenId);
-      success(res, { openid: devOpenId, open_id: devOpenId }, '获取openId成功(开发模式)');
-      return;
-    }
-
     const db = getDb();
     const appId = (db.prepare("SELECT value FROM system_config WHERE key='wx_app_id'").get() as any)?.value || process.env.WECHAT_APP_ID || '';
     const appSecret = (db.prepare("SELECT value FROM system_config WHERE key='wx_app_secret'").get() as any)?.value || process.env.WECHAT_APP_SECRET || '';

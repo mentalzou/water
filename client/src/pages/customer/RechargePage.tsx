@@ -105,24 +105,9 @@ export default function RechargePage() {
       const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
       let openId = user.open_id || user.openId || '';
 
-      // 无 openId 时尝试自动获取
+      // 在线支付必须通过微信OAuth获取真实openId
       if (!openId) {
-        try {
-          const devOpenId = 'dev_' + (user.phone || 'test') + '_' + Date.now();
-          const openIdRes: any = await customerApi.getWechatOpenId(devOpenId, 'oa');
-          if (openIdRes.code === 200 && openIdRes.data?.openid) {
-            openId = openIdRes.data.openid;
-            const updatedUser = { ...user, open_id: openId };
-            localStorage.setItem('customer_user', JSON.stringify(updatedUser));
-            console.log('[Recharge] 自动获取 openId:', openId);
-          }
-        } catch (e) {
-          console.error('[Recharge] 获取 openId 失败:', e);
-        }
-      }
-
-      if (!openId) {
-        alert('在线支付需要微信授权，请确保在微信环境中打开，或联系管理员获取 openId');
+        alert('在线支付需要微信授权，请在微信中重新打开此页面');
         setSubmitting(false);
         return;
       }
