@@ -4,7 +4,11 @@ import {
   API_ENDPOINTS,
   setMerchantKeys,
   getMerchantKeys,
+  loadTerminalConfig,
+  saveTerminalConfig,
+  clearTerminalConfig,
 } from '../config/helipay';
+import type { TerminalInfo, TerminalConfig } from '../config/helipay';
 import {
   aesDecrypt,
   desedeEncrypt,
@@ -90,9 +94,9 @@ function validateConfig(): void {
 }
 
 /**
- * 步骤1：生成终端
+ * 步骤1：生成终端（返回完整终端信息）
  */
-async function generateTerminal(): Promise<string> {
+async function generateTerminal(): Promise<TerminalInfo> {
   const requestBody = JSON.stringify({
     merchantNo: helipayConfig.merchantNo,
   });
@@ -109,19 +113,28 @@ async function generateTerminal(): Promise<string> {
   if (response.responseCode === '0000') {
     // snNo 可能在顶层或 data 下，做兼容
     const snNo = (response as any).snNo || (response as any).sn || response.data?.snNo || response.data?.sn;
-    console.log('终端序列号:', snNo);
-    return snNo;
+    const userName = (response as any).userName || response.data?.userName || '';
+    const merchantNo = (response as any).merchantNo || response.data?.merchantNo || helipayConfig.merchantNo;
+    const merchantName = (response as any).merchantName || response.data?.merchantName || '';
+
+    if (!snNo) {
+      throw new Error('终端生成失败: 未返回 snNo');
+    }
+
+    console.log('终端信息 - snNo:', snNo, 'userName:', userName, 'merchantName:', merchantName);
+
+    return { snNo, userName, merchantNo, merchantName };
   } else {
     throw new Error(`终端生成失败: ${response.responseMessage}`);
   }
 }
 
 /**
- * 步骤2：获取密钥
+ * 步骤2：获取密钥（同时将终端信息+密钥持久化到数据库）
  */
-async function requestKeys(snNo: string): Promise<void> {
+async function requestKeys(terminal: TerminalInfo): Promise<void> {
   const requestBody = JSON.stringify({
-    snNo,
+    snNo: terminal.snNo,
   });
 
   console.log('获取密钥请求参数:', requestBody);
@@ -149,29 +162,47 @@ async function requestKeys(snNo: string): Promise<void> {
   console.log('解密后的SECRET_KEY:', secretKey);
   console.log('解密后的SIGN_KEY:', signKey);
 
-  setMerchantKeys({
-    snNo,
+  const keys = {
+    snNo: terminal.snNo,
     secretKey,
     signKey,
     updatedAt: Date.now(),
-  });
+  };
+
+  // 更新内存缓存
+  setMerchantKeys(keys);
+
+  // 持久化到数据库：终端信息 + 通信密钥
+  const terminalConfig: TerminalConfig = { terminal, keys };
+  saveTerminalConfig(terminalConfig);
 }
 
 /**
- * 初始化支付（获取终端和密钥）
+ * 初始化支付（优先从数据库加载终端配置，不存在时重新获取）
+ * 一个商户号只需获取一次终端信息和通信密钥
  */
 async function initPayment(): Promise<void> {
   // 先验证配置
   validateConfig();
-  
-  const keys = getMerchantKeys();
 
-  // 如果密钥不存在或超过24小时，重新获取
-  if (!keys || Date.now() - keys.updatedAt > 24 * 60 * 60 * 1000) {
-    console.log('初始化支付配置...');
-    const snNo = await generateTerminal();
-    await requestKeys(snNo);
+  // 1. 检查内存缓存
+  let keys = getMerchantKeys();
+  if (keys && Date.now() - keys.updatedAt <= 24 * 60 * 60 * 1000) {
+    return; // 内存中有效，直接使用
   }
+
+  // 2. 尝试从数据库加载持久化的终端配置
+  const cached = loadTerminalConfig();
+  if (cached && cached.terminal?.snNo && cached.keys?.secretKey && cached.keys?.signKey) {
+    console.log('[InitPayment] 使用数据库缓存的终端配置, snNo:', cached.terminal.snNo);
+    setMerchantKeys(cached.keys);
+    return;
+  }
+
+  // 3. 数据库无缓存或缓存无效，重新获取终端和密钥
+  console.log('[InitPayment] 无有效终端配置，开始重新获取...');
+  const terminal = await generateTerminal();
+  await requestKeys(terminal);
 }
 
 /**

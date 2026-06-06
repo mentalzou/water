@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, CheckCircle2 } from 'lucide-react';
+import { Settings, Save, CheckCircle2, Server, Trash2, RefreshCw } from 'lucide-react';
 
 function SettingsIcon(props: any) {
   return (
@@ -17,9 +17,67 @@ export default function ConfigPage() {
   });
   const [saved, setSaved] = useState(false);
 
+  // 合利宝终端信息
+  const [terminalInfo, setTerminalInfo] = useState<any>(null);
+  const [terminalLoading, setTerminalLoading] = useState(false);
+  const [terminalDeleting, setTerminalDeleting] = useState(false);
+
   const isPercentage = configs.commission_type === 'percentage';
   const exampleAmount = 100;
   const commissionExample = isPercentage ? (exampleAmount * parseFloat(configs.commission_rate || '0') / 100) : parseFloat(configs.commission_rate || '0');
+
+  const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
+  function getToken() {
+    try {
+      const user = localStorage.getItem('user');
+      if (user) return JSON.parse(user).token || '';
+    } catch {}
+    return '';
+  }
+
+  async function fetchTerminalInfo() {
+    setTerminalLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/helipay/terminal`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        setTerminalInfo(data.data);
+      }
+    } catch (e) {
+      console.error('获取终端信息失败', e);
+    } finally {
+      setTerminalLoading(false);
+    }
+  }
+
+  async function deleteTerminal() {
+    if (!confirm('确定要删除合利宝终端信息吗？\n\n删除后，下次支付时将自动重新获取终端和通信密钥。')) return;
+    setTerminalDeleting(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/helipay/terminal`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        alert(data.message || '已删除');
+        setTerminalInfo({ exists: false });
+      } else {
+        alert(data.message || '删除失败');
+      }
+    } catch (e: any) {
+      alert('删除失败: ' + (e.message || '网络错误'));
+    } finally {
+      setTerminalDeleting(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchTerminalInfo();
+  }, []);
 
   function handleSave() {
     setSaved(true);
@@ -100,6 +158,86 @@ export default function ConfigPage() {
             ].map(({ label, key, placeholder, mask }) => (
               <div key={key}><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label><input type={mask?'password':'text'} placeholder={placeholder} className="w-full max-w-md px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"/></div>
             ))}
+          </div>
+        </div>
+
+        {/* Helipay Terminal Info */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-amber-50/80 to-orange-50/50">
+            <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+              <Server className="w-4.5 h-4.5 text-orange-500" /> 合利宝终端信息
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">商户号对应的终端和通信密钥缓存状态</p>
+          </div>
+
+          <div className="p-6">
+            {terminalLoading ? (
+              <div className="flex items-center gap-2 text-gray-400 text-sm">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-water rounded-full animate-spin" />
+                加载中...
+              </div>
+            ) : !terminalInfo || !terminalInfo.exists ? (
+              <div className="text-center py-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
+                  <Server className="w-6 h-6 text-gray-400" />
+                </div>
+                <p className="text-sm text-gray-500 mb-1">尚未获取终端信息</p>
+                <p className="text-xs text-gray-400">首次支付时将自动获取并缓存</p>
+                <button onClick={fetchTerminalInfo} className="mt-3 text-xs text-water hover:underline flex items-center gap-1 mx-auto">
+                  <RefreshCw className="w-3 h-3" /> 刷新
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* 终端基本信息 */}
+                <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                  {[
+                    { label: '终端号 (SN)', value: terminalInfo.terminal?.snNo },
+                    { label: '商户号', value: terminalInfo.terminal?.merchantNo },
+                    { label: '商户名称', value: terminalInfo.terminal?.merchantName },
+                    { label: '用户名', value: terminalInfo.terminal?.userName },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+                      <p className="text-sm font-mono text-gray-700">{value || '-'}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 密钥信息（脱敏） */}
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-xs text-gray-400 mb-2">通信密钥（脱敏显示）</p>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">SECRET_KEY</p>
+                      <p className="text-sm font-mono text-gray-600">{terminalInfo.keys?.secretKey || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">SIGN_KEY</p>
+                      <p className="text-sm font-mono text-gray-600">{terminalInfo.keys?.signKey || '-'}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">更新时间：{terminalInfo.keys?.updatedTime || '-'}</p>
+                </div>
+
+                {/* 操作按钮 */}
+                <div className="flex items-center gap-3 pt-2">
+                  <button onClick={fetchTerminalInfo}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+                    <RefreshCw className="w-3 h-3" /> 刷新
+                  </button>
+                  <button onClick={deleteTerminal} disabled={terminalDeleting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    {terminalDeleting ? (
+                      <div className="w-3 h-3 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3" />
+                    )}
+                    删除终端缓存
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

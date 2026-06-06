@@ -441,6 +441,57 @@ export async function queryOrderPayment(req: Request, res: Response): Promise<vo
   }
 }
 
+// ============ 合利宝终端信息 ============
+
+/** 获取合利宝终端信息（密钥脱敏） */
+export function getHelipayTerminalInfo(_req: Request, res: Response): void {
+  try {
+    const { loadTerminalConfig } = require('../config/helipay');
+    const config = loadTerminalConfig();
+
+    if (!config) {
+      success(res, { exists: false, message: '尚未获取终端信息' });
+      return;
+    }
+
+    // 脱敏处理：密钥仅显示前后各4位
+    const mask = (s: string) => {
+      if (!s || s.length <= 8) return '****';
+      return s.substring(0, 4) + '****' + s.substring(s.length - 4);
+    };
+
+    success(res, {
+      exists: true,
+      terminal: {
+        snNo: config.terminal.snNo,
+        userName: config.terminal.userName,
+        merchantNo: config.terminal.merchantNo,
+        merchantName: config.terminal.merchantName,
+      },
+      keys: {
+        snNo: config.keys.snNo,
+        secretKey: mask(config.keys.secretKey),
+        signKey: mask(config.keys.signKey),
+        updatedAt: config.keys.updatedAt,
+        updatedTime: new Date(config.keys.updatedAt).toLocaleString('zh-CN'),
+      },
+    });
+  } catch (e: any) {
+    error(res, e.message || '获取终端信息失败');
+  }
+}
+
+/** 清除合利宝终端信息（DB + 内存），下次支付时将自动重新获取 */
+export function deleteHelipayTerminal(_req: Request, res: Response): void {
+  try {
+    const { clearTerminalConfig } = require('../config/helipay');
+    clearTerminalConfig();
+    success(res, null, '终端信息已清除，下次支付时将自动重新获取');
+  } catch (e: any) {
+    error(res, e.message || '清除终端信息失败');
+  }
+}
+
 // ============ Config ============
 export function getConfigs(_req: Request, res: Response): void {
   const db = getDb();

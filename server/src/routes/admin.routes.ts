@@ -81,6 +81,10 @@ router.post('/products/upload', adminController.productUpload.single('file'), ad
 router.get('/orders', adminController.listAllOrders);
 router.post('/orders/:id/query-payment', adminController.queryOrderPayment);
 
+// Helipay terminal info
+router.get('/helipay/terminal', adminController.getHelipayTerminalInfo);
+router.delete('/helipay/terminal', adminController.deleteHelipayTerminal);
+
 // System config
 router.get('/configs', adminController.getConfigs);
 router.put('/configs', adminController.updateConfig);
