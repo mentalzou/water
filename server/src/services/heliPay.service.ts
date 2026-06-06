@@ -239,10 +239,20 @@ export async function createJsApiOrder(
       throw new Error('支付响应缺少payData');
     }
     const payData = typeof payDataStr === 'string' ? JSON.parse(payDataStr) : payDataStr;
-    console.log('payData:', JSON.stringify(payData));
+
+    // 规范化 WeChat JSAPI 参数：timeStamp 必须是字符串，补齐 signType
+    const normalizedPayData = {
+      appId: payData.appId,
+      timeStamp: String(payData.timeStamp),
+      nonceStr: payData.nonceStr,
+      package: payData.package,
+      signType: payData.signType || 'MD5',
+      paySign: payData.paySign,
+    };
+    console.log('payData:', JSON.stringify(normalizedPayData));
 
     return {
-      payData,
+      payData: normalizedPayData,
       orderNo: bizData.orderNum || processedResponse.orderNo || orderNo,
       transactionId: bizData.transactionId,
       orderId,
