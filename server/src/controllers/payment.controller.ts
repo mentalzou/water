@@ -4,10 +4,8 @@ import { orderModel } from '../models/order.model';
 import { userRechargeModel } from '../models/userRecharge.model';
 import { rechargePackageModel } from '../models/rechargePackage.model';
 import { balanceTransactionModel } from '../models/balanceTransaction.model';
-import { createJsApiOrder, processPaymentNotify } from '../services/heliPay.service';
+import { createJsApiOrder, parsePaymentNotify } from '../services/heliPay.service';
 import { processPaymentSuccess } from '../services/order.service';
-import { desedeDecrypt, verifyMd5Sign } from '../utils/crypto';
-import { getMerchantKeys } from '../config/helipay';
 
 /**
  * 从请求中获取客户端真实IP
@@ -150,109 +148,151 @@ export async function createRechargePayment(req: Request, res: Response): Promis
 }
 
 /**
- * 支付回调通知（统一处理订单支付和充值支付）
+ * 合利宝商户交易通知（被动接收，POST 推送）
+ *
+ * 报文格式：{ "data": "3DES加密数据", "agentNo": "", "sign": "RSA签名", "merchantNo": "" }
+ * 解密后得到 NotifyData，包含 orderNo / orderType / orderStatus 等字段
+ *
+ * 业务处理：
+ *   FORWARD（收单）+ SUCCESS → 订单标记为已支付
+ *   REVERSE（退款）+ SUCCESS → 订单标记为已退款
+ *
+ * 注意：必须返回纯文本 "success"，合利宝要求在收到后停止重试（共5次）
  */
 export async function paymentNotify(req: Request, res: Response): Promise<void> {
+  console.log('[合利宝通知] 收到通知报文:', JSON.stringify(req.body));
+
   try {
-    const { body, sign } = req.body;
+    const rawBody = req.body;
 
-    if (!body || !sign) {
-      res.status(400).json({ code: 'FAIL', message: '参数不完整' });
+    // 前置校验
+    if (!rawBody || !rawBody.data || !rawBody.sign) {
+      console.warn('[合利宝通知] 报文缺少 data / sign 字段');
+      res.status(400).send('fail');
       return;
     }
 
-    const keys = getMerchantKeys();
-    if (!keys) {
-      console.error('支付密钥未初始化');
-      res.status(500).json({ code: 'FAIL', message: '密钥未初始化' });
+    // 解密 + 验签
+    const notifyData = parsePaymentNotify(rawBody);
+    if (!notifyData) {
+      console.error('[合利宝通知] 解密或验签失败，拒绝处理');
+      res.status(400).send('fail');
       return;
     }
 
-    // 验证签名
-    if (!verifyMd5Sign(body, keys.signKey, sign)) {
-      console.error('支付回调签名验证失败');
-      res.status(400).json({ code: 'FAIL', message: '签名验证失败' });
-      return;
-    }
+    const {
+      orderNo,
+      orderType,
+      orderStatus,
+      refundOrderNo,
+      channelOrderId,
+      orderAmount,
+      finishDate,
+    } = notifyData;
 
-    // 解密内容
-    const decryptedContent = desedeDecrypt(body, keys.secretKey);
-    console.log('支付回调解密内容:', decryptedContent);
+    console.log('[合利宝通知] 解析成功:', {
+      orderNo,
+      orderType,
+      orderStatus,
+      refundOrderNo,
+      channelOrderId,
+      orderAmount,
+      finishDate,
+    });
 
-    const notifyData = JSON.parse(decryptedContent);
+    // ========== 收单通知（正向交易） ==========
+    if (orderType === 'FORWARD') {
+      const order = orderModel.findByOrderNo(orderNo);
 
-    if (notifyData.responseCode === '0000') {
-      const orderNo = notifyData.orderNo || '';
-      const transactionId = notifyData.transactionId || notifyData.data?.transactionId || `TXN_${Date.now()}`;
+      if (!order) {
+        console.warn(`[合利宝通知] FORWARD: 未找到订单 orderNo=${orderNo}，忽略`);
+        res.send('success');
+        return;
+      }
 
-      console.log('支付成功回调, orderNo:', orderNo, 'transactionId:', transactionId);
-
-      // 判断是充值支付还是订单支付
-      if (orderNo.startsWith('RECHARGE_')) {
-        // 充值支付：通过 transaction_id 查找充值记录
-        const allRecharges = require('../utils/db').getDb()
-            .prepare("SELECT * FROM user_recharges WHERE transaction_id = ?")
-            .all(orderNo) as any[];
-
-        if (allRecharges.length > 0) {
-          const rechargeRecord = allRecharges[0];
-
-          // 幂等性检查
-          if (balanceTransactionModel.hasRechargeTransaction(rechargeRecord.id)) {
-            console.log('充值已入账，跳过重复处理:', rechargeRecord.id);
-          } else {
-            userRechargeModel.markPaid(rechargeRecord.id, transactionId);
-
-            // 记录流水：本金
-            balanceTransactionModel.create({
-              user_id: rechargeRecord.user_id,
-              recharge_id: rechargeRecord.id,
-              tx_type: 'recharge_principal',
-              amount: rechargeRecord.amount,
-              principal_after: rechargeRecord.remaining_balance,
-              bonus_after: rechargeRecord.bonus_balance,
-              description: `充值本金到账（微信支付） - ¥${rechargeRecord.amount.toFixed(2)}`,
-              operator_ip: (req as any).ip || '',
-            });
-
-            // 记录流水：赠送金
-            if (rechargeRecord.bonus_amount > 0) {
-              balanceTransactionModel.create({
-                user_id: rechargeRecord.user_id,
-                recharge_id: rechargeRecord.id,
-                tx_type: 'recharge_bonus',
-                amount: rechargeRecord.bonus_amount,
-                principal_after: rechargeRecord.remaining_balance,
-                bonus_after: rechargeRecord.bonus_balance + rechargeRecord.bonus_amount,
-                description: `充值赠送金到账（微信支付） - ¥${rechargeRecord.bonus_amount.toFixed(2)}`,
-                operator_ip: (req as any).ip || '',
-              });
-            }
-
-            console.log('充值支付成功，充值记录已更新:', rechargeRecord.id);
-          }
-        } else {
-          console.warn('未找到对应的充值记录, orderNo:', orderNo);
+      if (orderStatus === 'SUCCESS') {
+        // 幂等：已经是 paid/refunding/refunded 状态则不再重复处理
+        if (order.status === 'paid' || order.status === 'refunding' || order.status === 'refunded') {
+          console.log(`[合利宝通知] FORWARD SUCCESS: 订单 ${orderNo} 已是 ${order.status} 状态，跳过`);
+          res.send('success');
+          return;
         }
-      } else {
-        // 订单支付
-        const order = orderModel.findByOrderNo(orderNo);
-        if (order) {
-          processPaymentSuccess(order.id, transactionId);
-          console.log('订单支付成功，订单已更新:', order.id);
-        } else {
-          console.warn('未找到对应的订单, orderNo:', orderNo);
+
+        const txnId = channelOrderId || `HLB_${Date.now()}`;
+        processPaymentSuccess(order.id, txnId);
+        console.log(`[合利宝通知] ✅ 订单 ${orderNo} 已标记为已支付, channelOrderId: ${txnId}`);
+        res.send('success');
+        return;
+      }
+
+      if (orderStatus === 'FAILED' || orderStatus === 'CLOSE' || orderStatus === 'CANCELLED') {
+        console.log(`[合利宝通知] FORWARD ${orderStatus}: 订单 ${orderNo} 交易未成功，不改状态`);
+        res.send('success');
+        return;
+      }
+
+      // INIT / DOING 等中间状态，不处理
+      console.log(`[合利宝通知] FORWARD ${orderStatus}: 中间状态，等待后续通知`);
+      res.send('success');
+      return;
+    }
+
+    // ========== 退款通知（反向交易） ==========
+    if (orderType === 'REVERSE') {
+      // 先尝试用 orderNo 查找原订单
+      let order = orderModel.findByOrderNo(orderNo);
+
+      // 如果找不到，尝试通过 remark 中的退款订单号查找
+      if (!order && refundOrderNo) {
+        const db = require('../utils/db').getDb();
+        const row = db.prepare(
+          "SELECT * FROM orders WHERE remark LIKE ? ORDER BY updated_at DESC LIMIT 1"
+        ).get(`%退款订单号:${refundOrderNo}%`) as any;
+        if (row) {
+          order = orderModel.findById(row.id);
+          console.log(`[合利宝通知] 通过退款订单号 ${refundOrderNo} 匹配到订单 ${row.order_no}`);
         }
       }
 
-      res.status(200).json({ code: 'SUCCESS', message: '处理成功' });
-    } else {
-      console.warn('支付回调失败:', notifyData.responseMessage);
-      res.status(400).json({ code: 'FAIL', message: notifyData.responseMessage || '支付失败' });
+      if (!order) {
+        console.warn(`[合利宝通知] REVERSE: 未找到订单 orderNo=${orderNo}, refundOrderNo=${refundOrderNo}，忽略`);
+        res.send('success');
+        return;
+      }
+
+      if (orderStatus === 'SUCCESS') {
+        // 幂等：已经是 refunded 则跳过
+        if (order.status === 'refunded') {
+          console.log(`[合利宝通知] REVERSE SUCCESS: 订单 ${order.order_no} 已是已退款状态，跳过`);
+          res.send('success');
+          return;
+        }
+
+        orderModel.markRefunded(order.id);
+        console.log(`[合利宝通知] ✅ 订单 ${order.order_no} 退款成功，已标记为已退款`);
+        res.send('success');
+        return;
+      }
+
+      if (orderStatus === 'FAILED') {
+        console.log(`[合利宝通知] REVERSE FAILED: 订单 ${order.order_no} 退款失败，请注意处理`);
+        res.send('success');
+        return;
+      }
+
+      // RECEIVE / DOING 等处理中状态
+      console.log(`[合利宝通知] REVERSE ${orderStatus}: 退款处理中，等待后续通知`);
+      res.send('success');
+      return;
     }
+
+    // 未知 orderType
+    console.warn(`[合利宝通知] 未知 orderType: ${orderType}`);
+    res.send('success');
   } catch (err: any) {
-    console.error('支付回调处理失败:', err);
-    res.status(500).json({ code: 'FAIL', message: '处理失败' });
+    console.error('[合利宝通知] 处理异常:', err);
+    // 即使异常也返回 success，避免合利宝无意义重试
+    res.send('success');
   }
 }
 
