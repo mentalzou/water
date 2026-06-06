@@ -215,7 +215,7 @@ export default function ConfirmOrderPage() {
         openId: openId,
       });
 
-      if (payRes.code !== 200 || !payRes.data?.jsApiParameters) {
+      if (payRes.code !== 200 || !payRes.data?.payData) {
         alert(payRes.message || '创建支付订单失败');
         setSubmitting(false);
         return;
@@ -225,7 +225,7 @@ export default function ConfirmOrderPage() {
       localStorage.removeItem('confirm_order_data');
 
       // 3. 调起微信支付
-      invokeWechatPay(payRes.data.jsApiParameters, orderId);
+      invokeWechatPay(payRes.data.payData, orderId);
 
     } catch (err: any) {
       alert(err.message || '下单失败');
@@ -235,26 +235,23 @@ export default function ConfirmOrderPage() {
   }
 
 
-  function invokeWechatPay(jsApiParameters: string, orderId: string) {
-    // 微信支付JSAPI
-    const params = JSON.parse(jsApiParameters);
-
+  function invokeWechatPay(payData: any, orderId: string) {
+    // payData 已是解析好的对象，直接用于 WeixinJSBridge
     if (typeof WeixinJSBridge === 'undefined') {
-      // 微信环境检测
       if (document.addEventListener) {
         document.addEventListener('WeixinJSBridgeReady', () => {
-          onBridgeReady(params, orderId);
+          onBridgeReady(payData, orderId);
         }, false);
       } else if ((document as any).attachEvent) {
         (document as any).attachEvent('WeixinJSBridgeReady', () => {
-          onBridgeReady(params, orderId);
+          onBridgeReady(payData, orderId);
         });
         (document as any).attachEvent('onWeixinJSBridgeReady', () => {
-          onBridgeReady(params, orderId);
+          onBridgeReady(payData, orderId);
         });
       }
     } else {
-      onBridgeReady(params, orderId);
+      onBridgeReady(payData, orderId);
     }
   }
 

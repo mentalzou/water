@@ -134,33 +134,32 @@ export default function RechargePage() {
         openId,
       });
 
-      if (payRes.code !== 200 || !payRes.data?.jsApiParameters) {
+      if (payRes.code !== 200 || !payRes.data?.payData) {
         alert(payRes.message || '创建支付订单失败');
         setSubmitting(false);
         return;
       }
 
       setSubmitting(false);
-      invokeWechatPay(payRes.data.jsApiParameters, rechargeId);
+      invokeWechatPay(payRes.data.payData, rechargeId);
     } catch (error: any) {
       alert(error.message || '充值失败');
       setSubmitting(false);
     }
   }
 
-  function invokeWechatPay(jsApiParameters: string, rechargeId: string) {
-    const params = JSON.parse(jsApiParameters);
-
+  function invokeWechatPay(payData: any, rechargeId: string) {
+    // payData 已是解析好的对象，直接用于 WeixinJSBridge
     function onReady() {
       WeixinJSBridge.invoke(
         'getBrandWCPayRequest',
         {
-          appId: params.appId,
-          timeStamp: params.timeStamp,
-          nonceStr: params.nonceStr,
-          package: params.package,
-          signType: params.signType,
-          paySign: params.paySign,
+          appId: payData.appId,
+          timeStamp: payData.timeStamp,
+          nonceStr: payData.nonceStr,
+          package: payData.package,
+          signType: payData.signType,
+          paySign: payData.paySign,
         },
         async (res: any) => {
           if (res.err_msg === 'get_brand_wcpay_request:ok') {

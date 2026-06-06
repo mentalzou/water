@@ -16,7 +16,8 @@ import { sendPostRequest } from '../utils/http';
 import type { Order } from '../types';
 
 export interface WxPayResult {
-  jsApiParameters: string;
+  payData: any;
+  orderNo: string;
   transactionId?: string;
   orderId: string;
 }
@@ -153,18 +154,16 @@ export async function createJsApiOrder(
       throw new Error('支付密钥未初始化');
     }
 
-    // 构建支付请求参数
-    const params = {
-      merchantNo: helipayConfig.merchantNo,
+    // 构建支付请求参数（JSAPI原生支付）
+    const params: Record<string, any> = {
       snNo: keys.snNo,
+      merchantNo: helipayConfig.merchantNo,
       orderNo: orderNo || `WD${Date.now()}`,
       appPayType: 'WXPAY',
       orderAmount: totalAmount.toFixed(2),
       openId,
-      appId: helipayConfig.appId,
       payRemarks: description || '好水到家订单',
       orderIp,
-      notifyUrl: helipayConfig.notifyUrl,
     };
 
     console.log('支付请求参数:', JSON.stringify(params));
@@ -173,8 +172,8 @@ export async function createJsApiOrder(
     const requestBody = buildEncryptedRequest(params, keys.secretKey, keys.signKey, keys.snNo);
     console.log('加密请求体:', JSON.stringify(requestBody));
 
-    // 发送请求
-    const fullUrl = `${helipayConfig.baseUrl.replace(/\/+$/, '')}${API_ENDPOINTS.orderSubmit}`;
+    // 发送请求（JSAPI原生支付）
+    const fullUrl = `${helipayConfig.baseUrl.replace(/\/+$/, '')}${API_ENDPOINTS.orderJsapi}`;
     const response = await sendPostRequest(
         fullUrl,
         JSON.stringify(requestBody),
@@ -192,10 +191,18 @@ export async function createJsApiOrder(
       throw new Error(`支付请求失败: ${processedResponse.responseMessage}`);
     }
 
-    // 返回JSAPI支付参数
+    // JSAPI返回的data中包含payData（用于WeixinJSBridge拉起支付）
+    const payDataStr = processedResponse.payData;
+    if (!payDataStr) {
+      throw new Error('支付响应缺少payData');
+    }
+    const payData = typeof payDataStr === 'string' ? JSON.parse(payDataStr) : payDataStr;
+    console.log('payData:', JSON.stringify(payData));
+
     return {
-      jsApiParameters: processedResponse.data?.jsApiParameters || processedResponse.jsApiParameters,
-      transactionId: processedResponse.data?.transactionId,
+      payData,
+      orderNo: processedResponse.orderNo || orderNo,
+      transactionId: processedResponse.transactionId,
       orderId,
     };
   } catch (error: any) {
