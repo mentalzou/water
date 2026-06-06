@@ -1,8 +1,37 @@
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Award, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+
+const CERTIFICATES = [
+  { name: '产品碳足迹证书',   file: '产品碳足迹证书.pdf' },
+  { name: '体系认证证书',     file: '体系认证证书.pdf' },
+  { name: '取水证',           file: '取水证.pdf' },
+  { name: '工业产品生产许可证', file: '工业产品生产许可证.pdf' },
+  { name: '新采矿证',         file: '新采矿证.pdf' },
+  { name: '食品生产许可证',   file: '食品生产许可证.pdf' },
+];
 
 export default function QualityReportPage() {
   const navigate = useNavigate();
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [loading, setLoading] = useState<number | null>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const toggleExpand = useCallback((index: number) => {
+    const willOpen = expanded !== index;
+    setExpanded(willOpen ? index : null);
+
+    if (willOpen) {
+      setLoading(index);
+      // 展开后等一帧再滚动，避免布局抖动
+      requestAnimationFrame(() => {
+        cardRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+  }, [expanded]);
+
+  const getPdfUrl = (file: string) =>
+    `${import.meta.env.VITE_API_BASE || ''}/uploads/quality/${encodeURIComponent(file)}#toolbar=0&navpanes=0&scrollbar=0`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -12,94 +41,74 @@ export default function QualityReportPage() {
           <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
             <ArrowLeft className="w-4 h-4 text-white" />
           </button>
-          <h1 className="text-xl font-bold text-white">质检报告</h1>
+          <h1 className="text-xl font-bold text-white">资质证书</h1>
         </div>
+        <p className="text-white/70 text-sm mt-1 px-1">共 {CERTIFICATES.length} 项证书</p>
       </header>
 
       {/* Content */}
-      <main className="px-4 py-6 space-y-4">
-        {/* 质检信息卡片 */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-            <div className="w-12 h-12 bg-water/10 rounded-xl flex items-center justify-center">
-              <FileText className="w-6 h-6 text-water" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">产品质量检验报告</h2>
-              <p className="text-xs text-gray-400 mt-0.5">符合国家饮用水标准</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {/* 品名 */}
-            <div className="flex items-center justify-between py-2">
-              <span className="text-gray-500 text-sm">品名</span>
-              <span className="text-gray-800 font-medium text-sm">山泉水</span>
-            </div>
-
-            <div className="border-t border-gray-50"></div>
-
-            {/* 报告日期 */}
-            <div className="flex items-center justify-between py-2">
-              <span className="text-gray-500 text-sm">报告日期</span>
-              <span className="text-gray-800 font-medium text-sm">2025年12月15日</span>
-            </div>
-
-            <div className="border-t border-gray-50"></div>
-
-            {/* 生产日期 */}
-            <div className="flex items-center justify-between py-2">
-              <span className="text-gray-500 text-sm">生产日期</span>
-              <span className="text-gray-800 font-medium text-sm">2025年12月10日</span>
-            </div>
-
-            <div className="border-t border-gray-50"></div>
-
-            {/* 质检报告链接 */}
-            <div className="flex items-center justify-between py-2">
-              <span className="text-gray-500 text-sm">质检报告</span>
-              <a
-                href="#"
-                className="flex items-center gap-1 text-water text-sm font-medium hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert('质检报告链接待配置');
-                }}
+      <main className="px-4 py-6 pb-10">
+        <div className="grid gap-4">
+          {CERTIFICATES.map((cert, index) => {
+            const isOpen = expanded === index;
+            const isLoading = loading === index;
+            return (
+              <div
+                key={cert.file}
+                ref={(el) => { cardRefs.current[index] = el; }}
+                className="bg-white rounded-2xl shadow-sm overflow-hidden"
               >
-                查看报告
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-          </div>
-        </div>
+                {/* 证书标题栏 */}
+                <button
+                  onClick={() => toggleExpand(index)}
+                  className="w-full p-5 flex items-center gap-4 active:bg-gray-50 transition-colors"
+                >
+                  <div className="w-11 h-11 bg-water/10 rounded-xl flex items-center justify-center shrink-0">
+                    <Award className="w-5 h-5 text-water" />
+                  </div>
 
-        {/* 检测项目 */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
-          <h3 className="font-semibold text-gray-800 text-sm">检测结果摘要</h3>
-          <div className="space-y-2">
-            {[
-              { name: '色度', value: '≤5度', standard: '≤15度', pass: true },
-              { name: '浑浊度', value: '≤0.5 NTU', standard: '≤1 NTU', pass: true },
-              { name: 'pH值', value: '7.2', standard: '6.5-8.5', pass: true },
-              { name: '总硬度', value: '85 mg/L', standard: '≤450 mg/L', pass: true },
-              { name: '菌落总数', value: '未检出', standard: '≤100 CFU/mL', pass: true },
-              { name: '大肠菌群', value: '未检出', standard: '不得检出', pass: true },
-            ].map((item) => (
-              <div key={item.name} className="flex items-center justify-between py-1.5 px-3 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <span className="text-gray-700 text-xs">{item.name}</span>
-                </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-gray-600">{item.value}</span>
-                  <span className="text-gray-400">{item.standard}</span>
-                  <span className={`w-4 h-4 rounded-full flex items-center justify-center ${item.pass ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'}`}>
-                    {item.pass ? '✓' : '✗'}
-                  </span>
+                  <div className="flex-1 min-w-0 text-left">
+                    <h3 className="text-gray-800 font-semibold text-sm leading-tight">
+                      {cert.name}
+                    </h3>
+                  </div>
+
+                  {isOpen
+                    ? <ChevronUp className="w-5 h-5 text-gray-400 shrink-0" />
+                    : <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />
+                  }
+                </button>
+
+                {/* 证书图片预览（固定高度容器，避免加载时抖动） */}
+                <div
+                  className="overflow-hidden transition-all duration-300 ease-in-out"
+                  style={{
+                    height: isOpen ? 'calc(100vw * 1.414)' : '0px',
+                    maxHeight: isOpen ? '80vh' : '0px',
+                  }}
+                >
+                  <div className="relative w-full h-full">
+                    {/* 加载中 */}
+                    {isLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+                        <Loader2 className="w-8 h-8 text-water animate-spin" />
+                      </div>
+                    )}
+                    {/* PDF 内嵌展示 */}
+                    {isOpen && (
+                      <iframe
+                        src={getPdfUrl(cert.file)}
+                        className="w-full h-full border-0"
+                        title={cert.name}
+                        sandbox="allow-scripts allow-same-origin"
+                        onLoad={() => setLoading(null)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-          <p className="text-xs text-gray-400 text-center pt-2">以上检测结果均符合国家标准</p>
+            );
+          })}
         </div>
       </main>
     </div>
