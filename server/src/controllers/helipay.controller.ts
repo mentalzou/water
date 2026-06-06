@@ -46,7 +46,7 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
         order.id,
         order.order_no,
         order.total_amount,
-        `好水到家订单-${order.order_no}`,
+        `武夷屿都山水订单-${order.order_no}`,
         openId
     );
 

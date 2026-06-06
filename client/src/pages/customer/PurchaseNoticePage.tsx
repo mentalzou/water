@@ -6,11 +6,6 @@ export default function PurchaseNoticePage() {
 
   const notices = [
     {
-      icon: '🏪',
-      title: '连锁经营，跨区域可送',
-      content: '福州、宁德、莆田、厦门、漳州、泉州六城通用',
-    },
-    {
       icon: '🕐',
       title: '服务时间',
       content: '周一至周日 8:30-17:30',
@@ -28,7 +23,7 @@ export default function PurchaseNoticePage() {
     {
       icon: '🏢',
       title: '楼层费收费标准',
-      content: '电梯房及五层以下楼梯房免配送费；针对5层及以上无电梯客户，一层加收一元。\n（楼层算法从地面开始算起，如您是**小区504，实际需要地面爬楼梯半截到一层，则按6层算，每桶收2元，以此类推）',
+      content: '电梯房免配送费；楼梯房一层加收一元。',
     },
     {
       icon: '⚠️',

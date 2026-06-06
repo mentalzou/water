@@ -54,7 +54,7 @@ export default function DeliverymanLayout() {
               <Truck className="w-4.5 h-4.5 text-white" />
             </div>
             <div>
-              <span className="font-bold text-gray-800 text-sm">好水到家</span>
+              <span className="font-bold text-gray-800 text-sm">武夷屿都山水</span>
               <p className="text-xs text-gray-400">派送中心</p>
             </div>
           </div>

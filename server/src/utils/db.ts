@@ -655,7 +655,7 @@ function seedDefaultData(database: Database.Database): void {
     );
     insertConfig.run('commission_type', 'percentage', 'string', '返佣类型：percentage=百分比, fixed=固定金额', 'commission');
     insertConfig.run('commission_rate', '5', 'number', '返佣数值：百分比时为5表示5%，固定金额时为具体元数', 'commission');
-    insertConfig.run('site_name', '好水到家', 'string', '站点名称', 'general');
+    insertConfig.run('site_name', '武夷屿都山水', 'string', '站点名称', 'general');
     insertConfig.run('wx_mch_id', '', 'string', '微信支付商户号', 'payment');
     insertConfig.run('wx_api_key', '', 'string', '微信支付APIv3密钥', 'payment');
     insertConfig.run('wx_app_id', '', 'string', '微信应用AppID', 'payment');

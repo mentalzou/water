@@ -11,6 +11,7 @@ import {
   desedeDecrypt,
   generateMd5Sign,
   verifyMd5Sign,
+  rsaVerifySign,
 } from '../utils/crypto';
 import { sendPostRequest } from '../utils/http';
 import type { Order } from '../types';
@@ -20,6 +21,45 @@ export interface WxPayResult {
   orderNo: string;
   transactionId?: string;
   orderId: string;
+}
+
+/**
+ * 小利云交易通知解密后的数据结构
+ */
+export interface NotifyData {
+  agentNo: string;
+  agentName: string;
+  merchantNo: string;
+  merchantName: string;
+  appPayType: string;
+  finishDate: string;
+  orderNo: string;
+  refundOrderNo?: string;
+  orderAmount: number;
+  realIncome: number;
+  orderStatus: string;   // INIT, SUCCESS, FAILED, DOING, CLOSE, CANCELLED
+  orderTradeFee: number;
+  phoneNoTemp: string;
+  productId: number;
+  productName: string;
+  snNo: string;
+  tuSn: string;
+  orderType: string;     // FORWARD: 收单, REVERSE: 退款
+  payRemarks?: string;
+  cashierFields?: Array<{ htmlText?: string; htmlValue?: string }>;
+  channelOrderId: string;
+  cardType?: string;
+  openId?: string;
+}
+
+/**
+ * 小利云通知原始报文结构
+ */
+export interface NotifyRawBody {
+  data: string;        // DES/3DES 加密的业务数据
+  agentNo: string;
+  sign: string;         // RSA 签名
+  merchantNo: string;
 }
 
 /**
@@ -162,7 +202,7 @@ export async function createJsApiOrder(
       appPayType: 'WXPAY',
       orderAmount: totalAmount.toFixed(2),
       openId,
-      payRemarks: description || '好水到家订单',
+      payRemarks: description || '武夷屿都山水订单',
       orderIp,
     };
 
@@ -288,41 +328,58 @@ function processEncryptedResponse(
 }
 
 /**
- * 处理支付回调通知
+ * 解析小利云交易通知报文（3DES解密 + RSA验签）
+ * 报文格式：{ data, agentNo, sign, merchantNo }
+ * - data 用 secretKey 做 3DES ECB ZeroPadding 解密
+ * - sign 用 合利宝公钥 做 RSA-SHA256 验签（验原文，即解密后的 JSON 字符串）
  */
-export function processPaymentNotify(
-    body: string,
-    sign: string
-): boolean {
+export function parsePaymentNotify(rawBody: NotifyRawBody): NotifyData | null {
+  const { data, sign, merchantNo } = rawBody;
+
+  if (!data || !sign) {
+    console.error('[通知] 参数不完整');
+    return null;
+  }
+
+  // 校验商户号匹配（防止非本商户的通知）
+  if (merchantNo && merchantNo !== helipayConfig.merchantNo) {
+    console.warn(`[通知] 商户号不匹配，期望:${helipayConfig.merchantNo}, 收到:${merchantNo}`);
+    return null;
+  }
+
   const keys = getMerchantKeys();
   if (!keys) {
-    console.error('支付密钥未初始化');
-    return false;
+    console.error('[通知] 支付密钥未初始化');
+    return null;
   }
 
   try {
-    // 验证签名
-    if (!verifyMd5Sign(body, keys.signKey, sign)) {
-      console.error('支付回调签名验证失败');
-      return false;
+    // 1. 3DES 解密 data 字段
+    console.log('[通知] 密文(data):', data.substring(0, 100) + '...');
+    const decryptedJson = desedeDecrypt(data, keys.secretKey);
+    console.log('[通知] 解密后内容:', decryptedJson);
+
+    // 2. RSA-SHA256 验签（对解密后的明文JSON做验签）
+    console.log('[通知] 签名(sign):', sign.substring(0, 80) + '...');
+    if (!rsaVerifySign(decryptedJson, helipayConfig.publicKey, sign)) {
+      console.error('[通知] RSA签名验证失败');
+      return null;
     }
+    console.log('[通知] RSA签名验证通过');
 
-    // 解密内容
-    const decryptedContent = desedeDecrypt(body, keys.secretKey);
-    console.log('支付回调解密内容:', decryptedContent);
+    // 3. 解析业务数据
+    const notifyData: NotifyData = JSON.parse(decryptedJson);
+    console.log('[通知] 解析完成:', {
+      orderNo: notifyData.orderNo,
+      orderStatus: notifyData.orderStatus,
+      orderType: notifyData.orderType,
+      channelOrderId: notifyData.channelOrderId,
+      orderAmount: notifyData.orderAmount,
+    });
 
-    const notifyData = JSON.parse(decryptedContent);
-
-    // 更新订单状态
-    if (notifyData.orderNo && notifyData.responseCode === '0000') {
-      console.log('支付成功，订单号:', notifyData.orderNo);
-      // 这里可以根据orderNo更新订单状态
-      // 实际项目中需要实现订单状态更新逻辑
-    }
-
-    return true;
+    return notifyData;
   } catch (error: any) {
-    console.error('处理支付回调失败:', error);
-    return false;
+    console.error('[通知] 解析失败:', error);
+    return null;
   }
 }

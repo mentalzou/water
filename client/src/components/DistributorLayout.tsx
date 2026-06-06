@@ -59,7 +59,7 @@ export default function DistributorLayout() {
               <span className="text-white font-bold text-sm">好</span>
             </div>
             <div>
-              <span className="font-bold text-gray-800 text-sm">好水到家</span>
+              <span className="font-bold text-gray-800 text-sm">武夷屿都山水</span>
               <p className="text-xs text-gray-400">分销商中心</p>
             </div>
           </div>

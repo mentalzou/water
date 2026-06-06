@@ -28,8 +28,8 @@ export default function SharePage() {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: '好水到家 - 天然矿泉水',
-          text: '我正在使用好水到家购买天然矿泉水，品质好、价格优！快来试试吧',
+          title: '武夷屿都山水 - 天然矿泉水',
+          text: '我正在使用武夷屿都山水购买天然矿泉水，品质好、价格优！快来试试吧',
           url: shareLink,
         });
       } else {

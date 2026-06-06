@@ -113,7 +113,7 @@ export default function AdminLayout() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
               <DropletsIcon />
             </div>
-            <span className="font-bold text-white text-lg">好水到家</span>
+            <span className="font-bold text-white text-lg">武夷屿都山水</span>
           </div>
         </div>
 

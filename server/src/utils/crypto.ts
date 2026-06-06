@@ -105,3 +105,21 @@ export function verifyMd5Sign(data: string, key: string, receivedSign: string): 
   const expectedSign = generateMd5Sign(data, key);
   return expectedSign === receivedSign;
 }
+
+/**
+ * RSA SHA256 验签（用于小利云通知回调）
+ * @param data 待验签的原文（解密后的JSON字符串）
+ * @param publicKeyPem 合利宝公钥 PEM 格式
+ * @param signBase64 签名值 Base64 编码
+ */
+export function rsaVerifySign(data: string, publicKeyPem: string, signBase64: string): boolean {
+  try {
+    const crypto = require('crypto');
+    const verify = crypto.createVerify('RSA-SHA256');
+    verify.update(data, 'utf8');
+    return verify.verify(publicKeyPem, signBase64, 'base64');
+  } catch (error) {
+    console.error('[RSA] 验签失败:', error);
+    return false;
+  }
+}

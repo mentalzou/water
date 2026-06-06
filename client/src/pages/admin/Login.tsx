@@ -54,7 +54,7 @@ export default function Login() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 mx-auto mb-4 flex items-center justify-center shadow-lg shadow-cyan-500/30">
             <Droplets className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">好水到家</h1>
+          <h1 className="text-2xl font-bold text-white">武夷屿都山水</h1>
           <p className="text-gray-400 text-sm mt-2">管理后台登录</p>
         </div>
 

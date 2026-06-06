@@ -54,7 +54,7 @@ export default function DistributorLogin() {
           <div className="w-16 h-16 rounded-2xl bg-white mx-auto mb-4 flex items-center justify-center shadow-lg">
             <Droplets className="w-8 h-8 text-water" />
           </div>
-          <h1 className="text-2xl font-bold text-white">好水到家</h1>
+          <h1 className="text-2xl font-bold text-white">武夷屿都山水</h1>
           <p className="text-white/70 text-sm mt-2">分销商中心登录</p>
         </div>
 

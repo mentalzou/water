@@ -5,6 +5,8 @@ export interface Helipay {
     merchantNo: string;
     appId: string;
     notifyUrl: string;
+    nofiyAesKey: string;
+    publicKey: string;
 }
 
 export const helipayConfig: Helipay = {
@@ -13,7 +15,9 @@ export const helipayConfig: Helipay = {
     aesKey: process.env.HELIPAY_AES_KEY || '',
     merchantNo: process.env.HELIPAY_MERCHANT_NO || '',
     appId: process.env.WECHAT_APP_ID || '',
-    notifyUrl: process.env.HELIPAY_NOTIFY_URL || 'https://yourdomain.com/api/payment/notify',
+    notifyUrl: process.env.HELIPAY_NOTIFY_URL || 'http://yjhmall.com/api/payment/notify',
+    nofiyAesKey: process.env.HELIPAY_NOTIFY_AES_KEY || '',
+    publicKey: process.env.HELIPAY_NOTIFY_PUBLIC_KEY || '',
 };
 
 // API端点

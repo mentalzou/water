@@ -6,7 +6,7 @@ import { getDb } from './utils/db';
 getDb();
 
 const server = app.listen(config.port, () => {
-  console.log(`🚀 好水到家 API 服务已启动: http://localhost:${config.port}`);
+  console.log(`🚀 武夷屿都山水 API 服务已启动: http://localhost:${config.port}`);
   console.log(`   环境: ${config.nodeEnv}`);
 });
 

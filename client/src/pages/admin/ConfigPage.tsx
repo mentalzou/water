@@ -13,7 +13,7 @@ export default function ConfigPage() {
   const [configs, setConfigs] = useState({
     commission_type: 'percentage',
     commission_rate: '5',
-    site_name: '好水到家',
+    site_name: '武夷屿都山水',
   });
   const [saved, setSaved] = useState(false);
 

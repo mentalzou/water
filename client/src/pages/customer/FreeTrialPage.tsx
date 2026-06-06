@@ -26,7 +26,7 @@ export default function FreeTrialPage() {
           <div>
             <h2 className="text-xl font-bold text-gray-800 mb-3">免费试喝活动</h2>
             <p className="text-gray-500 text-sm leading-relaxed">
-              感谢您关注我们的山泉水产品！
+              感谢您关注我们的‘武夷屿都山水’矿泉水系列产品！
             </p>
             <p className="text-gray-500 text-sm leading-relaxed mt-2">
               我们定期举办免费试喝活动，让您先品尝，再决定是否购买。
@@ -60,7 +60,7 @@ export default function FreeTrialPage() {
               </div>
               <div>
                 <h3 className="font-medium text-gray-800 text-sm">下单配送</h3>
-                <p className="text-gray-500 text-xs mt-1">使用试喝券在本平台下单，我们将免费为您配送一桶山泉水。</p>
+                <p className="text-gray-500 text-xs mt-1">使用试喝券在本平台下单，可免费领取一桶4.5L‘武夷屿都山水’矿泉水。</p>
               </div>
             </div>
 
@@ -70,7 +70,7 @@ export default function FreeTrialPage() {
               </div>
               <div>
                 <h3 className="font-medium text-gray-800 text-sm">分享好友</h3>
-                <p className="text-gray-500 text-xs mt-1">试喝满意后，分享给好友，一起享受高品质山泉水！</p>
+                <p className="text-gray-500 text-xs mt-1">试喝满意后，分享给好友，一起享受高品质‘武夷屿都山水’矿泉水。</p>
               </div>
             </div>
           </div>
