@@ -1,37 +1,26 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Award, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ArrowLeft, Award, ChevronDown, ChevronUp } from 'lucide-react';
 
 const CERTIFICATES = [
-  { name: '产品碳足迹证书',   file: '产品碳足迹证书.pdf' },
-  { name: '体系认证证书',     file: '体系认证证书.pdf' },
-  { name: '取水证',           file: '取水证.pdf' },
-  { name: '工业产品生产许可证', file: '工业产品生产许可证.pdf' },
-  { name: '新采矿证',         file: '新采矿证.pdf' },
-  { name: '食品生产许可证',   file: '食品生产许可证.pdf' },
+  { name: '产品碳足迹证书',   files: ['cptzjzs_01.jpg', 'cptzjzs_02.jpg'] },
+  { name: '体系认证证书',     files: ['txrzzs_01.jpg', 'txrzzs_02.jpg'] },
+  { name: '取水证',           files: ['qsz_01.jpg'] },
+  { name: '工业产品生产许可证', files: ['gycpscxkz_01.jpg'] },
+  { name: '新采矿证',         files: ['xckz_01.jpg'] },
+  { name: '食品生产许可证',   files: ['spscxkz_01.jpg'] },
 ];
 
 export default function QualityReportPage() {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [loading, setLoading] = useState<number | null>(null);
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const toggleExpand = useCallback((index: number) => {
-    const willOpen = expanded !== index;
-    setExpanded(willOpen ? index : null);
+  const toggleExpand = (index: number) => {
+    setExpanded(expanded === index ? null : index);
+  };
 
-    if (willOpen) {
-      setLoading(index);
-      // 展开后等一帧再滚动，避免布局抖动
-      requestAnimationFrame(() => {
-        cardRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      });
-    }
-  }, [expanded]);
-
-  const getPdfUrl = (file: string) =>
-    `${import.meta.env.VITE_API_BASE || ''}/uploads/quality/${encodeURIComponent(file)}#toolbar=0&navpanes=0&scrollbar=0`;
+  const getImgUrl = (file: string) =>
+    `${import.meta.env.VITE_API_BASE || ''}/uploads/quality/${encodeURIComponent(file)}`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -43,7 +32,7 @@ export default function QualityReportPage() {
           </button>
           <h1 className="text-xl font-bold text-white">资质证书</h1>
         </div>
-        <p className="text-white/70 text-sm mt-1 px-1">共 {CERTIFICATES.length} 项证书</p>
+        {/*<p className="text-white/70 text-sm mt-1 px-1">共 {CERTIFICATES.length} 项证书</p>*/}
       </header>
 
       {/* Content */}
@@ -51,13 +40,9 @@ export default function QualityReportPage() {
         <div className="grid gap-4">
           {CERTIFICATES.map((cert, index) => {
             const isOpen = expanded === index;
-            const isLoading = loading === index;
+            const pageCount = cert.files.length;
             return (
-              <div
-                key={cert.file}
-                ref={(el) => { cardRefs.current[index] = el; }}
-                className="bg-white rounded-2xl shadow-sm overflow-hidden"
-              >
+              <div key={index} className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 {/* 证书标题栏 */}
                 <button
                   onClick={() => toggleExpand(index)}
@@ -71,6 +56,9 @@ export default function QualityReportPage() {
                     <h3 className="text-gray-800 font-semibold text-sm leading-tight">
                       {cert.name}
                     </h3>
+                    {pageCount > 1 && (
+                      <p className="text-gray-400 text-xs mt-0.5">共 {pageCount} 页</p>
+                    )}
                   </div>
 
                   {isOpen
@@ -79,31 +67,29 @@ export default function QualityReportPage() {
                   }
                 </button>
 
-                {/* 证书图片预览（固定高度容器，避免加载时抖动） */}
+                {/* 证书图片展示 */}
                 <div
-                  className="overflow-hidden transition-all duration-300 ease-in-out"
-                  style={{
-                    height: isOpen ? 'calc(100vw * 1.414)' : '0px',
-                    maxHeight: isOpen ? '80vh' : '0px',
-                  }}
+                  className="grid transition-all duration-300 ease-in-out"
+                  style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
                 >
-                  <div className="relative w-full h-full">
-                    {/* 加载中 */}
-                    {isLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
-                        <Loader2 className="w-8 h-8 text-water animate-spin" />
+                  <div className="overflow-hidden">
+                    {cert.files.map((file, i) => (
+                      <div key={file} className="relative">
+                        {pageCount > 1 && (
+                          <span className="absolute top-3 right-3 bg-black/50 text-white text-xs px-2.5 py-1 rounded-full z-10">
+                            {i + 1}/{pageCount}
+                          </span>
+                        )}
+                        <img
+                          src={getImgUrl(file)}
+                          alt={`${cert.name} 第${i + 1}页`}
+                          className="w-full block"
+                          loading="lazy"
+                        />
+                        {/* 图片间距，非最后一张 */}
+                        {i < pageCount - 1 && <div className="h-1 bg-gray-100" />}
                       </div>
-                    )}
-                    {/* PDF 内嵌展示 */}
-                    {isOpen && (
-                      <iframe
-                        src={getPdfUrl(cert.file)}
-                        className="w-full h-full border-0"
-                        title={cert.name}
-                        sandbox="allow-scripts allow-same-origin"
-                        onLoad={() => setLoading(null)}
-                      />
-                    )}
+                    ))}
                   </div>
                 </div>
               </div>

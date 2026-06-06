@@ -245,7 +245,7 @@ export default function OrderPage() {
               className="flex items-center gap-0.5 px-1.5 rounded-full text-[11px] font-medium text-gray-600 hover:bg-water/5 hover:text-water active:bg-water/10 transition-colors flex-shrink-0"
             >
               <FileText className="w-3 h-3" />
-              质检报告
+              资质证书
             </button>
             <button
               onClick={() => navigate('/purchase-notice')}
