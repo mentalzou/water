@@ -232,7 +232,9 @@ export async function createJsApiOrder(
     }
 
     // JSAPI返回的data中包含payData（用于WeixinJSBridge拉起支付）
-    const payDataStr = processedResponse.payData;
+    // 响应结构: { data: { orderNum, payData, merchantNo, status }, sn, responseCode, responseMessage }
+    const bizData = processedResponse.data || processedResponse;
+    const payDataStr = bizData.payData;
     if (!payDataStr) {
       throw new Error('支付响应缺少payData');
     }
@@ -241,8 +243,8 @@ export async function createJsApiOrder(
 
     return {
       payData,
-      orderNo: processedResponse.orderNo || orderNo,
-      transactionId: processedResponse.transactionId,
+      orderNo: bizData.orderNum || processedResponse.orderNo || orderNo,
+      transactionId: bizData.transactionId,
       orderId,
     };
   } catch (error: any) {
