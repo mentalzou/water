@@ -70,7 +70,19 @@ export function desedeDecrypt(encryptedData: string, secretKey: string): string 
       padding: CryptoJS.pad.ZeroPadding,
     });
 
-    return decrypted.toString(CryptoJS.enc.Utf8);
+    // 调试：打印解密结果hex
+    console.log('[3DES] 解密结果(hex):', decrypted.toString());
+    console.log('[3DES] 解密结果sigBytes:', decrypted.sigBytes);
+
+    // ZeroPadding 会在末尾保留 \0 空字节，直接做 UTF-8 转码可能报 "Malformed UTF-8 data"
+    // 改用 Latin1（每字节直映一个字符），再去除尾部空字节
+    try {
+      return decrypted.toString(CryptoJS.enc.Utf8);
+    } catch {
+      // 回退：Latin1 永不会抛错
+      const result = decrypted.toString(CryptoJS.enc.Latin1);
+      return result.replace(/\0+$/, '');
+    }
   } catch (error) {
     console.error('3DES解密失败:', error);
     throw new Error('3DES解密失败');

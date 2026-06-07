@@ -39,7 +39,7 @@ export default function OrderManage() {
   const [refundQueryingOrders, setRefundQueryingOrders] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     loadOrders();
@@ -65,7 +65,7 @@ export default function OrderManage() {
       });
       if (res && res.code === 200) {
         setOrders(res.data?.data || res.data || []);
-        setTotal(res.data?.total || 0);
+        setTotal(res.pagination?.total || 0);
       }
     } catch (e) {
       console.error('[加载订单]', e);
@@ -208,7 +208,7 @@ export default function OrderManage() {
 
   /** 筛选条件变化时重新请求 */
   useEffect(() => { setPage(1); loadOrders(); }, [statusFilter, distributorFilter, deliverymanFilter, search, addressSearch]);
-  useEffect(() => { loadOrders(); }, [page]);
+  useEffect(() => { loadOrders(); }, [page, pageSize]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -331,7 +331,13 @@ export default function OrderManage() {
             </tbody>
           </table>
           <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex justify-between items-center">
-            <span>共 {total} 条记录</span>
+            <div className="flex items-center gap-3">
+              <span>共 {total} 条记录</span>
+              <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white outline-none">
+                {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}条/页</option>)}
+              </select>
+            </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
                 className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors">上一页</button>

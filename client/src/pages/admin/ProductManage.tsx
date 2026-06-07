@@ -51,9 +51,9 @@ export default function ProductManage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [pageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(12);
 
-  useEffect(() => { loadCategories(); loadBrands(); loadProducts(); }, [page]);
+  useEffect(() => { loadCategories(); loadBrands(); loadProducts(); }, [page, pageSize]);
   useEffect(() => { setPage(1); loadProducts(); }, [categoryFilter, brandFilter, keyword]);
   useEffect(() => {
     if (form.category_id) {
@@ -109,7 +109,7 @@ export default function ProductManage() {
       });
       if (res && res.code === 200) {
         setProducts(res.data?.data || res.data || []);
-        setTotal(res.data?.total || 0);
+        setTotal(res.pagination?.total || 0);
       } else {
         setError(res?.message || '加载产品失败');
       }
@@ -333,7 +333,13 @@ export default function ProductManage() {
         </div>
         {!loading && (
           <div className="mt-5 flex justify-between items-center">
-            <span className="text-sm text-gray-400">共 {total} 条记录</span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-400">共 {total} 条记录</span>
+              <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white outline-none">
+                {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}条/页</option>)}
+              </select>
+            </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
                 className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">上一页</button>

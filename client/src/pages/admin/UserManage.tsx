@@ -46,7 +46,7 @@ export default function UserManage() {
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(15);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
@@ -89,6 +89,7 @@ export default function UserManage() {
   }, [page, filterRole, searchTerm]);
 
   useEffect(() => { fetchUsers(); loadRoles(); }, [fetchUsers]);
+  useEffect(() => { setPage(1); }, [pageSize]);
 
   async function loadRoles() {
     try {
@@ -315,7 +316,13 @@ export default function UserManage() {
               {/* Pagination */}
               {totalPages > 1 && (
                   <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-                    <span className="text-sm text-gray-500">第 {page}/{totalPages} 页，共 {total} 条</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500">第 {page}/{totalPages} 页，共 {total} 条</span>
+                      <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                        className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white outline-none">
+                        {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}条/页</option>)}
+                      </select>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
                               className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">上一页</button>
