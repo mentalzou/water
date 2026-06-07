@@ -69,6 +69,10 @@ export const customerApi = {
   createPayment: (data: { orderId: string; openId: string }) =>
       api.post('/payment/create', data),
 
+  // 微信一键登录 - openId 登录/注册
+  wechatLogin: (openId: string) =>
+      api.post('/customers/wechat-login', { openId }),
+
   // 微信 OAuth - code 换 openId
   getWechatOpenId: (code: string, type: string = 'oa') =>
       api.post('/wechat/openid', { code, type }),

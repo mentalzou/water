@@ -39,6 +39,12 @@ export function useWechatOAuth() {
       return;
     }
 
+    // 在登录页时不自动跳转 OAuth，由登录页微信一键登录按钮自行处理
+    if (window.location.pathname === '/login') {
+      console.log('[OAuth] 当前在登录页，跳过自动 OAuth 重定向');
+      return;
+    }
+
     // ---------- Step 1: 检查 URL 中是否有微信回调的 code ----------
     const wxCode = searchParams.get('wx_code');    // 小程序 web-view 传递
     const oaCode = searchParams.get('code');        // 公众号 OAuth 回调

@@ -17,6 +17,7 @@ const router = Router();
 // Public Auth (no authentication required)
 router.post('/customers/login', customerController.customerLogin);
 router.post('/customers/register', customerController.customerRegister);
+router.post('/customers/wechat-login', customerController.wechatLogin);
 
 // WeChat OAuth: exchange code for openId
 router.post('/wechat/openid', customerController.getWechatOpenId);

@@ -29,6 +29,11 @@ export const userModel = {
     return db.prepare('SELECT * FROM users WHERE phone = ?').get(phone) as User | undefined;
   },
 
+  findByOpenId(openId: string): User | undefined {
+    if (!openId) return undefined;
+    return db.prepare("SELECT * FROM users WHERE open_id = ? AND open_id != ''").get(openId) as User | undefined;
+  },
+
   findAll(page = 1, pageSize = 20, role?: string, keyword?: string): { data: User[]; total: number } {
     let sql = 'SELECT * FROM users WHERE 1=1';
     const params: any[] = [];

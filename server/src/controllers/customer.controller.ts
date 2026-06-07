@@ -16,7 +16,69 @@ function str(val: unknown): string {
   return Array.isArray(val) ? val[0] || '' : String(val || '');
 }
 
+/** 生成 8 位随机数字，用作微信用户占位手机号 */
+function randomPhoneSuffix(): string {
+  return String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
+}
+
 // ============ Customer Auth ============
+
+/**
+ * 微信一键登录 / 自动注册
+ * 通过 openId 查找用户，存在则直接登录，不存在则自动注册并登录
+ */
+export function wechatLogin(req: Request, res: Response): void {
+  const openId = String(req.body.openId || '').trim();
+
+  if (!openId) {
+    error(res, '缺少微信 openId');
+    return;
+  }
+
+  // 拒绝 dev_ 前缀的模拟 openId
+  if (openId.startsWith('dev_')) {
+    error(res, '非法的 openId');
+    return;
+  }
+
+  // 1. 查找已绑定该 openId 的用户
+  let user = userModel.findByOpenId(openId);
+
+  if (user) {
+    // 用户已存在，检查状态
+    if (user.status !== 'active') {
+      error(res, '账号已被禁用', 403);
+      return;
+    }
+  } else {
+    // 2. 自动注册新用户（占位手机号，后续可引导绑定）
+    const placeholderPhone = `wx_${randomPhoneSuffix()}`;
+    user = userModel.create({
+      phone: placeholderPhone,
+      name: '',
+      role: 'customer',
+      password_hash: '', // 微信登录无密码
+      status: 'active',
+      open_id: openId,
+    } as any);
+  }
+
+  // 确保 open_id 已更新
+  if (!(user as any).open_id) {
+    userModel.update(user.id, { open_id: openId } as any);
+  }
+
+  const token = generateToken({ userId: user.id, role: user.role });
+  success(res, {
+    token,
+    userId: user.id,
+    name: user.name,
+    phone: user.phone,
+    role: user.role,
+    open_id: openId,
+  }, '微信登录成功');
+}
+
 export function customerLogin(req: Request, res: Response): void {
   const phone = String(req.body.phone || '').trim();
   const password = String(req.body.password || '');
