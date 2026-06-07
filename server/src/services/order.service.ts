@@ -182,7 +182,7 @@ export function processPaymentSuccess(orderId: string, transactionId: string): O
   const deliveryman = matchDeliverymanForOrder(order);
   if (deliveryman) {
     orderModel.assignDeliveryman(order.id, deliveryman.id);
-    console.log(`[派单] 订单 ${order.order_no} 已分配给派送员 ${deliveryman.name} (${deliveryman.district || deliveryman.city})`);
+    console.log(`[派单] 订单 ${order.order_no} 已分配给派送员 ${deliveryman.name} (${(deliveryman.districts || []).join('、') || deliveryman.city})`);
   } else {
     console.warn(`[派单] 订单 ${order.order_no} 暂无可用派送员，仍为待派送状态`);
   }

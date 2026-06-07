@@ -66,7 +66,7 @@ export function initTables(database: Database.Database): void {
       area_ids TEXT DEFAULT '[]',
       province TEXT DEFAULT '',
       city TEXT DEFAULT '',
-      district TEXT DEFAULT '',
+      districts TEXT DEFAULT '[]',
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive','busy')),
       total_orders INTEGER DEFAULT 0,
       completed_orders INTEGER DEFAULT 0,
@@ -688,6 +688,26 @@ function applyMigrations(db: Database.Database): void {
         db.exec("ALTER TABLE deliverymen ADD COLUMN district TEXT DEFAULT ''");
       }
       recordMigration(db, 16, 'deliverymen 新增 province/city/district 字段');
+    });
+    txn();
+  }
+
+  // === v17: deliverymen district 改为 districts（JSON 数组，支持多选区) ===
+  if (currentVersion < 17) {
+    const txn = db.transaction(() => {
+      const cols = db.prepare('PRAGMA table_info(deliverymen)').all() as any[];
+      if (!cols.some((c: any) => c.name === 'districts')) {
+        db.exec("ALTER TABLE deliverymen ADD COLUMN districts TEXT DEFAULT '[]'");
+      }
+      // 将旧 district 单值迁移到 districts
+      if (cols.some((c: any) => c.name === 'district')) {
+        const rows = db.prepare('SELECT id, district FROM deliverymen WHERE district IS NOT NULL AND district != \'\'').all() as any[];
+        for (const row of rows) {
+          const arr = [row.district];
+          db.prepare('UPDATE deliverymen SET districts = ? WHERE id = ?').run(JSON.stringify(arr), row.id);
+        }
+      }
+      recordMigration(db, 17, 'deliverymen district 改为 districts（JSON 数组，多选）');
     });
     txn();
   }

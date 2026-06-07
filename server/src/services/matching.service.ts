@@ -22,7 +22,8 @@ export function matchDeliverymanForOrder(order: Order): Deliveryman | null {
     const districtDms = deliverymanModel.findActiveByDistrict(district);
     if (districtDms.length > 0) {
       const picked = districtDms[Math.floor(Math.random() * districtDms.length)];
-      console.log(`[Matching] 同区匹配成功: ${picked.name} (${picked.district}), 该区共 ${districtDms.length} 人`);
+      const pickedDistricts = (picked.districts || []).join('、');
+      console.log(`[Matching] 同区匹配成功: ${picked.name} (负责区域: ${pickedDistricts}), 该区共 ${districtDms.length} 人`);
       return picked;
     }
   }

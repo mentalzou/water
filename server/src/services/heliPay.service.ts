@@ -424,7 +424,7 @@ export async function queryOrderStatus(orderNo: string): Promise<{
     const data = processedResponse.data || processedResponse;
 
     return {
-      status: data.status || 'UNKNOWN',
+      status: data.orderStatus || 'UNKNOWN',
       orderNo: data.orderNo || orderNo,
       merchantNo: data.merchantNo || '',
       rawResponse: processedResponse,

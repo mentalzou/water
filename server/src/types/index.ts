@@ -41,7 +41,7 @@ export interface Deliveryman {
   area_ids: string[];
   province: string;
   city: string;
-  district: string;
+  districts: string[];
   status: 'active' | 'inactive' | 'busy';
   total_orders: number;
   completed_orders: number;

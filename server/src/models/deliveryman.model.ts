@@ -26,7 +26,7 @@ export const deliverymanModel = {
     }
 
     db.prepare(
-      'INSERT INTO deliverymen (id, user_id, name, phone, area_ids, province, city, district, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO deliverymen (id, user_id, name, phone, area_ids, province, city, districts, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       id,
       userIdToUse,
@@ -35,7 +35,7 @@ export const deliverymanModel = {
       JSON.stringify(data.area_ids || []),
       data.province || '',
       data.city || '',
-      data.district || '',
+      JSON.stringify(data.districts || []),
       data.status || 'active'
     );
     return this.findById(id)!;
@@ -45,6 +45,7 @@ export const deliverymanModel = {
     const row = db.prepare('SELECT * FROM deliverymen WHERE id = ?').get(id) as any;
     if (row) {
       row.area_ids = JSON.parse(row.area_ids || '[]');
+      row.districts = JSON.parse(row.districts || '[]');
     }
     return row;
   },
@@ -55,6 +56,7 @@ export const deliverymanModel = {
     ).get(id) as any;
     if (row) {
       row.area_ids = JSON.parse(row.area_ids || '[]');
+      row.districts = JSON.parse(row.districts || '[]');
     }
     return row;
   },
@@ -63,6 +65,7 @@ export const deliverymanModel = {
     const row = db.prepare('SELECT * FROM deliverymen WHERE phone = ?').get(phone) as any;
     if (row) {
       row.area_ids = JSON.parse(row.area_ids || '[]');
+      row.districts = JSON.parse(row.districts || '[]');
     }
     return row;
   },
@@ -81,7 +84,7 @@ export const deliverymanModel = {
         const areaRows = db.prepare(`SELECT name FROM areas WHERE id IN (${placeholders})`).all(...areaIds) as any[];
         areas = areaRows.map((a: any) => a.name);
       }
-      return { ...row, area_ids: areaIds, areas };
+      return { ...row, area_ids: areaIds, areas, districts: JSON.parse(row.districts || '[]') };
     });
     return { data, total };
   },
@@ -89,16 +92,16 @@ export const deliverymanModel = {
   findActiveByAreaId(areaId: string): Deliveryman[] {
     const allActive = db.prepare("SELECT * FROM deliverymen WHERE status = 'active'").all() as any[];
     return allActive
-      .map(row => ({ ...row, area_ids: JSON.parse(row.area_ids || '[]') }))
+      .map(row => ({ ...row, area_ids: JSON.parse(row.area_ids || '[]'), districts: JSON.parse(row.districts || '[]') }))
       .filter((d: Deliveryman) => d.area_ids.includes(areaId));
   },
 
-  /** 按区（district）查找活跃派送员，用于按收货地址区级匹配 */
+  /** 按区（district）查找活跃派送员，支持多选区匹配 */
   findActiveByDistrict(district: string): Deliveryman[] {
     const rows = db.prepare(
-      "SELECT * FROM deliverymen WHERE status = 'active' AND district = ?"
-    ).all(district) as any[];
-    return rows.map(row => ({ ...row, area_ids: JSON.parse(row.area_ids || '[]') }));
+      "SELECT * FROM deliverymen WHERE status = 'active' AND districts LIKE ?"
+    ).all(`%${district}%`) as any[];
+    return rows.map(row => ({ ...row, area_ids: JSON.parse(row.area_ids || '[]'), districts: JSON.parse(row.districts || '[]') }));
   },
 
   update(id: string, data: Partial<Deliveryman>): Deliveryman | undefined {
@@ -107,7 +110,7 @@ export const deliverymanModel = {
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined && key !== 'id' && key !== 'created_at') {
         fields.push(`${key} = ?`);
-        values.push(key === 'area_ids' ? JSON.stringify(value) : value);
+        values.push(key === 'area_ids' || key === 'districts' ? JSON.stringify(value) : value);
       }
     }
     if (fields.length > 0) {

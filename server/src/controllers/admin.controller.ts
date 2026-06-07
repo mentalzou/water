@@ -145,14 +145,14 @@ export function createDeliveryman(req: Request, res: Response): void {
   const area_ids = Array.isArray(req.body.area_ids) ? req.body.area_ids : [];
   const province = str(req.body.province);
   const city = str(req.body.city);
-  const district = str(req.body.district);
+  const districts = Array.isArray(req.body.districts) ? req.body.districts : [];
 
-  if (!province || !city || !district) {
-    error(res, '请选择省/市/区');
+  if (!province || !city || districts.length === 0) {
+    error(res, '请选择省/市/区（至少选一个区）');
     return;
   }
 
-  const result = deliverymanModel.create({ name, phone, area_ids, province, city, district, password });
+  const result = deliverymanModel.create({ name, phone, area_ids, province, city, districts, password });
   success(res, result, '派送员创建成功');
 }
 

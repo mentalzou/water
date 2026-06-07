@@ -16,7 +16,7 @@ export default function DeliverymanManage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: '', phone: '', password: '', areas: [] as string[],
-    province: '', city: '', district: '',
+    province: '', city: '', districts: [] as string[],
   });
   const [editId, setEditId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -66,15 +66,15 @@ export default function DeliverymanManage() {
       else setData([]);
     } catch {
       setData([
-        { id: '1', name: '陈师傅', phone: '13900001111', area_ids: ['a1'], areas: ['朝阳区'], status: 'active', total_orders: 128, completed_orders: 125, rating: 4.9 },
-        { id: '2', name: '刘师傅', phone: '13900002222', area_ids: ['a2'], areas: ['海淀区'], status: 'active', total_orders: 96, completed_orders: 94, rating: 4.8 },
-        { id: '3', name: '王师傅', phone: '13900003333', area_ids: ['a1','a3'], areas: ['朝阳区','丰台区'], status: 'inactive', total_orders: 85, completed_orders: 83, rating: 4.7 },
+        { id: '1', name: '陈师傅', phone: '13900001111', area_ids: ['a1'], areas: ['朝阳区'], districts: ['朝阳区'], status: 'active', total_orders: 128, completed_orders: 125, rating: 4.9 },
+        { id: '2', name: '刘师傅', phone: '13900002222', area_ids: ['a2'], areas: ['海淀区'], districts: ['海淀区'], status: 'active', total_orders: 96, completed_orders: 94, rating: 4.8 },
+        { id: '3', name: '王师傅', phone: '13900003333', area_ids: ['a1','a3'], areas: ['朝阳区','丰台区'], districts: ['朝阳区','丰台区'], status: 'inactive', total_orders: 85, completed_orders: 83, rating: 4.7 },
       ]);
     } finally { setLoading(false); }
   }
 
   function handleAdd() {
-    setForm({ name: '', phone: '', password: '', areas: [], province: '', city: '', district: '' });
+    setForm({ name: '', phone: '', password: '', areas: [], province: '', city: '', districts: [] });
     setCities([]);
     setDistricts([]);
     setEditId(null);
@@ -86,7 +86,7 @@ export default function DeliverymanManage() {
     const cityList = getCities(p);
     setCities(cityList);
     setDistricts([]);
-    setForm(f => ({ ...f, province: p, city: cityList.length === 1 ? cityList[0] : '', district: '' }));
+    setForm(f => ({ ...f, province: p, city: cityList.length === 1 ? cityList[0] : '', districts: [] }));
     if (cityList.length === 1) {
       setDistricts(getDistricts(p, cityList[0]));
     }
@@ -96,14 +96,22 @@ export default function DeliverymanManage() {
   function handleCityChange(c: string) {
     const districtList = getDistricts(form.province, c);
     setDistricts(districtList);
-    setForm(f => ({ ...f, city: c, district: districtList.length === 1 ? districtList[0] : '' }));
+    setForm(f => ({ ...f, city: c, districts: [] }));
+  }
+
+  // 切换区县选中
+  function toggleDistrict(d: string) {
+    setForm(f => ({
+      ...f,
+      districts: f.districts.includes(d) ? f.districts.filter(x => x !== d) : [...f.districts, d],
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name || !form.phone) return;
-    if (!form.province || !form.city || !form.district) {
-      alert('请选择省/市/区');
+    if (!form.province || !form.city || form.districts.length === 0) {
+      alert('请选择省/市/区（至少选一个区）');
       return;
     }
     if (!editId && !form.password) {
@@ -123,7 +131,7 @@ export default function DeliverymanManage() {
         area_ids: form.areas,
         province: form.province,
         city: form.city,
-        district: form.district,
+        districts: form.districts,
         ...(editId ? {} : { password: form.password }),
       };
       if (editId) {
@@ -260,9 +268,14 @@ export default function DeliverymanManage() {
                   <td className="px-5 py-4 text-sm text-gray-600">{d.phone}</td>
                   <td className="px-5 py-4">
                     <div className="flex flex-wrap gap-1">
-                      <span className="inline-block px-2 py-0.5 bg-cyan-50 text-cyan-600 rounded-md text-xs">
-                        {[d.province, d.city, d.district].filter(Boolean).join(' ')}
-                      </span>
+                      {(d.districts || []).length > 0
+                        ? (d.districts as string[]).map((dst: string) => (
+                            <span key={dst} className="inline-block px-2 py-0.5 bg-cyan-50 text-cyan-600 rounded-md text-xs">
+                              {[d.province, d.city, dst].filter(Boolean).join(' ')}
+                            </span>
+                          ))
+                        : <span className="inline-block px-2 py-0.5 bg-gray-50 text-gray-400 rounded-md text-xs">{d.province} {d.city}</span>
+                      }
                     </div>
                   </td>
                   <td className="px-5 py-4 text-sm text-gray-600">{d.total_orders ?? 0}</td>
@@ -284,8 +297,9 @@ export default function DeliverymanManage() {
                       <button onClick={() => {
                         const p = d.province || '';
                         const c = d.city || '';
+                        const dsts = Array.isArray(d.districts) ? d.districts : (d.district ? [d.district] : []);
                         setEditId(d.id);
-                        setForm({ name: d.name, phone: d.phone, password: '', areas: d.area_ids || [], province: p, city: c, district: d.district || '' });
+                        setForm({ name: d.name, phone: d.phone, password: '', areas: d.area_ids || [], province: p, city: c, districts: dsts });
                         setCities(p ? getCities(p) : []);
                         setDistricts(p && c ? getDistricts(p, c) : []);
                         setShowForm(true);
@@ -352,25 +366,35 @@ export default function DeliverymanManage() {
                 )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    负责区域 <span className="text-red-500">*</span>（省/市/区）
+                    负责区域 <span className="text-red-500">*</span>（省/市/区，区可多选）
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 mb-2">
                     <select value={form.province} onChange={e => handleProvinceChange(e.target.value)} required
                             className="px-2 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 ring-water/30">
-                      <option value="">省</option>
+                      <option value="">选择省份</option>
                       {provinces.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                     <select value={form.city} onChange={e => handleCityChange(e.target.value)} required
                             className="px-2 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 ring-water/30">
-                      <option value="">市</option>
+                      <option value="">选择城市</option>
                       {cities.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    <select value={form.district} onChange={e => setForm({...form, district: e.target.value})} required
-                            className="px-2 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 ring-water/30">
-                      <option value="">区/县</option>
-                      {districts.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
                   </div>
+                  {districts.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-lg border border-gray-100 max-h-32 overflow-y-auto">
+                      {districts.map(d => (
+                        <label key={d}
+                          className={`cursor-pointer px-2 py-1 rounded-md text-xs font-medium transition-all border ${
+                            form.districts.includes(d) ? 'bg-water text-white border-water' : 'bg-white text-gray-600 border-gray-200 hover:border-water/30'
+                          }`}>
+                          <input type="checkbox" hidden checked={form.districts.includes(d)}
+                            onChange={() => toggleDistrict(d)} />
+                          {d}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {districts.length > 0 && <p className="text-xs text-gray-400 mt-1">已选 {form.districts.length} 个区：{form.districts.join('、') || '无'}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">负责区域（旧版区域标签，可多选）</label>
