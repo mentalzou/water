@@ -228,8 +228,11 @@ export function createArea(req: Request, res: Response): void {
   success(res, result, '区域创建成功');
 }
 
-export function listAreas(_req: Request, res: Response): void {
-  success(res, areaModel.findAll());
+export function listAreas(req: Request, res: Response): void {
+  const page = parseInt(str(req.query.page)) || 1;
+  const pageSize = parseInt(str(req.query.pageSize)) || 20;
+  const { data, total } = areaModel.findPaginated(page, pageSize);
+  paginated(res, data, page, pageSize, total);
 }
 
 export function updateArea(req: Request, res: Response): void {
@@ -366,11 +369,14 @@ export function createProduct(req: Request, res: Response): void {
 }
 
 export function listProducts(req: Request, res: Response): void {
+  const page = parseInt(str(req.query.page)) || 1;
+  const pageSize = parseInt(str(req.query.pageSize)) || 20;
   const options: { brandId?: string; categoryId?: string; keyword?: string } = {};
   if (req.query.brand_id) options.brandId = str(req.query.brand_id);
   if (req.query.category_id) options.categoryId = str(req.query.category_id);
   if (req.query.keyword) options.keyword = str(req.query.keyword);
-  success(res, productModel.findAll(false, options));
+  const { data, total } = productModel.findPaginated(page, pageSize, false, options);
+  paginated(res, data, page, pageSize, total);
 }
 
 export function updateProduct(req: Request, res: Response): void {

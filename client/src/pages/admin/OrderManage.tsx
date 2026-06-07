@@ -37,6 +37,9 @@ export default function OrderManage() {
   const [refundingOrders, setRefundingOrders] = useState<Set<string>>(new Set());
   // 退款查询中
   const [refundQueryingOrders, setRefundQueryingOrders] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize] = useState(20);
 
   useEffect(() => {
     loadOrders();
@@ -48,7 +51,7 @@ export default function OrderManage() {
     try {
       setLoading(true);
       const token = getToken();
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (statusFilter) params.set('status', statusFilter);
       if (distributorFilter) params.set('distributor_id', distributorFilter);
       if (deliverymanFilter) params.set('deliveryman_id', deliverymanFilter);
@@ -62,6 +65,7 @@ export default function OrderManage() {
       });
       if (res && res.code === 200) {
         setOrders(res.data?.data || res.data || []);
+        setTotal(res.data?.total || 0);
       }
     } catch (e) {
       console.error('[加载订单]', e);
@@ -203,7 +207,10 @@ export default function OrderManage() {
   }
 
   /** 筛选条件变化时重新请求 */
-  useEffect(() => { loadOrders(); }, [statusFilter, distributorFilter, deliverymanFilter, search, addressSearch]);
+  useEffect(() => { setPage(1); loadOrders(); }, [statusFilter, distributorFilter, deliverymanFilter, search, addressSearch]);
+  useEffect(() => { loadOrders(); }, [page]);
+
+  const totalPages = Math.ceil(total / pageSize);
 
   return (
       <div className="max-w-7xl mx-auto">
@@ -323,7 +330,16 @@ export default function OrderManage() {
               ))}
             </tbody>
           </table>
-          <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex justify-between items-center"><span>共 {orders.length} 条记录</span></div>
+          <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex justify-between items-center">
+            <span>共 {total} 条记录</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors">上一页</button>
+              <span className="text-gray-500">{page}/{Math.max(totalPages, 1)}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors">下一页</button>
+            </div>
+          </div>
         </div>
 
         {/* Detail Modal */}

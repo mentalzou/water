@@ -22,21 +22,25 @@ export default function DistributorManage() {
   const [showResetPwdVisible, setShowResetPwdVisible] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize] = useState(20);
 
-  useEffect(() => { loadData(); }, []);
-  useEffect(() => { loadData(); }, [search, statusFilter]);
+  useEffect(() => { loadData(); }, [page, search, statusFilter]);
 
   async function loadData() {
     try {
       const token = getToken();
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (search) params.set('keyword', search);
       if (statusFilter) params.set('status', statusFilter);
-      const qs = params.toString();
-      const res: any = await fetch(`${API_BASE}/admin/distributors${qs ? '?' + qs : ''}`, {
+      const res: any = await fetch(`${API_BASE}/admin/distributors?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then(r => r.json());
-      if (res.code === 200) setData(res.data?.data || res.data || []);
+      if (res.code === 200) {
+        setData(res.data?.data || res.data || []);
+        setTotal(res.data?.total || 0);
+      }
       else setData([]);
     } catch {
       setData([]);
@@ -147,7 +151,10 @@ export default function DistributorManage() {
     setResetting(false);
   }
 
-  const filtered = data;
+  const totalPages = Math.ceil(total / pageSize);
+
+  // 筛选条件变化时回到第一页
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
 
   return (
       <div className="max-w-6xl mx-auto">
@@ -191,9 +198,9 @@ export default function DistributorManage() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr><td colSpan={7} className="py-16 text-center"><div className="w-8 h-8 border-3 border-water/30 border-t-water rounded-full animate-spin mx-auto" /></td></tr>
-              ) : filtered.length === 0 ? (
+              ) : data.length === 0 ? (
                 <tr><td colSpan={7} className="py-16 text-center text-gray-400">暂无数据</td></tr>
-              ) : filtered.map((d) => (
+              ) : data.map((d) => (
                 <tr key={d.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4"><span className="font-mono text-sm bg-water/10 px-2 py-1 rounded-lg text-water font-semibold">{d.code}</span></td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{d.user_name}</td>
@@ -223,7 +230,18 @@ export default function DistributorManage() {
               ))}
             </tbody>
           </table>
-          <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 text-right">共 {filtered.length} 条记录</div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-3 bg-gray-50/50 border-t border-gray-100">
+              <span className="text-xs text-gray-400">第 {page}/{totalPages} 页，共 {total} 条</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                  className="px-3 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors">上一页</button>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                  className="px-3 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors">下一页</button>
+              </div>
+            </div>
+          )}
+          {totalPages <= 1 && <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 text-right">共 {total} 条记录</div>}
         </div>
 
         {/* Modal Form */}

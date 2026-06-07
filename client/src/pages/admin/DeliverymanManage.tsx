@@ -36,8 +36,11 @@ export default function DeliverymanManage() {
 
   // Toggle status loading state
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize] = useState(20);
 
-  useEffect(() => { loadData(); loadAreas(); }, []);
+  useEffect(() => { loadData(); loadAreas(); }, [page]);
 
   async function loadAreas() {
     try {
@@ -59,17 +62,17 @@ export default function DeliverymanManage() {
   async function loadData() {
     try {
       const token = getToken();
-      const res: any = await fetch(`${API_BASE}/admin/deliverymen`, {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+      const res: any = await fetch(`${API_BASE}/admin/deliverymen?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then(r => r.json());
-      if (res.code === 200) setData(res.data?.data || res.data || []);
+      if (res.code === 200) {
+        setData(res.data?.data || res.data || []);
+        setTotal(res.data?.total || 0);
+      }
       else setData([]);
     } catch {
-      setData([
-        { id: '1', name: '陈师傅', phone: '13900001111', area_ids: ['a1'], areas: ['朝阳区'], districts: ['朝阳区'], status: 'active', total_orders: 128, completed_orders: 125, rating: 4.9 },
-        { id: '2', name: '刘师傅', phone: '13900002222', area_ids: ['a2'], areas: ['海淀区'], districts: ['海淀区'], status: 'active', total_orders: 96, completed_orders: 94, rating: 4.8 },
-        { id: '3', name: '王师傅', phone: '13900003333', area_ids: ['a1','a3'], areas: ['朝阳区','丰台区'], districts: ['朝阳区','丰台区'], status: 'inactive', total_orders: 85, completed_orders: 83, rating: 4.7 },
-      ]);
+      setData([]);
     } finally { setLoading(false); }
   }
 
@@ -227,6 +230,7 @@ export default function DeliverymanManage() {
   const filtered = data.filter(d =>
     !search || d.name.includes(search) || d.phone.includes(search)
   );
+  const totalPages = Math.ceil(total / pageSize);
 
   return (
       <div className="max-w-6xl mx-auto">
@@ -332,7 +336,16 @@ export default function DeliverymanManage() {
               ))}
             </tbody>
           </table>
-          <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 text-right">共 {filtered.length} 条记录</div>
+          <div className="px-6 py-3 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex justify-between items-center">
+            <span>共 {total} 条记录</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors">上一页</button>
+              <span className="text-gray-500">{page}/{Math.max(totalPages, 1)}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                className="px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors">下一页</button>
+            </div>
+          </div>
         </div>
 
         {/* Form Modal */}

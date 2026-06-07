@@ -21,22 +21,27 @@ export default function AreaManage() {
   const [form, setForm] = useState({ name: '', description: '' });
   const [editId, setEditId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize] = useState(12);
 
-  useEffect(() => { loadAreas(); }, []);
+  useEffect(() => { loadAreas(); }, [page]);
 
   async function loadAreas() {
     try {
       setLoading(true);
       setError('');
       const token = getToken();
-      const res: any = await fetch(`${API_BASE}/admin/areas`, {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+      const res: any = await fetch(`${API_BASE}/admin/areas?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then(r => r.text()).then(text => {
         try { return JSON.parse(text); }
         catch { return null; }
       });
       if (res && res.code === 200) {
-        setAreas(res.data || []);
+        setAreas(res.data?.data || res.data || []);
+        setTotal(res.data?.total || 0);
       } else {
         setError(res?.message || '加载区域失败');
       }
@@ -105,6 +110,8 @@ export default function AreaManage() {
     }
   }
 
+  const totalPages = Math.ceil(total / pageSize);
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-8">
@@ -153,6 +160,18 @@ export default function AreaManage() {
             </div>
           ))}
         </div>
+        {!loading && (
+          <div className="mt-5 flex justify-between items-center">
+            <span className="text-sm text-gray-400">共 {total} 条记录</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">上一页</button>
+              <span className="text-sm text-gray-500">{page}/{Math.max(totalPages, 1)}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">下一页</button>
+            </div>
+          </div>
+        )}
       )}
 
       {/* Form Modal */}

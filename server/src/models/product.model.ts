@@ -57,9 +57,30 @@ export const productModel = {
     return db.prepare(sql).all(...params) as Product[];
   },
 
-  findPaginated(page = 1, pageSize = 20): { data: Product[]; total: number } {
-    const total = (db.prepare('SELECT COUNT(*) as count FROM products').get() as { count: number }).count;
-    const data = db.prepare('SELECT * FROM products ORDER BY sort_order ASC LIMIT ? OFFSET ?').all(pageSize, (page - 1) * pageSize) as Product[];
+  findPaginated(page = 1, pageSize = 20, activeOnly = true, options?: { brandId?: string; categoryId?: string; keyword?: string }): { data: Product[]; total: number } {
+    let sql = activeOnly
+      ? 'FROM products p LEFT JOIN brands b ON p.brand_id = b.id LEFT JOIN product_categories c ON p.category_id = c.id WHERE p.status = ?'
+      : 'FROM products p LEFT JOIN brands b ON p.brand_id = b.id LEFT JOIN product_categories c ON p.category_id = c.id WHERE 1=1';
+    const params: any[] = [];
+    if (activeOnly) {
+      params.push('active');
+    }
+    if (options?.brandId) {
+      sql += ' AND p.brand_id = ?';
+      params.push(options.brandId);
+    }
+    if (options?.categoryId) {
+      sql += ' AND p.category_id = ?';
+      params.push(options.categoryId);
+    }
+    if (options?.keyword) {
+      sql += ' AND p.name LIKE ?';
+      params.push(`%${options.keyword}%`);
+    }
+    const countSql = 'SELECT COUNT(*) as count ' + sql;
+    const dataSql = 'SELECT p.*, b.name as brand_name, c.name as category_name ' + sql + ' ORDER BY p.sort_order ASC LIMIT ? OFFSET ?';
+    const total = (db.prepare(countSql).get(...params) as { count: number }).count;
+    const data = db.prepare(dataSql).all(...params, pageSize, (page - 1) * pageSize) as Product[];
     return { data, total };
   },
 

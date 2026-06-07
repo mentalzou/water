@@ -49,9 +49,12 @@ export default function ProductManage() {
   const [keyword, setKeyword] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize] = useState(12);
 
-  useEffect(() => { loadCategories(); loadBrands(); loadProducts(); }, []);
-  useEffect(() => { loadProducts(); }, [categoryFilter, brandFilter, keyword]);
+  useEffect(() => { loadCategories(); loadBrands(); loadProducts(); }, [page]);
+  useEffect(() => { setPage(1); loadProducts(); }, [categoryFilter, brandFilter, keyword]);
   useEffect(() => {
     if (form.category_id) {
       loadBrands(form.category_id);
@@ -94,19 +97,19 @@ export default function ProductManage() {
       setLoading(true);
       setError('');
       const token = getToken();
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (categoryFilter) params.set('category_id', categoryFilter);
       if (brandFilter) params.set('brand_id', brandFilter);
       if (keyword) params.set('keyword', keyword);
-      const qs = params.toString();
-      const res: any = await fetch(`${API_BASE}/admin/products${qs ? '?' + qs : ''}`, {
+      const res: any = await fetch(`${API_BASE}/admin/products?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then(r => r.text()).then(text => {
         try { return JSON.parse(text); }
         catch { return null; }
       });
       if (res && res.code === 200) {
-        setProducts(res.data || []);
+        setProducts(res.data?.data || res.data || []);
+        setTotal(res.data?.total || 0);
       } else {
         setError(res?.message || '加载产品失败');
       }
@@ -240,6 +243,8 @@ export default function ProductManage() {
     setShowForm(true);
   }
 
+  const totalPages = Math.ceil(total / pageSize);
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
@@ -325,6 +330,18 @@ export default function ProductManage() {
             </div>
           ))}
         </div>
+        {!loading && (
+          <div className="mt-5 flex justify-between items-center">
+            <span className="text-sm text-gray-400">共 {total} 条记录</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">上一页</button>
+              <span className="text-sm text-gray-500">{page}/{Math.max(totalPages, 1)}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">下一页</button>
+            </div>
+          </div>
+        )}
     )}
 
       {/* Form Modal */}
