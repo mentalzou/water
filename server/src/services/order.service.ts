@@ -174,16 +174,20 @@ export function createCustomerOrder(data: {
 }
 
 export function processPaymentSuccess(orderId: string, transactionId: string): Order | null {
-  const order = orderModel.markPaid(orderId, transactionId);
+  // 第一步：标记为"待派送"状态
+  const order = orderModel.markPendingDelivery(orderId, transactionId);
   if (!order) return null;
 
-  // Auto-match deliveryman
+  // 第二步：根据订单地址的"区"匹配派送员（随机派单）
   const deliveryman = matchDeliverymanForOrder(order);
   if (deliveryman) {
     orderModel.assignDeliveryman(order.id, deliveryman.id);
+    console.log(`[派单] 订单 ${order.order_no} 已分配给派送员 ${deliveryman.name} (${deliveryman.district || deliveryman.city})`);
+  } else {
+    console.warn(`[派单] 订单 ${order.order_no} 暂无可用派送员，仍为待派送状态`);
   }
 
-  // Create commission record
+  // 第三步：创建佣金记录
   createCommissionRecord(order);
 
   return orderModel.findById(orderId)!;

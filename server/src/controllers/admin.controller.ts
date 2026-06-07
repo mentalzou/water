@@ -42,7 +42,7 @@ export function getDashboard(_req: Request, res: Response): void {
 
   const totalCustomers = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'customer'").get() as { count: number }).count;
   const activeDistributors = (db.prepare("SELECT COUNT(*) as count FROM distributors WHERE status = 'active'").get() as { count: number }).count;
-  const pendingDelivery = (db.prepare("SELECT COUNT(*) as count FROM orders WHERE status IN ('paid','assigned','delivering')").get() as { count: number }).count;
+  const pendingDelivery = (db.prepare("SELECT COUNT(*) as count FROM orders WHERE status IN ('paid','pending_delivery','assigned','delivering')").get() as { count: number }).count;
 
   // Recent orders
   const recentOrders = db.prepare(
@@ -143,7 +143,16 @@ export function createDeliveryman(req: Request, res: Response): void {
     return;
   }
   const area_ids = Array.isArray(req.body.area_ids) ? req.body.area_ids : [];
-  const result = deliverymanModel.create({ name, phone, area_ids, password });
+  const province = str(req.body.province);
+  const city = str(req.body.city);
+  const district = str(req.body.district);
+
+  if (!province || !city || !district) {
+    error(res, '请选择省/市/区');
+    return;
+  }
+
+  const result = deliverymanModel.create({ name, phone, area_ids, province, city, district, password });
   success(res, result, '派送员创建成功');
 }
 
@@ -452,8 +461,8 @@ export async function refundOrder(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // 只有已付款状态才能退款
-  if (order.status !== 'paid') {
+  // 只有已付款或待派送状态才能退款
+  if (order.status !== 'paid' && order.status !== 'pending_delivery') {
     error(res, '仅已付款状态的订单支持退款');
     return;
   }

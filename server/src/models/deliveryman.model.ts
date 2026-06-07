@@ -26,13 +26,16 @@ export const deliverymanModel = {
     }
 
     db.prepare(
-      'INSERT INTO deliverymen (id, user_id, name, phone, area_ids, status) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO deliverymen (id, user_id, name, phone, area_ids, province, city, district, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       id,
       userIdToUse,
       data.name || '',
       data.phone || '',
       JSON.stringify(data.area_ids || []),
+      data.province || '',
+      data.city || '',
+      data.district || '',
       data.status || 'active'
     );
     return this.findById(id)!;
@@ -88,6 +91,14 @@ export const deliverymanModel = {
     return allActive
       .map(row => ({ ...row, area_ids: JSON.parse(row.area_ids || '[]') }))
       .filter((d: Deliveryman) => d.area_ids.includes(areaId));
+  },
+
+  /** 按区（district）查找活跃派送员，用于按收货地址区级匹配 */
+  findActiveByDistrict(district: string): Deliveryman[] {
+    const rows = db.prepare(
+      "SELECT * FROM deliverymen WHERE status = 'active' AND district = ?"
+    ).all(district) as any[];
+    return rows.map(row => ({ ...row, area_ids: JSON.parse(row.area_ids || '[]') }));
   },
 
   update(id: string, data: Partial<Deliveryman>): Deliveryman | undefined {

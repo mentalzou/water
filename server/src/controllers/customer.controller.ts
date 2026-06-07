@@ -347,6 +347,9 @@ export function addAddress(req: Request, res: Response): void {
 
   const contact_name = str(req.body.contact_name);
   const contact_phone = str(req.body.contact_phone);
+  const province = str(req.body.province);
+  const city = str(req.body.city);
+  const district = str(req.body.district);
   const detail = str(req.body.detail);
 
   if (!contact_name || !contact_phone || !detail) {
@@ -354,13 +357,18 @@ export function addAddress(req: Request, res: Response): void {
     return;
   }
 
+  if (!province || !city || !district) {
+    error(res, '请选择省/市/区');
+    return;
+  }
+
   const address = addressModel.create({
     user_id: userId,
     contact_name,
     contact_phone,
-    province: str(req.body.province),
-    city: str(req.body.city),
-    district: str(req.body.district),
+    province,
+    city,
+    district,
     detail,
     is_default: req.body.is_default ? 1 : 0,
   });

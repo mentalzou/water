@@ -64,6 +64,9 @@ export function initTables(database: Database.Database): void {
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
       area_ids TEXT DEFAULT '[]',
+      province TEXT DEFAULT '',
+      city TEXT DEFAULT '',
+      district TEXT DEFAULT '',
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive','busy')),
       total_orders INTEGER DEFAULT 0,
       completed_orders INTEGER DEFAULT 0,
@@ -126,7 +129,7 @@ export function initTables(database: Database.Database): void {
       distributor_id TEXT REFERENCES distributors(id),
       distributor_commission REAL DEFAULT 0,
       deliveryman_id TEXT REFERENCES deliverymen(id),
-      status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','refunding','refunded','assigned','delivering','completed','cancelled')),
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','pending_delivery','refunding','refunded','assigned','delivering','completed','cancelled')),
       pay_status TEXT DEFAULT 'unpaid' CHECK(pay_status IN ('unpaid','paid','refunded')),
       pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
       from_balance REAL DEFAULT 0,
@@ -576,7 +579,7 @@ function applyMigrations(db: Database.Database): void {
           distributor_id TEXT REFERENCES distributors(id),
           distributor_commission REAL DEFAULT 0,
           deliveryman_id TEXT,
-          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','refunding','refunded','assigned','delivering','completed','cancelled')),
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','pending_delivery','refunding','refunded','assigned','delivering','completed','cancelled')),
           pay_status TEXT DEFAULT 'unpaid' CHECK(pay_status IN ('unpaid','paid','refunded')),
           pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
           from_balance REAL DEFAULT 0, from_bonus REAL DEFAULT 0,
@@ -612,7 +615,7 @@ function applyMigrations(db: Database.Database): void {
           distributor_id TEXT REFERENCES distributors(id),
           distributor_commission REAL DEFAULT 0,
           deliveryman_id TEXT,
-          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','refunding','refunded','assigned','delivering','completed','cancelled')),
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','pending_delivery','refunding','refunded','assigned','delivering','completed','cancelled')),
           pay_status TEXT DEFAULT 'unpaid' CHECK(pay_status IN ('unpaid','paid','refunded')),
           pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
           from_balance REAL DEFAULT 0, from_bonus REAL DEFAULT 0,
@@ -631,6 +634,60 @@ function applyMigrations(db: Database.Database): void {
         db.exec('ALTER TABLE orders_new RENAME TO orders');
       }
       recordMigration(db, 14, 'orders 状态新增 refunded（已退款）');
+    });
+    txn();
+  }
+
+  // === v15: orders 状态增加 pending_delivery（待派送） ===
+  if (currentVersion < 15) {
+    const txn = db.transaction(() => {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'").get() as { sql: string } | undefined;
+      if (tableInfo && !tableInfo.sql.includes('pending_delivery')) {
+        db.exec('DROP TABLE IF EXISTS orders_new');
+        db.exec(`CREATE TABLE orders_new (
+          id TEXT PRIMARY KEY, order_no TEXT NOT NULL UNIQUE,
+          customer_phone TEXT NOT NULL, customer_name TEXT DEFAULT '',
+          address TEXT NOT NULL, total_amount REAL NOT NULL,
+          distributor_id TEXT REFERENCES distributors(id),
+          distributor_commission REAL DEFAULT 0,
+          deliveryman_id TEXT,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','paid','pending_delivery','refunding','refunded','assigned','delivering','completed','cancelled')),
+          pay_status TEXT DEFAULT 'unpaid' CHECK(pay_status IN ('unpaid','paid','refunded')),
+          pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
+          from_balance REAL DEFAULT 0, from_bonus REAL DEFAULT 0,
+          transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
+          created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+          paid_at TEXT DEFAULT '', assigned_at TEXT DEFAULT '', delivered_at TEXT DEFAULT ''
+        )`);
+        db.exec(`INSERT INTO orders_new SELECT
+          id,order_no,customer_phone,customer_name,address,total_amount,
+          distributor_id,distributor_commission,deliveryman_id,
+          status,pay_status,pay_method,from_balance,from_bonus,
+          transaction_id,remark,created_at,updated_at,
+          paid_at,assigned_at,delivered_at
+        FROM orders`);
+        db.exec('DROP TABLE orders');
+        db.exec('ALTER TABLE orders_new RENAME TO orders');
+      }
+      recordMigration(db, 15, 'orders 状态新增 pending_delivery（待派送）');
+    });
+    txn();
+  }
+
+  // === v16: deliverymen 增加 province/city/district 字段 ===
+  if (currentVersion < 16) {
+    const txn = db.transaction(() => {
+      const cols = db.prepare('PRAGMA table_info(deliverymen)').all() as any[];
+      if (!cols.some((c: any) => c.name === 'province')) {
+        db.exec("ALTER TABLE deliverymen ADD COLUMN province TEXT DEFAULT ''");
+      }
+      if (!cols.some((c: any) => c.name === 'city')) {
+        db.exec("ALTER TABLE deliverymen ADD COLUMN city TEXT DEFAULT ''");
+      }
+      if (!cols.some((c: any) => c.name === 'district')) {
+        db.exec("ALTER TABLE deliverymen ADD COLUMN district TEXT DEFAULT ''");
+      }
+      recordMigration(db, 16, 'deliverymen 新增 province/city/district 字段');
     });
     txn();
   }

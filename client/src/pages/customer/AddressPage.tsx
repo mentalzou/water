@@ -5,19 +5,27 @@ import {
 } from 'lucide-react';
 import { customerApi } from '../../api/customer.api';
 import BottomNav from '../../components/BottomNav';
+import { getProvinces, getCities, getDistricts } from '../../data/regions';
 
 export default function AddressPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [addresses, setAddresses] = useState<any[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState({ contact_name: '', contact_phone: '', detail: '', is_default: false });
+  const [form, setForm] = useState({
+    contact_name: '', contact_phone: '', province: '', city: '', district: '', detail: '', is_default: false
+  });
   const [loading, setLoading] = useState(false);
+  const [cities, setCities] = useState<string[]>([]);
+  const [districts, setDistricts] = useState<string[]>([]);
 
   const fromPage = location.state?.from;
 
   console.log('location.state');
   console.log(fromPage);
+
+  // 省份列表
+  const provinces = getProvinces();
 
   function handleBack() {
     if (fromPage === 'confirm-order') {
@@ -29,13 +37,11 @@ export default function AddressPage() {
 
   function handleSelectAddress(addr: any) {
     if (fromPage === 'confirm-order') {
-      // 使用 replace 回到确认订单页面，带 address_id 参数
       window.location.replace('/order/confirm?address_id=' + addr.id);
     } else {
       handleSetDefault(addr.id);
     }
   }
-
 
   function loadAddresses() {
     customerApi.getAddresses().then((res: any) => {
@@ -45,18 +51,57 @@ export default function AddressPage() {
 
   useEffect(() => { loadAddresses(); }, []);
 
+  // 当省份变化时，更新城市列表
+  function handleProvinceChange(province: string) {
+    const cityList = getCities(province);
+    setCities(cityList);
+    setDistricts([]);
+    setForm(f => ({
+      ...f,
+      province,
+      city: cityList.length === 1 ? cityList[0] : '',
+      district: '',
+    }));
+    // 如果只有一个城市，自动加载区县
+    if (cityList.length === 1) {
+      const districtList = getDistricts(province, cityList[0]);
+      setDistricts(districtList);
+    }
+  }
+
+  // 当城市变化时，更新区县列表
+  function handleCityChange(city: string) {
+    const districtList = getDistricts(form.province, city);
+    setDistricts(districtList);
+    setForm(f => ({
+      ...f,
+      city,
+      district: districtList.length === 1 ? districtList[0] : '',
+    }));
+  }
+
   function startEdit(addr?: any) {
     if (addr) {
       setEditing(addr.id);
+      const p = addr.province || '';
+      const c = addr.city || '';
+      const d = addr.district || '';
       setForm({
         contact_name: addr.contact_name,
         contact_phone: addr.contact_phone,
+        province: p,
+        city: c,
+        district: d,
         detail: addr.detail,
         is_default: !!addr.is_default,
       });
+      if (p) setCities(getCities(p));
+      if (p && c) setDistricts(getDistricts(p, c));
     } else {
       setEditing('new');
-      setForm({ contact_name: '', contact_phone: '', detail: '', is_default: false });
+      setForm({ contact_name: '', contact_phone: '', province: '', city: '', district: '', detail: '', is_default: false });
+      setCities([]);
+      setDistricts([]);
     }
   }
 
@@ -64,12 +109,18 @@ export default function AddressPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.contact_name || !form.contact_phone || !form.detail) return;
+    if (!form.contact_name || !form.contact_phone || !form.province || !form.city || !form.district || !form.detail) {
+      alert('请填写完整信息（联系人、手机号、省/市/区、详细地址）');
+      return;
+    }
     setLoading(true);
     try {
       let res;
       if (editing === 'new') {
-        res = await customerApi.addAddress({ ...form, is_default: form.is_default ? 1 : 0 });
+        res = await customerApi.addAddress({
+          ...form,
+          is_default: form.is_default ? 1 : 0,
+        });
       } else {
         res = await customerApi.updateAddress(editing!, form);
       }
@@ -123,7 +174,27 @@ export default function AddressPage() {
                        className="w-full px-4 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20" />
                 <input value={form.contact_phone} onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))} placeholder="手机号" maxLength={11} required
                        className="w-full px-4 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20" />
-                <textarea value={form.detail} onChange={e => setForm(f => ({ ...f, detail: e.target.value }))} placeholder="详细地址" rows={2} required
+
+                {/* 省市区级联选择 */}
+                <div className="grid grid-cols-3 gap-2">
+                  <select value={form.province} onChange={e => handleProvinceChange(e.target.value)} required
+                          className="px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20">
+                    <option value="">请选择省</option>
+                    {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <select value={form.city} onChange={e => handleCityChange(e.target.value)} required
+                          className="px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20">
+                    <option value="">请选择市</option>
+                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select value={form.district} onChange={e => setForm(f => ({ ...f, district: e.target.value }))} required
+                          className="px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20">
+                    <option value="">请选择区</option>
+                    {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                <textarea value={form.detail} onChange={e => setForm(f => ({ ...f, detail: e.target.value }))} placeholder="详细地址（街道、门牌号等）" rows={2} required
                           className="w-full px-4 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20 resize-none" />
                 <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                   <input type="checkbox" checked={form.is_default} onChange={e => setForm(f => ({ ...f, is_default: e.target.checked }))} className="w-4 h-4 accent-water" />
@@ -161,7 +232,7 @@ export default function AddressPage() {
                       <span className="absolute top-2 right-2 text-[10px] font-medium text-water bg-water/10 px-2 py-0.5 rounded-full">默认</span>
                   )}
                   <p className="font-medium text-gray-800 text-sm">{addr.contact_name}<span className="ml-2 text-gray-400 font-normal">{addr.contact_phone}</span></p>
-                  <p className="text-gray-500 text-xs mt-1 leading-relaxed whitespace-pre-wrap">{addr.detail}</p>
+                  <p className="text-gray-500 text-xs mt-1 leading-relaxed whitespace-pre-wrap">{addr.province}{addr.city}{addr.district} {addr.detail}</p>
                   {fromPage !== 'confirm-order' && (
                       <div className="flex gap-3 mt-3">
                         <button onClick={() => handleSetDefault(addr.id)} className={`text-xs ${addr.is_default ? 'text-gray-300' : 'text-blue-500'}`}>设为默认</button>

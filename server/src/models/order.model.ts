@@ -215,6 +215,13 @@ export const orderModel = {
     return this.findById(id);
   },
 
+  /** 支付成功后的"待派送"状态（等待系统匹配派送员） */
+  markPendingDelivery(id: string, transactionId: string): Order | undefined {
+    db.prepare("UPDATE orders SET pay_status = 'paid', status = 'pending_delivery', transaction_id = ?, paid_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+      .run(transactionId, id);
+    return this.findById(id);
+  },
+
   markRefunding(id: string, refundOrderNo: string): Order | undefined {
     db.prepare("UPDATE orders SET status = 'refunding', remark = '退款订单号:' || ? || CASE WHEN remark IS NOT NULL AND remark != '' THEN ';' || remark ELSE '' END, updated_at = datetime('now') WHERE id = ?")
       .run(refundOrderNo, id);
