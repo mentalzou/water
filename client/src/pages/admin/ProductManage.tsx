@@ -293,6 +293,7 @@ export default function ProductManage() {
       ) : products.length === 0 ? (
         <div className="text-center py-20 text-gray-400">暂无产品数据</div>
       ) : (
+        <>
         <div className="grid grid-cols-3 gap-5">
           {products.map((p, idx) => (
             <div key={p.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all relative overflow-hidden group">
@@ -342,6 +343,7 @@ export default function ProductManage() {
             </div>
           </div>
         )}
+        </>
     )}
 
       {/* Form Modal */}

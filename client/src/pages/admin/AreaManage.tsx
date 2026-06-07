@@ -138,6 +138,7 @@ export default function AreaManage() {
       ) : areas.length === 0 ? (
         <div className="text-center py-20 text-gray-400">暂无区域数据</div>
       ) : (
+        <>
         <div className="grid grid-cols-2 gap-5">
           {areas.map(area => (
             <div key={area.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
@@ -172,6 +173,7 @@ export default function AreaManage() {
             </div>
           </div>
         )}
+        </>
       )}
 
       {/* Form Modal */}
