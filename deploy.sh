@@ -133,6 +133,17 @@ pm2 start npm --name "water-server" -- start --prefix "$PROJECT_DIR/server" --
 pm2 save
 pm2 startup | tail -n 1 | sudo bash 2>/dev/null || true
 
+# 安装并配置日志轮转（按天拆分）
+echo ""
+echo "配置 PM2 日志按天轮转..."
+pm2 install pm2-logrotate 2>/dev/null || true
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
+pm2 set pm2-logrotate:retain 365
+pm2 set pm2-logrotate:max_size 50M
+pm2 set pm2-logrotate:compress true
+pm2 set pm2-logrotate:dateFormat YYYY-MM-DD
+echo "日志轮转配置完成（每天0点轮转，保留365天，自动压缩）"
+
 # 配置 Nginx 反向代理
 echo ""
 echo "配置 Nginx..."
