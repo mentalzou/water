@@ -90,54 +90,77 @@ export function desedeDecrypt(encryptedData: string, secretKey: string): string 
 }
 
 /**
- * 3DES ECB 解密 - 兼容非标准长度通知密钥
- * 合利宝通知回调密钥由商户后台配置，长度可能不是标准的 16/24 位
- * - 16 字节：复用 processKeyLength 逻辑（复制前 8 字节补齐 24）
- * - 17~23 字节：右侧补 \0 到 24
- * - 24 字节：直接使用
- * - 其他：取 MD5 → 16 字节后同上处理
+ * 合利宝通知 - 3DES ECB Base64 解密
+ *
+ * 官方 Demo 流程：
+ *   1. data 字段是标准 Base64 编码（不是 Hex！）
+ *   2. Base64 解码后的字节 → 3DES ECB ZeroPadding 解密
+ *   3. 密钥处理：hutool 的 SecureUtil.desede(key.getBytes()) 自动处理非标准长度
+ *      Node.js 侧：参考 hutool 行为，对 16 字节复制前 8 字节，其余补齐到 24
+ *
+ * @param base64Data  通知报文的 data 字段（Base64 字符串）
+ * @param notifyKey   通知解密密钥（UTF-8 字节为有效载荷）
  */
-export function desedeDecryptWithAutoPad(encryptedData: string, notifyKey: string): string {
-  let paddedKey: string;
-  const len = notifyKey.length;
+export function desedeDecryptNotify(base64Data: string, notifyKey: string): string {
+  console.log('[3DES-Notify] 输入 data 长度:', base64Data.length);
 
-  if (len === 16 || len === 24) {
-    // 标准长度，直接用 desedeDecrypt（内部 processKeyLength 处理 16→24）
-    console.log('[3DES-Notify] 标准密钥长度:', len, '，直接使用 desedeDecrypt');
-    return desedeDecrypt(encryptedData, notifyKey);
-  }
+  // 1. Base64 解码
+  const cipherWords = CryptoJS.enc.Base64.parse(base64Data);
+  console.log('[3DES-Notify] Base64 解码后 sigBytes:', cipherWords.sigBytes);
 
-  if (len >= 17 && len <= 23) {
-    // 17~23 字节：右侧补 \0 到 24
-    paddedKey = notifyKey.padEnd(24, '\0');
-    console.log('[3DES-Notify] 原始密钥长度:', len, '，补齐 \0 到:', paddedKey.length);
-  } else {
-    // 不常见的长度：MD5 取 16 字节再扩展为 24
-    const md5 = CryptoJS.MD5(notifyKey).toString();
-    paddedKey = md5.substring(0, 16) + md5.substring(0, 8);
-    console.log('[3DES-Notify] 原始密钥长度:', len, '，MD5 后取前 24 字节使用');
-  }
+  // 2. 密钥补齐到 24 字节（参照 hutool Behavior）
+  const keyBytes = prepareNotifyKey(notifyKey);
 
-  // 直接构建 key 并解密，跳过 processKeyLength（已保证 24 字节）
-  const key = CryptoJS.enc.Utf8.parse(paddedKey);
-  const encryptedHex = CryptoJS.enc.Hex.parse(encryptedData);
-  const encrypted = CryptoJS.lib.CipherParams.create({
-    ciphertext: encryptedHex,
-  });
-  const decrypted = CryptoJS.TripleDES.decrypt(encrypted, key, {
+  // 3. 3DES ECB ZeroPadding 解密
+  const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext: cipherWords });
+  const decrypted = CryptoJS.TripleDES.decrypt(cipherParams, keyBytes, {
     mode: CryptoJS.mode.ECB,
     padding: CryptoJS.pad.ZeroPadding,
   });
 
   console.log('[3DES-Notify] 解密结果(hex):', decrypted.toString());
-  console.log('[3DES-Notify] 解密结果sigBytes:', decrypted.sigBytes);
+  console.log('[3DES-Notify] 解密结果 sigBytes:', decrypted.sigBytes);
 
   try {
-    return decrypted.toString(CryptoJS.enc.Utf8);
+    const utf8 = decrypted.toString(CryptoJS.enc.Utf8);
+    // 去除 ZeroPadding 尾部的 \0
+    return utf8.replace(/\0+$/, '');
   } catch {
-    const result = decrypted.toString(CryptoJS.enc.Latin1);
-    return result.replace(/\0+$/, '');
+    const latin1 = decrypted.toString(CryptoJS.enc.Latin1);
+    return latin1.replace(/\0+$/, '');
   }
+}
+
+/**
+ * 将通知密钥处理为 24 字节 3DES key（WordArray）
+ *
+ * hutool SecureUtil.desede(key.getBytes()) 对非标准长度密钥的行为：
+ * - key 长度 < 16：补 \0 到 16，再复制前 8 字节到 24
+ * - key 长度 16：复制前 8 字节 → 24
+ * - key 长度 17~23：补 \0 到 24
+ * - key 长度 = 24：直接使用
+ * - key 长度 > 24：截取前 24
+ */
+function prepareNotifyKey(notifyKey: string): CryptoJS.lib.WordArray {
+  let padded: string;
+  const len = notifyKey.length;
+  console.log('[3DES-Notify] 原始密钥长度:', len);
+
+  if (len === 24) {
+    padded = notifyKey;
+  } else if (len === 16) {
+    padded = notifyKey + notifyKey.substring(0, 8);
+  } else if (len < 16) {
+    const k16 = notifyKey.padEnd(16, '\0');
+    padded = k16 + k16.substring(0, 8);
+  } else if (len < 24) {
+    padded = notifyKey.padEnd(24, '\0');
+  } else {
+    padded = notifyKey.substring(0, 24);
+  }
+
+  console.log('[3DES-Notify] 补齐后密钥长度:', padded.length);
+  return CryptoJS.enc.Utf8.parse(padded);
 }
 
 /**
@@ -170,10 +193,35 @@ export function verifyMd5Sign(data: string, key: string, receivedSign: string): 
 }
 
 /**
- * RSA SHA256 验签（用于小利云通知回调）
- * @param data 待验签的原文（解密后的JSON字符串）
- * @param publicKeyPem 合利宝公钥 PEM 格式
- * @param signBase64 签名值 Base64 编码
+ * 合利宝通知 RSA-MD5 验签
+ *
+ * 官方 Demo 流程（与直觉不同！）：
+ *   1. 验签原文 = 通知报文中原始的 Base64 data 字段（未解密）
+ *   2. 签名算法 = MD5withRSA（不是 SHA256！）
+ *   3. 签名字段 = sign（Base64 编码）
+ *
+ * @param rawBase64Data  通知报文的 data 字段原文（Base64 字符串，不要先解密）
+ * @param publicKeyPem   合利宝公钥 PEM 格式
+ * @param signBase64     通知报文的 sign 字段（Base64 编码的签名值）
+ */
+export function rsaMd5VerifySign(rawBase64Data: string, publicKeyPem: string, signBase64: string): boolean {
+  try {
+    const crypto = require('crypto');
+    const verify = crypto.createVerify('RSA-MD5');
+    verify.update(rawBase64Data, 'utf8');
+    const result = verify.verify(publicKeyPem, signBase64, 'base64');
+    if (!result) {
+      console.error('[RSA-MD5] 验签失败');
+    }
+    return result;
+  } catch (error) {
+    console.error('[RSA-MD5] 验签异常:', error);
+    return false;
+  }
+}
+
+/**
+ * RSA SHA256 验签（保留，用于其他场景）
  */
 export function rsaVerifySign(data: string, publicKeyPem: string, signBase64: string): boolean {
   try {

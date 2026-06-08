@@ -13,10 +13,10 @@ import {
   aesDecrypt,
   desedeEncrypt,
   desedeDecrypt,
-  desedeDecryptWithAutoPad,
+  desedeDecryptNotify,
   generateMd5Sign,
   verifyMd5Sign,
-  rsaVerifySign,
+  rsaMd5VerifySign,
 } from '../utils/crypto';
 import { sendPostRequest } from '../utils/http';
 import type { Order } from '../types';
@@ -575,10 +575,14 @@ export async function queryRefundStatus(refundOrderNo: string): Promise<{
 }
 
 /**
- * 解析小利云交易通知报文（3DES解密 + RSA验签）
- * 报文格式：{ data, agentNo, sign, merchantNo }
- * - data 用 secretKey 做 3DES ECB ZeroPadding 解密
- * - sign 用 合利宝公钥 做 RSA-SHA256 验签（验原文，即解密后的 JSON 字符串）
+ * 解析小利云交易通知报文（3DES Base64解密 + RSA-MD5 验签）
+ *
+ * 官方 Demo 流程（参考 NotifyDecodeTestDemo.java）：
+ *   1. sign 字段用 RSA-MD5 验签，验签原文 = data 字段的 Base64 字符串（解密前！）
+ *   2. 验签通过后，data 字段做 Base64 解码 → 3DES ECB ZeroPadding 解密 → 得到 JSON
+ *   3. 密钥 = 通知专用的 3DES key（商户后台配置，非业务通信 secretKey）
+ *
+ * 报文格式：{ data: Base64, agentNo, sign: Base64, merchantNo }
  */
 export function parsePaymentNotify(rawBody: NotifyRawBody): NotifyData | null {
   const { data, sign, merchantNo } = rawBody;
@@ -594,48 +598,28 @@ export function parsePaymentNotify(rawBody: NotifyRawBody): NotifyData | null {
     return null;
   }
 
-  const keys = getMerchantKeys();
-
-  // 通知解密使用独立的通知密钥（HELIPAY_NOTIFY_AES_KEY），不依赖业务通信密钥
-  // 如果通知密钥没配置且没有业务密钥，无法解密
-  if (!helipayConfig.nofiyAesKey && !keys) {
-    console.error('[通知] 通知密钥和业务密钥均未配置');
+  const notifyKey = helipayConfig.nofiyAesKey;
+  if (!notifyKey) {
+    console.error('[通知] 未配置通知密钥 HELIPAY_NOTIFY_AES_KEY');
     return null;
   }
 
   try {
-    // 1. 3DES 解密 data 字段（通知使用独立密钥，非业务通信 secretKey）
-    const notifyKey = helipayConfig.nofiyAesKey;
-    if (!notifyKey) {
-      console.error('[通知] 未配置通知密钥 HELIPAY_NOTIFY_AES_KEY');
+    // ===== 步骤 1: RSA-MD5 验签（对原始 Base64 data 验签，解密前！）=====
+    console.log('[通知] 密文(data) 前 100 字符:', data.substring(0, 100) + '...');
+    console.log('[通知] 签名(sign) 前 80 字符:', sign.substring(0, 80) + '...');
+
+    if (!rsaMd5VerifySign(data, helipayConfig.publicKey, sign)) {
+      console.error('[通知] RSA-MD5 签名验证失败');
       return null;
     }
-    console.log('[通知] 密文(data):', data.substring(0, 100) + '...');
-    console.log('[通知] 通知密钥长度:', notifyKey.length);
+    console.log('[通知] RSA-MD5 签名验证通过');
 
-    // 优先使用通知专用密钥解密；失败则回退到业务通信密钥（兼容老配置）
-    let decryptedJson: string;
-    try {
-      decryptedJson = desedeDecryptWithAutoPad(data, notifyKey);
-    } catch {
-      console.log('[通知] 通知密钥解密失败，尝试使用业务通信密钥...');
-      if (keys) {
-        decryptedJson = desedeDecrypt(data, keys.secretKey);
-      } else {
-        throw new Error('通知密钥和业务密钥均不可用');
-      }
-    }
+    // ===== 步骤 2: 3DES 解密（Base64 解码 → 3DES ECB ZeroPadding）=====
+    const decryptedJson = desedeDecryptNotify(data, notifyKey);
     console.log('[通知] 解密后内容:', decryptedJson);
 
-    // 2. RSA-SHA256 验签（对解密后的明文JSON做验签）
-    console.log('[通知] 签名(sign):', sign.substring(0, 80) + '...');
-    if (!rsaVerifySign(decryptedJson, helipayConfig.publicKey, sign)) {
-      console.error('[通知] RSA签名验证失败');
-      return null;
-    }
-    console.log('[通知] RSA签名验证通过');
-
-    // 3. 解析业务数据
+    // ===== 步骤 3: 解析业务数据 =====
     const notifyData: NotifyData = JSON.parse(decryptedJson);
     console.log('[通知] 解析完成:', {
       orderNo: notifyData.orderNo,
