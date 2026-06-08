@@ -207,9 +207,30 @@ export function verifyMd5Sign(data: string, key: string, receivedSign: string): 
 export function rsaMd5VerifySign(rawBase64Data: string, publicKeyPem: string, signBase64: string): boolean {
   try {
     const crypto = require('crypto');
-    const verify = crypto.createVerify('RSA-MD5');
-    verify.update(rawBase64Data, 'utf8');
-    const result = verify.verify(publicKeyPem, signBase64, 'base64');
+
+    // OpenSSL 3.0+ 不再支持 createVerify('RSA-MD5')，改为手动构建 DigestInfo
+    // 1. 计算 MD5 哈希 (Node.js 仍支持 MD5 哈希)
+    const md5Hash = crypto.createHash('md5').update(rawBase64Data, 'utf8').digest();
+    console.log('[RSA-MD5] MD5 哈希:', md5Hash.toString('hex'));
+
+    // 2. 构建 ASN.1 DigestInfo 结构
+    //    MD5 OID: 1.2.840.113549.2.5
+    //    DigestInfo ::= SEQUENCE {
+    //      digestAlgorithm AlgorithmIdentifier ::= SEQUENCE {
+    //        algorithm   OID (MD5: 1.2.840.113549.2.5),
+    //        parameters  NULL
+    //      },
+    //      digest        OCTET STRING
+    //    }
+    //    预编码的 34 字节前缀: SEQUENCE { SEQUENCE { OID(1.2.840.113549.2.5), NULL }, OCTET STRING }
+    const md5DigestInfoPrefix = Buffer.from('3020300c06082a864886f70f020505000410', 'hex');
+    const digestInfo = Buffer.concat([md5DigestInfoPrefix, md5Hash]);
+
+    // 3. 验签：algorithm=null 表示 data 已经是 DigestInfo 格式
+    const publicKey = crypto.createPublicKey(publicKeyPem);
+    const signature = Buffer.from(signBase64, 'base64');
+    const result = crypto.verify(null, digestInfo, publicKey, signature);
+
     if (!result) {
       console.error('[RSA-MD5] 验签失败');
     }
