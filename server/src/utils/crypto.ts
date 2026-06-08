@@ -90,6 +90,57 @@ export function desedeDecrypt(encryptedData: string, secretKey: string): string 
 }
 
 /**
+ * 3DES ECB 解密 - 兼容非标准长度通知密钥
+ * 合利宝通知回调密钥由商户后台配置，长度可能不是标准的 16/24 位
+ * - 16 字节：复用 processKeyLength 逻辑（复制前 8 字节补齐 24）
+ * - 17~23 字节：右侧补 \0 到 24
+ * - 24 字节：直接使用
+ * - 其他：取 MD5 → 16 字节后同上处理
+ */
+export function desedeDecryptWithAutoPad(encryptedData: string, notifyKey: string): string {
+  let paddedKey: string;
+  const len = notifyKey.length;
+
+  if (len === 16 || len === 24) {
+    // 标准长度，直接用 desedeDecrypt（内部 processKeyLength 处理 16→24）
+    console.log('[3DES-Notify] 标准密钥长度:', len, '，直接使用 desedeDecrypt');
+    return desedeDecrypt(encryptedData, notifyKey);
+  }
+
+  if (len >= 17 && len <= 23) {
+    // 17~23 字节：右侧补 \0 到 24
+    paddedKey = notifyKey.padEnd(24, '\0');
+    console.log('[3DES-Notify] 原始密钥长度:', len, '，补齐 \0 到:', paddedKey.length);
+  } else {
+    // 不常见的长度：MD5 取 16 字节再扩展为 24
+    const md5 = CryptoJS.MD5(notifyKey).toString();
+    paddedKey = md5.substring(0, 16) + md5.substring(0, 8);
+    console.log('[3DES-Notify] 原始密钥长度:', len, '，MD5 后取前 24 字节使用');
+  }
+
+  // 直接构建 key 并解密，跳过 processKeyLength（已保证 24 字节）
+  const key = CryptoJS.enc.Utf8.parse(paddedKey);
+  const encryptedHex = CryptoJS.enc.Hex.parse(encryptedData);
+  const encrypted = CryptoJS.lib.CipherParams.create({
+    ciphertext: encryptedHex,
+  });
+  const decrypted = CryptoJS.TripleDES.decrypt(encrypted, key, {
+    mode: CryptoJS.mode.ECB,
+    padding: CryptoJS.pad.ZeroPadding,
+  });
+
+  console.log('[3DES-Notify] 解密结果(hex):', decrypted.toString());
+  console.log('[3DES-Notify] 解密结果sigBytes:', decrypted.sigBytes);
+
+  try {
+    return decrypted.toString(CryptoJS.enc.Utf8);
+  } catch {
+    const result = decrypted.toString(CryptoJS.enc.Latin1);
+    return result.replace(/\0+$/, '');
+  }
+}
+
+/**
  * 处理3DES密钥长度
  */
 function processKeyLength(key: string): string {

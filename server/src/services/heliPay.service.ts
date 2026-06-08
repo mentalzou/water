@@ -13,6 +13,7 @@ import {
   aesDecrypt,
   desedeEncrypt,
   desedeDecrypt,
+  desedeDecryptWithAutoPad,
   generateMd5Sign,
   verifyMd5Sign,
   rsaVerifySign,
@@ -594,15 +595,36 @@ export function parsePaymentNotify(rawBody: NotifyRawBody): NotifyData | null {
   }
 
   const keys = getMerchantKeys();
-  if (!keys) {
-    console.error('[通知] 支付密钥未初始化');
+
+  // 通知解密使用独立的通知密钥（HELIPAY_NOTIFY_AES_KEY），不依赖业务通信密钥
+  // 如果通知密钥没配置且没有业务密钥，无法解密
+  if (!helipayConfig.nofiyAesKey && !keys) {
+    console.error('[通知] 通知密钥和业务密钥均未配置');
     return null;
   }
 
   try {
-    // 1. 3DES 解密 data 字段
+    // 1. 3DES 解密 data 字段（通知使用独立密钥，非业务通信 secretKey）
+    const notifyKey = helipayConfig.nofiyAesKey;
+    if (!notifyKey) {
+      console.error('[通知] 未配置通知密钥 HELIPAY_NOTIFY_AES_KEY');
+      return null;
+    }
     console.log('[通知] 密文(data):', data.substring(0, 100) + '...');
-    const decryptedJson = desedeDecrypt(data, keys.secretKey);
+    console.log('[通知] 通知密钥长度:', notifyKey.length);
+
+    // 优先使用通知专用密钥解密；失败则回退到业务通信密钥（兼容老配置）
+    let decryptedJson: string;
+    try {
+      decryptedJson = desedeDecryptWithAutoPad(data, notifyKey);
+    } catch {
+      console.log('[通知] 通知密钥解密失败，尝试使用业务通信密钥...');
+      if (keys) {
+        decryptedJson = desedeDecrypt(data, keys.secretKey);
+      } else {
+        throw new Error('通知密钥和业务密钥均不可用');
+      }
+    }
     console.log('[通知] 解密后内容:', decryptedJson);
 
     // 2. RSA-SHA256 验签（对解密后的明文JSON做验签）
