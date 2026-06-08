@@ -34,7 +34,19 @@ export default function CustomerLogin() {
     if (!inWechat || oauthProcessed.current) return;
 
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
     const isPending = sessionStorage.getItem(WECHAT_LOGIN_KEY);
+
+    // 关键：立即同步清除 URL 中的 code/state，防止页面刷新导致 code 被重复使用（40029）
+    if ((code || isPending) && (window.location.search.includes('code=') || window.location.search.includes('state='))) {
+      const cleanSearch = window.location.search
+        .replace(/[?&]code=[^&]*/, '')
+        .replace(/[?&]state=[^&]*/, '')
+        .replace(/^&/, '?') // 如果第一个参数被去掉，& 换成 ?
+        .replace(/^\?&/, '?');
+      const cleanUrl = window.location.pathname + cleanSearch;
+      window.history.replaceState(null, '', cleanUrl);
+    }
 
     // 场景1: 已有本地 openId + 登录标记 → 直接调用微信登录接口
     if (isPending) {
@@ -42,9 +54,6 @@ export default function CustomerLogin() {
       if (storedOpenId) {
         oauthProcessed.current = true;
         sessionStorage.removeItem(WECHAT_LOGIN_KEY);
-        // 清除 URL 中的 code/state 参数
-        const cleanPath = window.location.pathname + (searchParams.get('from') ? `?from=${searchParams.get('from')}` : '');
-        navigate(cleanPath, { replace: true });
         doWechatLogin(storedOpenId);
         return;
       }
@@ -55,9 +64,6 @@ export default function CustomerLogin() {
       oauthProcessed.current = true;
       sessionStorage.removeItem(WECHAT_LOGIN_KEY);
       setWechatLoading(true);
-      // 清除 URL 中 code/state 参数
-      const cleanPath = window.location.pathname + (searchParams.get('from') ? `?from=${searchParams.get('from')}` : '');
-      navigate(cleanPath, { replace: true });
 
       customerApi
         .getWechatOpenId(code, 'oa')
@@ -76,6 +82,11 @@ export default function CustomerLogin() {
           setErrorMsg(err.message || '微信授权失败，请重试');
         });
       return;
+    }
+
+    // 场景3: 只有 isPending 但还没拿到 openId/code → 清理标记，避免卡住
+    if (isPending && !code) {
+      sessionStorage.removeItem(WECHAT_LOGIN_KEY);
     }
   }, []);
 

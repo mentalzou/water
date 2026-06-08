@@ -39,9 +39,11 @@ export function useWechatOAuth() {
       return;
     }
 
-    // 在登录页时不自动跳转 OAuth，由登录页微信一键登录按钮自行处理
+    // 在登录页时不自动处理 OAuth，由 Login.tsx 内的微信一键登录按钮全权负责
+    // 注意：React 的 useEffect 从子组件到父组件依次执行，
+    // 因此 CustomerLogin 的 effect 会先于本 hook 执行，code 由 Login.tsx 优先消费
     if (window.location.pathname === '/login') {
-      console.log('[OAuth] 当前在登录页，跳过自动 OAuth 重定向');
+      console.log('[OAuth] 当前在登录页，跳过自动 OAuth 处理');
       return;
     }
 
@@ -54,6 +56,15 @@ export function useWechatOAuth() {
 
     if (code) {
       console.log(`[OAuth] 检测到微信 ${codeType} code，正在换取 openId...`);
+
+      // 立即同步清除 URL 中的 code/state，防止页面刷新导致 code 被重复提交（微信 40029）
+      const cleanSearch = window.location.search
+        .replace(/[?&]code=[^&]*/, '')
+        .replace(/[?&]state=[^&]*/, '')
+        .replace(/^&/, '?')
+        .replace(/^\?&/, '?');
+      window.history.replaceState(null, '', window.location.pathname + cleanSearch);
+
       customerApi
         .getWechatOpenId(code, codeType)
         .then((res: any) => {
