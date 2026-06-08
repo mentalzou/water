@@ -102,11 +102,11 @@ export function desedeDecrypt(encryptedData: string, secretKey: string): string 
  * @param notifyKey   通知解密密钥（UTF-8 字节为有效载荷）
  */
 export function desedeDecryptNotify(base64Data: string, notifyKey: string): string {
-  console.log('[3DES-Notify] 输入 data 长度:', base64Data.length);
+  // console.log('[3DES-Notify] 输入 data 长度:', base64Data.length);
 
   // 1. Base64 解码
   const cipherWords = CryptoJS.enc.Base64.parse(base64Data);
-  console.log('[3DES-Notify] Base64 解码后 sigBytes:', cipherWords.sigBytes);
+  // console.log('[3DES-Notify] Base64 解码后 sigBytes:', cipherWords.sigBytes);
 
   // 2. 密钥补齐到 24 字节（参照 hutool Behavior）
   const keyBytes = prepareNotifyKey(notifyKey);
@@ -118,8 +118,8 @@ export function desedeDecryptNotify(base64Data: string, notifyKey: string): stri
     padding: CryptoJS.pad.ZeroPadding,
   });
 
-  console.log('[3DES-Notify] 解密结果(hex):', decrypted.toString());
-  console.log('[3DES-Notify] 解密结果 sigBytes:', decrypted.sigBytes);
+  // console.log('[3DES-Notify] 解密结果(hex):', decrypted.toString());
+  // console.log('[3DES-Notify] 解密结果 sigBytes:', decrypted.sigBytes);
 
   try {
     const utf8 = decrypted.toString(CryptoJS.enc.Utf8);
@@ -144,7 +144,7 @@ export function desedeDecryptNotify(base64Data: string, notifyKey: string): stri
 function prepareNotifyKey(notifyKey: string): CryptoJS.lib.WordArray {
   let padded: string;
   const len = notifyKey.length;
-  console.log('[3DES-Notify] 原始密钥长度:', len);
+  // console.log('[3DES-Notify] 原始密钥长度:', len);
 
   if (len === 24) {
     padded = notifyKey;
@@ -159,7 +159,7 @@ function prepareNotifyKey(notifyKey: string): CryptoJS.lib.WordArray {
     padded = notifyKey.substring(0, 24);
   }
 
-  console.log('[3DES-Notify] 补齐后密钥长度:', padded.length);
+  // console.log('[3DES-Notify] 补齐后密钥长度:', padded.length);
   return CryptoJS.enc.Utf8.parse(padded);
 }
 
@@ -208,33 +208,77 @@ export function rsaMd5VerifySign(rawBase64Data: string, publicKeyPem: string, si
   try {
     const crypto = require('crypto');
 
-    // OpenSSL 3.0+ 不再支持 createVerify('RSA-MD5')，改为手动构建 DigestInfo
-    // 1. 计算 MD5 哈希 (Node.js 仍支持 MD5 哈希)
-    const md5Hash = crypto.createHash('md5').update(rawBase64Data, 'utf8').digest();
-    console.log('[RSA-MD5] MD5 哈希:', md5Hash.toString('hex'));
-
-    // 2. 构建 ASN.1 DigestInfo 结构
-    //    MD5 OID: 1.2.840.113549.2.5
-    //    DigestInfo ::= SEQUENCE {
-    //      digestAlgorithm AlgorithmIdentifier ::= SEQUENCE {
-    //        algorithm   OID (MD5: 1.2.840.113549.2.5),
-    //        parameters  NULL
-    //      },
-    //      digest        OCTET STRING
-    //    }
-    //    预编码的 34 字节前缀: SEQUENCE { SEQUENCE { OID(1.2.840.113549.2.5), NULL }, OCTET STRING }
-    const md5DigestInfoPrefix = Buffer.from('3020300c06082a864886f70f020505000410', 'hex');
-    const digestInfo = Buffer.concat([md5DigestInfoPrefix, md5Hash]);
-
-    // 3. 验签：algorithm=null 表示 data 已经是 DigestInfo 格式
-    const publicKey = crypto.createPublicKey(publicKeyPem);
-    const signature = Buffer.from(signBase64, 'base64');
-    const result = crypto.verify(null, digestInfo, publicKey, signature);
-
-    if (!result) {
-      console.error('[RSA-MD5] 验签失败');
+    // 1. 解析公钥（兼容 PEM 和原始 Base64 DER 两种格式）
+    let publicKey: any;
+    if (publicKeyPem.includes('-----BEGIN')) {
+      publicKey = crypto.createPublicKey(publicKeyPem);
+    } else {
+      publicKey = crypto.createPublicKey({
+        key: Buffer.from(publicKeyPem, 'base64'),
+        format: 'der',
+        type: 'spki',
+      });
     }
-    return result;
+
+    // 诊断：公钥信息
+    // if (publicKey.asymmetricKeyDetails) {
+    //   console.log('[RSA-MD5] 公钥 modulus 长度(bits):', publicKey.asymmetricKeyDetails.modulusLength);
+    // }
+
+    // 诊断：data 原文信息
+    // console.log('[RSA-MD5] data 原文长度:', rawBase64Data.length);
+    // console.log('[RSA-MD5] data 原文前50字符:', rawBase64Data.substring(0, 50));
+    // console.log('[RSA-MD5] data 原文末50字符:', rawBase64Data.substring(Math.max(0, rawBase64Data.length - 50)));
+    // 检查是否含换行符
+    // const hasNewline = rawBase64Data.includes('\n') || rawBase64Data.includes('\r');
+    // console.log('[RSA-MD5] data 是否含换行:', hasNewline);
+
+    // 2. 计算 MD5 哈希
+    const md5Hash = crypto.createHash('md5').update(rawBase64Data, 'utf8').digest();
+    // console.log('[RSA-MD5] MD5 哈希(hex):', md5Hash.toString('hex'));
+    // console.log('[RSA-MD5] MD5 哈希长度(bytes):', md5Hash.length);
+
+    // 3. 构建 DigestInfo
+    const md5DigestInfoPrefix = Buffer.from('3020300c06082a864886f70d020505000410', 'hex');
+    const digestInfo = Buffer.concat([md5DigestInfoPrefix, md5Hash]);
+    // console.log('[RSA-MD5] DigestInfo 总长度:', digestInfo.length, 'bytes');
+    // console.log('[RSA-MD5] DigestInfo(hex):', digestInfo.toString('hex'));
+
+    // 4. 签名解码诊断
+    const signature = Buffer.from(signBase64, 'base64');
+    // console.log('[RSA-MD5] sign Base64长度:', signBase64.length);
+    // console.log('[RSA-MD5] signature 解码后长度:', signature.length, 'bytes');
+
+    // 5. 用 publicDecrypt 解开签名，查看里面的 DigestInfo（用于诊断）
+    try {
+      const decryptedSig = crypto.publicDecrypt(publicKey, signature);
+      // console.log('[RSA-MD5] 签名解密后长度:', decryptedSig.length, 'bytes');
+      // console.log('[RSA-MD5] 签名解密后(hex):', decryptedSig.toString('hex'));
+
+      // 手动比较
+      const match = decryptedSig.equals(digestInfo);
+      // console.log('[RSA-MD5] 签名内含 DigestInfo 与本机一致:', match);
+      if (!match) {
+        // 只比较哈希部分（末尾 16 字节）
+        const sigHash = decryptedSig.subarray(decryptedSig.length - 16);
+        const hashMatch = sigHash.equals(md5Hash);
+        // console.log('[RSA-MD5] 签名内含哈希与本机 MD5 一致:', hashMatch);
+        if (!hashMatch) {
+          console.log('[RSA-MD5] 签名内含哈希(hex):', sigHash.toString('hex'));
+        }
+      }
+      return match;
+    } catch (decryptError: any) {
+      console.error('[RSA-MD5] publicDecrypt 失败:', decryptError.message);
+
+      // 回退到 verify
+      const result = crypto.verify(null, digestInfo, publicKey, signature);
+      console.log('[RSA-MD5] verify(null) 结果:', result);
+      if (!result) {
+        console.error('[RSA-MD5] 验签失败');
+      }
+      return result;
+    }
   } catch (error) {
     console.error('[RSA-MD5] 验签异常:', error);
     return false;

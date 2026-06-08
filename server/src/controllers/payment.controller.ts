@@ -190,15 +190,15 @@ export async function paymentNotify(req: Request, res: Response): Promise<void> 
       finishDate,
     } = notifyData;
 
-    console.log('[合利宝通知] 解析成功:', {
-      orderNo,
-      orderType,
-      orderStatus,
-      refundOrderNo,
-      channelOrderId,
-      orderAmount,
-      finishDate,
-    });
+    // console.log('[合利宝通知] 解析成功:', {
+    //   orderNo,
+    //   orderType,
+    //   orderStatus,
+    //   refundOrderNo,
+    //   channelOrderId,
+    //   orderAmount,
+    //   finishDate,
+    // });
 
     // ========== 收单通知（正向交易） ==========
     if (orderType === 'FORWARD') {

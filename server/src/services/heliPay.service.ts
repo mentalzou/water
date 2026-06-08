@@ -606,28 +606,45 @@ export function parsePaymentNotify(rawBody: NotifyRawBody): NotifyData | null {
 
   try {
     // ===== 步骤 1: RSA-MD5 验签（对原始 Base64 data 验签，解密前！）=====
-    console.log('[通知] 密文(data) 前 100 字符:', data.substring(0, 100) + '...');
-    console.log('[通知] 签名(sign) 前 80 字符:', sign.substring(0, 80) + '...');
 
     if (!rsaMd5VerifySign(data, helipayConfig.publicKey, sign)) {
       console.error('[通知] RSA-MD5 签名验证失败');
       return null;
     }
-    console.log('[通知] RSA-MD5 签名验证通过');
+    // console.log('[通知] RSA-MD5 签名验证通过');
 
     // ===== 步骤 2: 3DES 解密（Base64 解码 → 3DES ECB ZeroPadding）=====
     const decryptedJson = desedeDecryptNotify(data, notifyKey);
     console.log('[通知] 解密后内容:', decryptedJson);
 
     // ===== 步骤 3: 解析业务数据 =====
-    const notifyData: NotifyData = JSON.parse(decryptedJson);
-    console.log('[通知] 解析完成:', {
-      orderNo: notifyData.orderNo,
-      orderStatus: notifyData.orderStatus,
-      orderType: notifyData.orderType,
-      channelOrderId: notifyData.channelOrderId,
-      orderAmount: notifyData.orderAmount,
-    });
+    // 合利宝通知解密后可能含未转义的控制字符，需先转义再 JSON 解析
+
+    // 诊断：用 JS 字符串 charCodeAt 看 position 430~445
+    const charCodes: number[] = [];
+    for (let i = 430; i < Math.min(decryptedJson.length, 450); i++) {
+      charCodes.push(decryptedJson.charCodeAt(i));
+    }
+    // console.log('[通知] 位置 430~450 charCodes:', charCodes.map(c => '0x' + c.toString(16)).join(','));
+    // console.log('[通知] 位置 435 字符 charCode:', '0x' + decryptedJson.charCodeAt(435).toString(16));
+    // console.log('[通知] 位置 435 周围:', JSON.stringify(decryptedJson.substring(430, 445)));
+
+    // 所有控制字符（0x00-0x1F 除了 \t \n \r 已被上面处理）统一移除或转义
+    const sanitizedJson = decryptedJson
+      .replace(/\r\n/g, '\\n')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t')
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    // console.log('[通知] 是否有变化:', decryptedJson !== sanitizedJson);
+    const notifyData: NotifyData = JSON.parse(sanitizedJson);
+    // console.log('[通知] 解析完成:', {
+    //   orderNo: notifyData.orderNo,
+    //   orderStatus: notifyData.orderStatus,
+    //   orderType: notifyData.orderType,
+    //   channelOrderId: notifyData.channelOrderId,
+    //   orderAmount: notifyData.orderAmount,
+    // });
 
     return notifyData;
   } catch (error: any) {
