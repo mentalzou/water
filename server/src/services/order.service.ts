@@ -1,6 +1,5 @@
 import { orderModel } from '../models/order.model';
 import { productModel } from '../models/product.model';
-import { matchDeliverymanForOrder } from './matching.service';
 import { createCommissionRecord } from './commission.service';
 import { rewardPointsForOrder } from './points.service';
 import { userRechargeModel } from '../models/userRecharge.model';
@@ -178,21 +177,14 @@ export function createCustomerOrder(data: {
 }
 
 export function processPaymentSuccess(orderId: string, transactionId: string): Order | null {
-  // 第一步：标记为"待派送"状态
+  // 第一步：标记为"待派送"状态（自动派单已禁用，由管理员手工派单）
   const order = orderModel.markPendingDelivery(orderId, transactionId);
   if (!order) return null;
 
-  // 第二步：根据订单地址的"区"匹配派送员（随机派单）
-  const deliveryman = matchDeliverymanForOrder(order);
-  if (deliveryman) {
-    orderModel.assignDeliveryman(order.id, deliveryman.id);
-    console.log(`[派单] 订单 ${order.order_no} 已分配给派送员 ${deliveryman.name} (${(deliveryman.districts || []).join('、') || deliveryman.city})`);
-  } else {
-    console.warn(`[派单] 订单 ${order.order_no} 暂无可用派送员，仍为待派送状态`);
-  }
-
-  // 第三步：创建佣金记录
+  // 第二步：创建佣金记录
   createCommissionRecord(order);
+
+  console.log(`[支付] 订单 ${order.order_no} 支付成功，已进入待派送状态，等待管理员手工派单`);
 
   return orderModel.findById(orderId)!;
 }
