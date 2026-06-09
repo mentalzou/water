@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Package, Eye, Filter, RefreshCw, Undo2, SearchCheck } from 'lucide-react';
+import { Search, Package, Eye, RefreshCw, Undo2, SearchCheck, UserCheck } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -10,6 +10,7 @@ function getToken(): string {
 const statusMap: Record<string, { label: string; color: string }> = {
   pending: { label: '待支付', color: 'bg-gray-100 text-gray-700' },
   paid: { label: '已付款', color: 'bg-blue-100 text-blue-700' },
+  pending_delivery: { label: '待派送', color: 'bg-purple-100 text-purple-700' },
   refunding: { label: '退款中', color: 'bg-yellow-100 text-yellow-700' },
   refunded: { label: '已退款', color: 'bg-red-100 text-red-700' },
   assigned: { label: '待配送', color: 'bg-orange-100 text-orange-700' },
@@ -37,6 +38,11 @@ export default function OrderManage() {
   const [refundingOrders, setRefundingOrders] = useState<Set<string>>(new Set());
   // 退款查询中
   const [refundQueryingOrders, setRefundQueryingOrders] = useState<Set<string>>(new Set());
+  // 分配派送员中
+  const [assigningOrders, setAssigningOrders] = useState<Set<string>>(new Set());
+  // 分配派送员弹窗 { orderId, orderNo }
+  const [assignModal, setAssignModal] = useState<{ orderId: string; orderNo: string; currentDeliverymanName: string } | null>(null);
+  const [selectedDeliverymanId, setSelectedDeliverymanId] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -206,6 +212,44 @@ export default function OrderManage() {
     }
   }
 
+  /** 手动分配派送员 */
+  async function assignDeliveryman(orderId: string) {
+    const token = getToken();
+    if (!selectedDeliverymanId) {
+      alert('请选择派送员');
+      return;
+    }
+    setAssigningOrders(prev => new Set(prev).add(orderId));
+    try {
+      const res: any = await fetch(`${API_BASE}/admin/orders/${orderId}/assign-deliveryman`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ deliveryman_id: selectedDeliverymanId }),
+      }).then(r => r.text()).then(text => {
+        try { return JSON.parse(text); } catch { return null; }
+      });
+      if (res && res.code === 200) {
+        alert(res.message || '分配成功');
+        setAssignModal(null);
+        setSelectedDeliverymanId('');
+        loadOrders();
+      } else {
+        alert(res?.message || '分配失败');
+      }
+    } catch (e: any) {
+      alert('分配失败: ' + (e.message || '网络错误'));
+    } finally {
+      setAssigningOrders(prev => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
+    }
+  }
+
   /** 筛选条件变化时重新请求 */
   useEffect(() => { setPage(1); loadOrders(); }, [statusFilter, distributorFilter, deliverymanFilter, search, addressSearch]);
   useEffect(() => { loadOrders(); }, [page, pageSize]);
@@ -248,6 +292,7 @@ export default function OrderManage() {
             <option value="">全部状态</option>
             <option value="pending">待支付</option>
             <option value="paid">已付款</option>
+            <option value="pending_delivery">待派送</option>
             <option value="refunding">退款中</option>
             <option value="refunded">已退款</option>
             <option value="assigned">待配送</option>
@@ -296,7 +341,17 @@ export default function OrderManage() {
                           )}
                         </button>
                       )}
-                      {o.status === 'paid' && (
+                      {(o.status === 'paid' || o.status === 'pending_delivery' || o.status === 'assigned') && (
+                        <button
+                          onClick={() => { setAssignModal({ orderId: o.id, orderNo: o.order_no, currentDeliverymanName: o.deliveryman?.name || '' }); setSelectedDeliverymanId(''); }}
+                          disabled={assigningOrders.has(o.id)}
+                          className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="分配派送员"
+                        >
+                          <UserCheck className="w-4 h-4" />
+                        </button>
+                      )}
+                      {(o.status === 'paid' || o.status === 'pending_delivery') && (
                         <button
                           onClick={() => requestRefund(o)}
                           disabled={refundingOrders.has(o.id)}
@@ -394,6 +449,46 @@ export default function OrderManage() {
                 )}
 
                 <p className="text-xs text-gray-400 pt-1">下单时间：{selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString('zh-CN') : '-'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Assign Deliveryman Modal */}
+        {assignModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setAssignModal(null)}>
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-5">
+                <div>
+                  <h2 className="font-bold text-lg text-gray-800">分配派送员</h2>
+                  <p className="text-xs text-gray-400 font-mono mt-0.5">{assignModal.orderNo}</p>
+                  {assignModal.currentDeliverymanName && (
+                    <p className="text-xs text-orange-500 mt-1">当前派送员：{assignModal.currentDeliverymanName}（可重新分配）</p>
+                  )}
+                </div>
+                <button onClick={() => setAssignModal(null)} className="p-1 hover:bg-gray-100 rounded-lg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+              </div>
+              <div className="space-y-4">
+                <select
+                  value={selectedDeliverymanId}
+                  onChange={e => setSelectedDeliverymanId(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:ring-2 ring-water/30 text-sm"
+                >
+                  <option value="">-- 请选择派送员 --</option>
+                  {deliverymen.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setAssignModal(null)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-gray-500 text-sm hover:bg-gray-50 transition-colors">取消</button>
+                  <button
+                    onClick={() => assignDeliveryman(assignModal.orderId)}
+                    disabled={!selectedDeliverymanId || assigningOrders.has(assignModal.orderId)}
+                    className="flex-1 py-2.5 bg-water text-white rounded-xl text-sm font-medium hover:bg-water/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {assigningOrders.has(assignModal.orderId) ? '分配中...' : '确认分配'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

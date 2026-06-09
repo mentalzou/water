@@ -561,6 +561,46 @@ export async function queryRefundOrder(req: Request, res: Response): Promise<voi
   }
 }
 
+// ============ 手动分配派送员 ============
+export function assignOrderDeliveryman(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  const deliverymanId = str(req.body.deliveryman_id);
+
+  if (!deliverymanId) {
+    error(res, '请选择派送员');
+    return;
+  }
+
+  // 查询订单
+  const order = orderModel.findById(id);
+  if (!order) {
+    notFound(res);
+    return;
+  }
+
+  // 允许分配的状态：paid（旧版已付款）、pending_delivery（待派送）、assigned（重新分配）
+  const allowStatuses = ['paid', 'pending_delivery', 'assigned'];
+  if (!allowStatuses.includes(order.status)) {
+    error(res, `当前订单状态"${order.status}"不允许分配派送员，仅已付款/待派送/已派单状态的订单支持`);
+    return;
+  }
+
+  // 验证派送员存在且活跃
+  const deliveryman = deliverymanModel.findById(deliverymanId);
+  if (!deliveryman) {
+    error(res, '派送员不存在', 404);
+    return;
+  }
+  if (deliveryman.status !== 'active') {
+    error(res, '该派送员当前不可用');
+    return;
+  }
+
+  const result = orderModel.assignDeliveryman(order.id, deliverymanId);
+  console.log(`[手动派单] 订单 ${order.order_no} 已分配给派送员 ${deliveryman.name}(${deliveryman.phone})`);
+  success(res, result, `已分配给派送员 ${deliveryman.name}`);
+}
+
 // ============ 合利宝终端信息 ============
 
 /** 获取合利宝终端信息（密钥脱敏） */

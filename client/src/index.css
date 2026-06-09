@@ -66,3 +66,22 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* iOS safe-area padding — 适配刘海屏 & 底部横条 */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+}
+
+/* 移动端 body 全宽 */
+@media (max-width: 1023px) {
+  body {
+    display: block;
+  }
+  #root {
+    width: 100%;
+  }
+}
