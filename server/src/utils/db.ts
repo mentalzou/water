@@ -294,7 +294,12 @@ function recordMigration(db: Database.Database, version: number, description: st
  */
 function applyMigrations(db: Database.Database): void {
   const currentVersion = getCurrentVersion(db);
-  console.log(`[Migration] 当前数据库版本: v${currentVersion}`);
+  const LATEST_VERSION = 20;
+
+  // 已达最新版本，无需迁移，静默返回（避免每次启动都刷日志）
+  if (currentVersion >= LATEST_VERSION) return;
+
+  console.log(`[Migration] 当前数据库版本: v${currentVersion}，最新版本: v${LATEST_VERSION}`);
 
   // === v1: brands 表 + category_id 字段 ===
   if (currentVersion < 1) {
