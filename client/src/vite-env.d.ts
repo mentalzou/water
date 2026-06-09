@@ -1,11 +1,16 @@
+/// <reference types="vite/client" />
+
 interface ImportMetaEnv {
   readonly VITE_WECHAT_APP_ID: string;
+  readonly VITE_API_URL: string;
+  readonly VITE_API_BASE: string;
 }
+
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-// ΢�� JS-SDK ȫ����������
+// 微信 JS-SDK 全局类型声明
 interface WeixinJSBridgeInvokeResult {
     err_msg: string;
     [key: string]: any;
