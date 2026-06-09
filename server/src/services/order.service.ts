@@ -27,6 +27,8 @@ export function createCustomerOrder(data: {
   distributor_id?: string;
   user_id?: string;
   pay_method?: 'online' | 'balance';
+  delivery_date?: string;
+  delivery_time?: string;
 }): CreateOrderResult | null {
   // 验证所有商品并计算总金额
   let totalAmount = 0;
@@ -168,6 +170,8 @@ export function createCustomerOrder(data: {
     pay_method: payMethod,
     from_balance: fromBalance,
     from_bonus: fromBonus,
+    delivery_date: data.delivery_date || '',
+    delivery_time: data.delivery_time || '',
   });
 
   return { order };

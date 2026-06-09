@@ -406,6 +406,67 @@ export function listAllOrders(req: Request, res: Response): void {
   paginated(res, data, page, pageSize, total);
 }
 
+// ============ 订单导出（CSV） ============
+export function exportOrders(req: Request, res: Response): void {
+  const status = req.query.status ? str(req.query.status) : undefined;
+  const options: { keyword?: string; address?: string; distributor_id?: string; deliveryman_id?: string } = {};
+  if (req.query.keyword) options.keyword = str(req.query.keyword);
+  if (req.query.address) options.address = str(req.query.address);
+  if (req.query.distributor_id) options.distributor_id = str(req.query.distributor_id);
+  if (req.query.deliveryman_id) options.deliveryman_id = str(req.query.deliveryman_id);
+
+  const orders = orderModel.findAllNoPaginate(status, options);
+
+  const payMethodMap: Record<string, string> = { online: '在线支付', balance: '账户余额', mixed: '混合支付' };
+  const statusMap: Record<string, string> = {
+    pending: '待支付', paid: '已付款', pending_delivery: '待派送', refunding: '退款中',
+    refunded: '已退款', assigned: '待配送', delivering: '配送中', completed: '已完成',
+  };
+
+  // 生成 CSV（BOM + UTF-8）
+  const BOM = '\uFEFF';
+  const headers = ['订单号', '客户', '手机号', '收货地址', '预约时间', '商品明细',
+    '金额', '支付方式', '分销商', '派送员', '状态', '下单时间'];
+  const csvEscape = (v: string) => {
+    const s = String(v ?? '');
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+
+  const rows = orders.map(o => {
+    const productDetail = (o.items && o.items.length > 0)
+      ? o.items.map((it: any) => `${it.product_name} ×${it.quantity}${it.unit || ''} ￥${Number(it.unit_price || 0).toFixed(2)}`).join('; ')
+      : '-';
+
+    const appointment = [o.delivery_date, o.delivery_time].filter(Boolean).join(' ') || '-';
+
+    return [
+      o.order_no,
+      o.customer_name,
+      o.customer_phone,
+      o.address,
+      appointment,
+      productDetail,
+      `¥${Number(o.total_amount || 0).toFixed(2)}`,
+      payMethodMap[o.pay_method || ''] || o.pay_method || '-',
+      (o as any).distributor_name || '-',
+      (o as any).deliveryman_name || '-',
+      statusMap[o.status] || o.status,
+      o.created_at || '-',
+    ].map(csvEscape).join(',');
+  });
+
+  const csv = BOM + [headers.join(','), ...rows].join('\n');
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const filename = `order_export_${timestamp}.csv`;
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csv);
+}
+
 // ============ 订单交易查询（向合利宝查询交易状态） ============
 export async function queryOrderPayment(req: Request, res: Response): Promise<void> {
   const id = str(req.params.id);

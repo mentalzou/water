@@ -117,7 +117,17 @@ export default function ConfirmOrderPage() {
   // const finalAmount = totalAmount - couponAmount;
   const finalAmount = orderData?.totalAmount || 0;
 
-  async function handleSubmit() {
+  /** 将展示用的日期文本转为实际日期字符串 YYYY-MM-DD */
+function resolveDeliveryDate(raw: string): string {
+  if (raw === '明天') {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+  return raw;
+}
+
+async function handleSubmit() {
     if (!selectedAddress && !contactPhone) {
       alert('请选择收货地址或填写联系电话');
       return;
@@ -160,6 +170,8 @@ export default function ConfirmOrderPage() {
         items: orderItems,
         distributor_code: orderData.distributorCode || undefined,
         pay_method: payMethod,
+        delivery_date: resolveDeliveryDate(deliveryDate),
+        delivery_time: deliveryTime,
       });
 
       if (!orderRes.data?.id) {

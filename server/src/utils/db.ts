@@ -711,6 +711,21 @@ function applyMigrations(db: Database.Database): void {
     });
     txn();
   }
+
+  // === v18: orders 增加预约时间字段 ===
+  if (currentVersion < 18) {
+    const txn = db.transaction(() => {
+      const cols = db.prepare('PRAGMA table_info(orders)').all() as any[];
+      if (!cols.some((c: any) => c.name === 'delivery_date')) {
+        db.exec("ALTER TABLE orders ADD COLUMN delivery_date TEXT DEFAULT ''");
+      }
+      if (!cols.some((c: any) => c.name === 'delivery_time')) {
+        db.exec("ALTER TABLE orders ADD COLUMN delivery_time TEXT DEFAULT ''");
+      }
+      recordMigration(db, 18, 'orders 新增预约时间 delivery_date / delivery_time');
+    });
+    txn();
+  }
 }
 
 /** 将旧订单数据迁移到 order_items 表 */

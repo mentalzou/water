@@ -118,6 +118,8 @@ export interface Order {
   from_bonus: number;
   transaction_id?: string;
   remark?: string;
+  delivery_date?: string;
+  delivery_time?: string;
   created_at: string;
   updated_at: string;
   paid_at?: string;

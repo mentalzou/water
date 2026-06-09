@@ -249,7 +249,14 @@ export function getProducts(_req: Request, res: Response): void {
 
 // ============ Orders ============
 export function createOrder(req: Request, res: Response): void {
-  const { customer_phone, customer_name, address, items, distributor_code, pay_method } = req.body;
+  let { customer_phone, customer_name, address, items, distributor_code, pay_method, delivery_date, delivery_time } = req.body;
+
+  // 将"明天"转为系统日期 +1 天，避免存储文字
+  if (delivery_date === '明天') {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    delivery_date = d.toISOString().slice(0, 10);
+  }
   
   // 验证必填字段
   if (!customer_phone || !address) {
@@ -285,7 +292,7 @@ export function createOrder(req: Request, res: Response): void {
     return;
   }
 
-  // 创建订单（支持多商品 + 支付方式）
+  // 创建订单（支持多商品 + 支付方式 + 预约时间）
   const result = createCustomerOrder({
     customer_phone,
     customer_name: customer_name || '',
@@ -294,6 +301,8 @@ export function createOrder(req: Request, res: Response): void {
     distributor_id: distributorId,
     user_id: userId,
     pay_method: payMethod,
+    delivery_date: delivery_date || '',
+    delivery_time: delivery_time || '',
   });
 
   if (!result) {

@@ -24,6 +24,8 @@ export const orderModel = {
     pay_method?: string;
     from_balance?: number;
     from_bonus?: number;
+    delivery_date?: string;
+    delivery_time?: string;
     items: Array<{
       product_id: string;
       product_name: string;
@@ -37,8 +39,8 @@ export const orderModel = {
     
     // 创建订单主表记录（不含商品信息）
     db.prepare(
-      `INSERT INTO orders (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, distributor_commission, pay_method, from_balance, from_bonus)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO orders (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, distributor_commission, pay_method, from_balance, from_bonus, delivery_date, delivery_time)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id, order_no,
       data.customer_phone, data.customer_name, data.address,
@@ -46,7 +48,9 @@ export const orderModel = {
       data.distributor_id || null, data.distributor_commission || 0,
       data.pay_method || 'online',
       data.from_balance || 0,
-      data.from_bonus || 0
+      data.from_bonus || 0,
+      data.delivery_date || '',
+      data.delivery_time || ''
     );
 
     // 创建订单商品明细
@@ -185,6 +189,49 @@ export const orderModel = {
     }));
     
     return { data: data as any, total };
+  },
+
+  /** 导出报表：不分页，返回所有匹配的订单（含商品明细 + 分销商/派送员名称） */
+  findAllNoPaginate(
+    status?: string,
+    options?: { keyword?: string; address?: string; distributor_id?: string; deliveryman_id?: string }
+  ): (Order & { items?: any[]; distributor_name?: string; deliveryman_name?: string })[] {
+    let sql = `SELECT o.*,
+      d_user.name as distributor_name,
+      dm.name as deliveryman_name
+      FROM orders o
+      LEFT JOIN distributors d ON o.distributor_id = d.id
+      LEFT JOIN users d_user ON d.user_id = d_user.id
+      LEFT JOIN deliverymen dm ON o.deliveryman_id = dm.id
+      WHERE 1=1`;
+    const params: any[] = [];
+    if (status) {
+      sql += ' AND o.status = ?';
+      params.push(status);
+    }
+    if (options?.keyword) {
+      sql += " AND (o.order_no LIKE ? OR o.customer_name LIKE ? OR o.customer_phone LIKE ?)";
+      const kw = `%${options.keyword}%`;
+      params.push(kw, kw, kw);
+    }
+    if (options?.address) {
+      sql += ' AND o.address LIKE ?';
+      params.push(`%${options.address}%`);
+    }
+    if (options?.distributor_id) {
+      sql += ' AND o.distributor_id = ?';
+      params.push(options.distributor_id);
+    }
+    if (options?.deliveryman_id) {
+      sql += ' AND o.deliveryman_id = ?';
+      params.push(options.deliveryman_id);
+    }
+    sql += ' ORDER BY o.created_at DESC';
+    const rows = db.prepare(sql).all(params) as any[];
+    return rows.map((row: any) => ({
+      ...row,
+      items: this.getOrderItems(row.id),
+    }));
   },
 
   updateStatus(id: string, status: Order['status']): Order | undefined {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Package, Eye, RefreshCw, Undo2, SearchCheck, UserCheck } from 'lucide-react';
+import { Search, Package, Eye, RefreshCw, Undo2, SearchCheck, UserCheck, Download } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -16,6 +16,12 @@ const statusMap: Record<string, { label: string; color: string }> = {
   assigned: { label: '待配送', color: 'bg-orange-100 text-orange-700' },
   delivering: { label: '配送中', color: 'bg-indigo-100 text-indigo-700' },
   completed: { label: '已完成', color: 'bg-green-100 text-green-700' },
+};
+
+const payMethodMap: Record<string, string> = {
+  online: '在线支付',
+  balance: '账户余额',
+  mixed: '混合支付',
 };
 
 export default function OrderManage() {
@@ -46,6 +52,7 @@ export default function OrderManage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(20);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -77,6 +84,44 @@ export default function OrderManage() {
       console.error('[加载订单]', e);
     } finally {
       setLoading(false);
+    }
+  }
+
+  /** 按当前筛选条件导出 CSV */
+  async function exportOrders() {
+    try {
+      setExporting(true);
+      const token = getToken();
+      const params = new URLSearchParams();
+      if (statusFilter) params.set('status', statusFilter);
+      if (distributorFilter) params.set('distributor_id', distributorFilter);
+      if (deliverymanFilter) params.set('deliveryman_id', deliverymanFilter);
+      if (search.trim()) params.set('keyword', search.trim());
+      if (addressSearch.trim()) params.set('address', addressSearch.trim());
+
+      const res = await fetch(`${API_BASE}/admin/orders/export?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        alert('导出失败，请重试');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // 从 Content-Disposition 头取文件名，兼容后端动态命名
+      const disposition = res.headers.get('Content-Disposition');
+      const match = disposition?.match(/filename="?([^";]+)"?/);
+      a.download = match?.[1] || `order_export_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert('导出失败: ' + (e.message || '网络错误'));
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -299,28 +344,54 @@ export default function OrderManage() {
             <option value="delivering">配送中</option>
             <option value="completed">已完成</option>
           </select>
+          {/* 导出按钮 */}
+          <button
+            onClick={exportOrders}
+            disabled={exporting}
+            className="px-5 py-3 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-emerald-200"
+          >
+            {exporting ? (
+              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> 导出中...</>
+            ) : (
+              <><Download className="w-4 h-4" /> 导出报表</>
+            )}
+          </button>
         </div>
 
         {/* Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <table className="w-full">
             <thead><tr className="bg-gray-50/80 border-b border-gray-100">
-              {['订单号','客户','手机号','地址','商品','数量','金额','分销商','派送员','状态','操作'].map(h => (<th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>))}
+              {['订单号','客户','手机号','地址','预约时间','商品明细','金额','支付方式','分销商','派送员','状态','操作'].map(h => (<th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>))}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={11} className="py-16 text-center"><div className="w-8 h-8 border-3 border-water/30 border-t-water rounded-full animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={12} className="py-16 text-center"><div className="w-8 h-8 border-3 border-water/30 border-t-water rounded-full animate-spin mx-auto" /></td></tr>
               ) : orders.length === 0 ? (
-                <tr><td colSpan={11} className="py-16 text-center text-gray-400">暂无订单数据</td></tr>
+                <tr><td colSpan={12} className="py-16 text-center text-gray-400">暂无订单数据</td></tr>
               ) : orders.map(o => (
                 <tr key={o.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-4 py-3.5 text-xs font-mono text-gray-600">{o.order_no}</td>
                   <td className="px-4 py-3.5 text-sm text-gray-800">{o.customer_name}</td>
                   <td className="px-4 py-3.5 text-sm text-gray-500">{o.customer_phone}</td>
                   <td className="px-4 py-3.5 text-xs text-gray-500 max-w-[160px] truncate" title={o.address}>{o.address}</td>
-                  <td className="px-4 py-3.5 text-sm text-gray-700">{(o.items && o.items.length > 0) ? `${o.items.length}种商品` : (o.product_name || o.product?.name || '-')}</td>
-                  <td className="px-4 py-3.5 text-sm text-gray-600">{o.items ? o.items.reduce((s: number, i: any) => s + (i.quantity || 0), 0) : (o.quantity)}</td>
+                  <td className="px-4 py-3.5 text-xs text-gray-600 whitespace-nowrap">
+                    {o.delivery_date || '-'}{(o.delivery_date && o.delivery_time) ? ' ' : ''}{o.delivery_time || ''}
+                  </td>
+                  <td className="px-4 py-3.5 text-xs text-gray-700 max-w-[200px]">
+                    {o.items && o.items.length > 0
+                      ? o.items.map((item: any, i: number) => (
+                          <div key={i} className={i > 0 ? 'mt-1' : ''}>
+                            <span className="font-medium">{item.product_name}</span>
+                            <span className="text-gray-400"> ×{item.quantity}{item.unit || ''}</span>
+                            <span className="text-gray-400 ml-1">¥{Number(item.unit_price || 0).toFixed(2)}</span>
+                          </div>
+                        ))
+                      : (o.product_name || o.product?.name || '-')
+                    }
+                  </td>
                   <td className="px-4 py-3.5 text-sm font-semibold text-gray-800">¥{Number(o.total_amount || o.amount || 0).toFixed(2)}</td>
+                  <td className="px-4 py-3.5 text-sm text-gray-600">{payMethodMap[o.pay_method] || o.pay_method || '-'}</td>
                   <td className="px-4 py-3.5 text-sm text-purple-600">{o.distributor_name || o.distributor?.name || '-'}</td>
                   <td className="px-4 py-3.5 text-sm text-cyan-600">{o.deliveryman_name || o.deliveryman?.name || '-'}</td>
                   <td className="px-4 py-3.5"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusMap[o.status]?.color}`}>{statusMap[o.status]?.label || o.status}</span></td>
@@ -417,7 +488,9 @@ export default function OrderManage() {
                   ['客户姓名', selectedOrder.customer_name],
                   ['联系电话', selectedOrder.customer_phone],
                   ['收货地址', selectedOrder.address],
+                  ['预约时间', [selectedOrder.delivery_date, selectedOrder.delivery_time].filter(Boolean).join(' ') || '-'],
                   ['订单金额', `¥${Number(selectedOrder.total_amount || selectedOrder.amount || 0).toFixed(2)}`],
+                  ['支付方式', payMethodMap[selectedOrder.pay_method] || selectedOrder.pay_method || '-'],
                   ['分销商', selectedOrder.distributor_name || selectedOrder.distributor?.name || '无'],
                   ['派送员', selectedOrder.deliveryman_name || selectedOrder.deliveryman?.name || '未分配'],
                   ['状态', statusMap[selectedOrder.status]?.label || selectedOrder.status],
@@ -428,17 +501,23 @@ export default function OrderManage() {
                   </div>
                 ))}
 
-                {/* 商品信息：支持多商品 */}
+                {/* 商品信息：支持多商品，展示单价 */}
                 {(selectedOrder.items && selectedOrder.items.length > 0) ? (
                   <div className="pt-1 space-y-2">
                     <span className="text-gray-400">商品信息</span>
                     <div className="bg-gray-50 rounded-xl p-3 space-y-2">
                       {selectedOrder.items.map((item: any, i: number) => (
                         <div key={i} className={`flex justify-between items-center text-xs ${i < selectedOrder.items.length - 1 ? 'pb-2 border-b border-dashed border-gray-200' : ''}`}>
-                          <span className="text-gray-700 font-medium truncate max-w-[220px]">{item.product_name || item.product_id || '-'}</span>
-                          <span className="text-gray-500">×{item.quantity} {item.unit || ''}</span>
+                          <span className="text-gray-700 font-medium truncate max-w-[200px]">{item.product_name}</span>
+                          <span className="text-gray-400 whitespace-nowrap">
+                            ×{item.quantity}{item.unit || ''} 单价¥{Number(item.unit_price || 0).toFixed(2)}
+                          </span>
                         </div>
                       ))}
+                      <div className="flex justify-between items-center text-xs pt-2 border-t border-dashed border-gray-200">
+                        <span className="text-gray-400">合计</span>
+                        <span className="font-bold text-gray-800">¥{Number(selectedOrder.total_amount || selectedOrder.amount || 0).toFixed(2)}</span>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -448,7 +527,12 @@ export default function OrderManage() {
                   </div>
                 )}
 
-                <p className="text-xs text-gray-400 pt-1">下单时间：{selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString('zh-CN') : '-'}</p>
+                <div className="pt-2 space-y-1">
+                  <p className="text-xs text-gray-400">下单时间：{selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString('zh-CN') : '-'}</p>
+                  {selectedOrder.paid_at && selectedOrder.paid_at !== 'undefined' && <p className="text-xs text-gray-400">支付时间：{new Date(selectedOrder.paid_at).toLocaleString('zh-CN')}</p>}
+                  {(selectedOrder.assigned_at && selectedOrder.assigned_at !== 'undefined') && <p className="text-xs text-gray-400">派送时间：{new Date(selectedOrder.assigned_at).toLocaleString('zh-CN')}</p>}
+                  {(selectedOrder.delivered_at && selectedOrder.delivered_at !== 'undefined') && <p className="text-xs text-gray-400">送达时间：{new Date(selectedOrder.delivered_at).toLocaleString('zh-CN')}</p>}
+                </div>
               </div>
             </div>
           </div>

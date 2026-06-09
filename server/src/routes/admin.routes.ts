@@ -78,6 +78,7 @@ router.delete('/products/:id', adminController.deleteProduct);
 router.post('/products/upload', adminController.productUpload.single('file'), adminController.uploadProductImage);
 
 // Orders management
+router.get('/orders/export', adminController.exportOrders);
 router.get('/orders', adminController.listAllOrders);
 router.post('/orders/:id/query-payment', adminController.queryOrderPayment);
 router.post('/orders/:id/refund', adminController.refundOrder);
