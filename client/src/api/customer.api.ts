@@ -52,6 +52,8 @@ export const customerApi = {
     quantity?: number;
     distributor_code?: string;
     pay_method?: 'online' | 'balance';
+    delivery_date?: string;
+    delivery_time?: string;
   }) => api.post('/orders', data),
 
   getOrderById: (id: string) => api.get(`/orders/${id}`),

@@ -1,5 +1,3 @@
-/// <reference types="vite/client" />
-// Vite ������������
 interface ImportMetaEnv {
   readonly VITE_WECHAT_APP_ID: string;
 }
@@ -24,3 +22,6 @@ interface WeixinJSBridge {
 }
 
 declare const WeixinJSBridge: WeixinJSBridge;
+
+// qrcode 模块类型声明
+declare module 'qrcode';
