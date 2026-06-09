@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Receipt, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Receipt, TrendingUp, Download } from 'lucide-react';
 import { distributorApi } from '../../api/distributor.api';
 
 export default function CommissionPage() {
@@ -23,6 +23,18 @@ export default function CommissionPage() {
     }).finally(() => setLoading(false));
   }, []);
 
+  function handleExport() {
+    const user = JSON.parse(localStorage.getItem('distributor_user') || '{}');
+    const distributorId = user.distributorId;
+    if (!distributorId) return;
+
+    // 直接通过浏览器下载 CSV
+    const a = document.createElement('a');
+    a.href = distributorApi.exportCommissionsUrl(distributorId);
+    a.download = `commission_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  }
+
   return (
     <div className="min-h-screen bg-primary-50">
       <header className="bg-gradient-to-r from-water-light to-water pt-12 pb-8 px-5 sticky top-0 z-10">
@@ -30,7 +42,13 @@ export default function CommissionPage() {
           <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
             <ArrowLeft className="w-4 h-4 text-white" />
           </button>
-          <h1 className="text-xl font-bold text-white">佣金明细</h1>
+          <h1 className="text-xl font-bold text-white flex-1">佣金明细</h1>
+          <button onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white/20 rounded-xl text-white text-sm font-medium active:bg-white/30 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            导出
+          </button>
         </div>
       </header>
 

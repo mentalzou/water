@@ -21,6 +21,9 @@ const DistributorRecharge = lazy(() => import('./pages/distributor/RechargePage'
 const DistributorShare = lazy(() => import('./pages/distributor/SharePage'))
 const DistributorCommission = lazy(() => import('./pages/distributor/CommissionPage'))
 const DistributorOrderList = lazy(() => import('./pages/distributor/OrderList'))
+{/* 提现与下线功能暂屏蔽 */}
+{/* const DistributorWithdraw = lazy(() => import('./pages/distributor/WithdrawPage'))
+const DistributorDownlines = lazy(() => import('./pages/distributor/DownlinesPage')) */}
 const DeliverymanTaskList = lazy(() => import('./pages/deliveryman/TaskList'))
 const DeliverymanTaskDetail = lazy(() => import('./pages/deliveryman/TaskDetail'))
 const AdminLogin = lazy(() => import('./pages/admin/Login'))
@@ -94,6 +97,9 @@ function AppContent() {
                 <Route path="share" element={<DistributorShare />} />
                 <Route path="commission" element={<DistributorCommission />} />
                 <Route path="orders" element={<DistributorOrderList />} />
+{/* 提现与下线功能暂屏蔽 */}
+                {/* <Route path="withdraw" element={<DistributorWithdraw />} />
+                <Route path="downlines" element={<DistributorDownlines />} /> */}
             </Route>
 
             {/* 派送员端 */}

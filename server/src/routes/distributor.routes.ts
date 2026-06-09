@@ -23,4 +23,12 @@ router.get('/distributors/:code', distributorController.getDistributorInfo);
 router.get('/distributors/:id/commission/summary', distributorController.getCommissionSummary);
 router.get('/distributors/:id/commissions', distributorController.getCommissionRecords);
 
+// 提现与下线功能暂屏蔽
+// router.post('/distributors/:id/withdraw', distributorController.requestWithdraw);
+// router.get('/distributors/:id/withdraws', distributorController.getWithdrawRecords);
+// router.get('/distributors/:id/downlines', distributorController.getDownlines);
+
+// Commission export
+router.get('/distributors/:id/commissions/export', distributorController.exportCommissions);
+
 export default router;

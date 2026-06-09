@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { success, error, paginated } from '../utils/response';
 import { distributorModel } from '../models/distributor.model';
 import { commissionModel } from '../models/commission.model';
+import { withdrawModel } from '../models/withdraw.model';
 import { userModel } from '../models/user.model';
 import { getDb } from '../utils/db';
 import { generateToken } from '../utils/jwt';
@@ -144,4 +145,112 @@ export function getCommissionRecords(req: Request, res: Response): void {
   const pageSize = parseInt(str(req.query.pageSize)) || 20;
   const { data, total } = commissionModel.findByDistributor(distributorId, page, pageSize);
   paginated(res, data, page, pageSize, total);
+}
+
+// ============ 提现管理 ============
+
+/** 申请提现 */
+export function requestWithdraw(req: Request, res: Response): void {
+  const distributorId = str(req.params.id);
+  const amount = parseFloat(str(req.body.amount));
+  const bankName = str(req.body.bank_name);
+  const bankAccount = str(req.body.bank_account);
+  const accountName = str(req.body.account_name);
+
+  if (!amount || amount <= 0) {
+    return error(res, '请输入有效的提现金额');
+  }
+
+  const distributor = distributorModel.findById(distributorId);
+  if (!distributor) return error(res, '分销商不存在', 404);
+
+  if (distributor.available_commission < amount) {
+    return error(res, '可提现余额不足');
+  }
+
+  const wr = withdrawModel.create({
+    distributor_id: distributorId,
+    amount,
+    bank_name: bankName,
+    bank_account: bankAccount,
+    account_name: accountName,
+  });
+
+  success(res, wr, '提现申请已提交');
+}
+
+/** 查询提现记录 */
+export function getWithdrawRecords(req: Request, res: Response): void {
+  const distributorId = str(req.params.id);
+  const page = parseInt(str(req.query.page)) || 1;
+  const pageSize = parseInt(str(req.query.pageSize)) || 20;
+  const { data, total } = withdrawModel.findByDistributor(distributorId, page, pageSize);
+  paginated(res, data, page, pageSize, total);
+}
+
+// ============ 佣金报表导出 ============
+
+/** 导出佣金记录为 CSV */
+export function exportCommissions(req: Request, res: Response): void {
+  const distributorId = str(req.params.id);
+
+  const distributor = distributorModel.findById(distributorId);
+  if (!distributor) {
+    error(res, '分销商不存在', 404);
+    return;
+  }
+
+  // 拉取该分销商所有佣金记录（不分页）
+  const { data } = commissionModel.findByDistributor(distributorId, 1, 99999);
+
+  // 生成 CSV
+  const BOM = '\uFEFF'; // UTF-8 BOM 确保 Excel 正确识别中文
+  const headers = ['序号', '佣金金额', '佣金类型', '佣金比例', '订单金额', '状态', '创建时间'];
+  const statusMap: Record<string, string> = {
+    pending: '待结算',
+    settled: '已结算',
+    cancelled: '已取消',
+  };
+
+  const lines = [headers.join(',')];
+  data.forEach((r: any, i: number) => {
+    const row = [
+      i + 1,
+      r.commission_amount?.toFixed(2) || '0.00',
+      r.commission_type === 'percentage' ? '按比例' : '固定金额',
+      r.commission_type === 'percentage' ? `${r.commission_rate}%` : '-',
+      r.order_amount?.toFixed(2) || '0.00',
+      statusMap[r.status] || r.status,
+      r.created_at || '',
+    ];
+    // CSV 字段包含逗号或引号时需要用引号包裹
+    lines.push(row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','));
+  });
+
+  const csvContent = BOM + lines.join('\n');
+  const filename = `commission_export_${new Date().toISOString().slice(0, 10)}.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csvContent);
+}
+
+// ============ 下线管理 ============
+
+/** 获取分销商的下线客户列表 */
+export function getDownlines(req: Request, res: Response): void {
+  const distributorId = str(req.params.id);
+  const page = parseInt(str(req.query.page)) || 1;
+  const pageSize = parseInt(str(req.query.pageSize)) || 20;
+
+  const distributor = distributorModel.findById(distributorId);
+  if (!distributor) return error(res, '分销商不存在', 404);
+
+  const { data, total } = userModel.findByReferrer(distributorId, page, pageSize);
+  const downlineCount = userModel.countByReferrer(distributorId);
+
+  paginated(res, data, page, pageSize, total);
+  // 额外注入下线总数（不影响分页结构，在响应中补充）
+  // 由于 paginated 是标准格式，无法附加额外字段，这里将 total 信息复用
+  // 前端通过 total 即可获知总数
 }

@@ -112,5 +112,10 @@ router.post('/banners', adBannerController.createBanner);
 router.put('/banners/:id', adBannerController.updateBanner);
 router.delete('/banners/:id', adBannerController.deleteBanner);
 
+// Withdraw Management
+router.get('/withdraws', adminController.listWithdraws);
+router.put('/withdraws/:id/approve', adminController.approveWithdraw);
+router.put('/withdraws/:id/reject', adminController.rejectWithdraw);
+router.put('/withdraws/:id/pay', adminController.payWithdraw);
 
 export default router;

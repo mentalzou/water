@@ -7,6 +7,7 @@ export interface User {
   password_hash?: string;
   points: number;
   status: 'active' | 'inactive' | 'locked';
+  referrer_distributor_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -141,6 +142,22 @@ export interface CommissionRecord {
   status: 'pending' | 'settled' | 'cancelled';
   settled_at?: string;
   created_at: string;
+}
+
+export interface WithdrawRequest {
+  id: string;
+  distributor_id: string;
+  amount: number;
+  bank_name: string;
+  bank_account: string;
+  account_name: string;
+  status: 'pending' | 'approved' | 'rejected' | 'paid';
+  remark: string;
+  reviewed_by: string;
+  reviewed_at: string;
+  created_at: string;
+  distributor_code?: string;
+  distributor_name?: string;
 }
 
 export interface SystemConfig {

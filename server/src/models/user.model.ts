@@ -8,7 +8,7 @@ export const userModel = {
   create(data: Partial<User> & { phone: string }): User {
     const id = uuidv4();
     db.prepare(
-      'INSERT INTO users (id, phone, name, role, password_hash, avatar, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (id, phone, name, role, password_hash, avatar, status, referrer_distributor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       id,
       data.phone,
@@ -16,7 +16,8 @@ export const userModel = {
       data.role || 'customer',
       data.password_hash || '',
       data.avatar || '',
-      data.status || 'active'
+      data.status || 'active',
+      (data as any).referrer_distributor_id || ''
     );
     return this.findById(id)!;
   },
@@ -55,6 +56,24 @@ export const userModel = {
     params.push(pageSize, (page - 1) * pageSize);
     const data = db.prepare(sql).all(...params) as User[];
     return { data, total };
+  },
+
+  /** 查询某分销商的下线客户 */
+  findByReferrer(distributorId: string, page = 1, pageSize = 20): { data: User[]; total: number } {
+    const total = (db.prepare(
+      'SELECT COUNT(*) as count FROM users WHERE referrer_distributor_id = ? AND role = ?'
+    ).get(distributorId, 'customer') as { count: number }).count;
+    const data = db.prepare(
+      'SELECT * FROM users WHERE referrer_distributor_id = ? AND role = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    ).all(distributorId, 'customer', pageSize, (page - 1) * pageSize) as User[];
+    return { data, total };
+  },
+
+  /** 统计某分销商的下线数量 */
+  countByReferrer(distributorId: string): number {
+    return (db.prepare(
+      'SELECT COUNT(*) as count FROM users WHERE referrer_distributor_id = ? AND role = ?'
+    ).get(distributorId, 'customer') as { count: number }).count;
   },
 
   update(id: string, data: Partial<User>): User | undefined {

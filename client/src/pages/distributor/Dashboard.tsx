@@ -81,7 +81,7 @@ export default function DistributorDashboard() {
       {/* Quick Actions */}
       <div>
         <h2 className="text-sm font-semibold text-gray-700 mb-3">快捷入口</h2>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {menuItems.map(({ icon: Icon, label, path, color }) => (
             <button key={path} onClick={() => navigate(path)}
               className="bg-white rounded-xl p-4 flex flex-col items-center gap-2.5 shadow-sm border border-gray-100 hover:shadow-md active:scale-[0.97] transition-all"

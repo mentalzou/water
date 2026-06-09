@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Droplets, ArrowRight, Eye, EyeOff, Phone, UserPlus } from 'lucide-react';
 import api from '../../api/client';
 import { customerApi } from '../../api/customer.api';
+import { useAppStore } from '../../stores/store';
 import {
   isWechat,
   getWechatAppId,
@@ -18,6 +19,7 @@ export default function CustomerLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const submitting = useRef(false);
+  const { distributorCode } = useAppStore();
   const oauthProcessed = useRef(false);
   const [isRegister, setIsRegister] = useState(false);
   const [phone, setPhone] = useState('');
@@ -95,7 +97,7 @@ export default function CustomerLogin() {
     setWechatLoading(true);
     setErrorMsg('');
     try {
-      const res: any = await customerApi.wechatLogin(openId);
+      const res: any = await customerApi.wechatLogin(openId, distributorCode || undefined);
       if (res.code === 200) {
         localStorage.setItem('customer_token', res.data.token);
         localStorage.setItem('customer_user', JSON.stringify(res.data));
@@ -149,6 +151,7 @@ export default function CustomerLogin() {
       const url = isRegister ? '/customers/register' : '/customers/login';
       const body: any = { phone, password };
       if (isRegister && name) body.name = name;
+      if (isRegister && distributorCode) body.distributor_code = distributorCode;
 
       const res: any = await api.post(url, body);
       if (res.code === 200) {

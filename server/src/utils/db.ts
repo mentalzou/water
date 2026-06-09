@@ -726,6 +726,39 @@ function applyMigrations(db: Database.Database): void {
     });
     txn();
   }
+
+  // === v19: users 新增 referrer_distributor_id（推荐分销商绑定） ===
+  if (currentVersion < 19) {
+    const txn = db.transaction(() => {
+      const userCols = db.prepare('PRAGMA table_info(users)').all() as any[];
+      if (!userCols.some((c: any) => c.name === 'referrer_distributor_id')) {
+        db.exec("ALTER TABLE users ADD COLUMN referrer_distributor_id TEXT DEFAULT ''");
+      }
+      recordMigration(db, 19, 'users 新增 referrer_distributor_id 推荐分销商绑定');
+    });
+    txn();
+  }
+
+  // === v20: withdraw_requests 提现申请表 ===
+  if (currentVersion < 20) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS withdraw_requests (
+        id TEXT PRIMARY KEY,
+        distributor_id TEXT NOT NULL REFERENCES distributors(id),
+        amount REAL NOT NULL,
+        bank_name TEXT DEFAULT '',
+        bank_account TEXT DEFAULT '',
+        account_name TEXT DEFAULT '',
+        status TEXT DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','paid')),
+        remark TEXT DEFAULT '',
+        reviewed_by TEXT DEFAULT '',
+        reviewed_at TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 20, 'withdraw_requests 提现申请表');
+    });
+    txn();
+  }
 }
 
 /** 将旧订单数据迁移到 order_items 表 */

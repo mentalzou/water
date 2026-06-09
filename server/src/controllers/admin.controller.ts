@@ -6,6 +6,7 @@ import { deliverymanModel } from '../models/deliveryman.model';
 import { areaModel } from '../models/area.model';
 import { orderModel } from '../models/order.model';
 import { commissionModel } from '../models/commission.model';
+import { withdrawModel } from '../models/withdraw.model';
 import { userModel } from '../models/user.model';
 import { roleModel } from '../models/role.model';
 import { brandModel } from '../models/brand.model';
@@ -738,6 +739,41 @@ export function updateConfig(req: Request, res: Response): void {
   const db = getDb();
   db.prepare("UPDATE system_config SET value = ? WHERE key = ?").run(value, key);
   success(res, null, '配置已更新');
+}
+
+// ============ 提现管理 ============
+
+export function listWithdraws(req: Request, res: Response): void {
+  const page = parseInt(str(req.query.page)) || 1;
+  const pageSize = parseInt(str(req.query.pageSize)) || 20;
+  const status = str(req.query.status) || undefined;
+  const { data, total } = withdrawModel.findAll(page, pageSize, status);
+  paginated(res, data, page, pageSize, total);
+}
+
+export function approveWithdraw(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  const reviewer = (req as any).user?.userId || 'admin';
+  const record = withdrawModel.updateStatus(id, 'approved', reviewer);
+  if (!record) return notFound(res);
+  success(res, record, '审核通过');
+}
+
+export function rejectWithdraw(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  const remark = str(req.body.remark);
+  const reviewer = (req as any).user?.userId || 'admin';
+  const record = withdrawModel.updateStatus(id, 'rejected', reviewer, remark);
+  if (!record) return notFound(res);
+  success(res, record, '已拒绝');
+}
+
+export function payWithdraw(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  const reviewer = (req as any).user?.userId || 'admin';
+  const record = withdrawModel.updateStatus(id, 'paid', reviewer);
+  if (!record) return notFound(res);
+  success(res, record, '已标记为已打款');
 }
 
 // ============ Admin Auth (Login - no auth middleware needed) ============

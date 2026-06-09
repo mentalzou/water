@@ -1,22 +1,41 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Link2, Copy, Check, Share2, QrCode } from 'lucide-react';
+import { ArrowLeft, Link2, Copy, Check, Share2, QrCode, Download } from 'lucide-react';
 import { distributorApi } from '../../api/distributor.api';
+import QRCode from 'qrcode';
 
 export default function SharePage() {
   const navigate = useNavigate();
   const [shareLink, setShareLink] = useState('');
   const [copied, setCopied] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     // 从 localStorage 获取当前登录用户的分销商ID
     const user = JSON.parse(localStorage.getItem('distributor_user') || '{}');
-    const id = user.distributorId || 'demo';  // 使用用户的真实 ID
-    distributorApi.getShareLink(id).then((res: any) => {
-      if (res.code === 200 && res.data?.url) setShareLink(res.data.url);
-      else setShareLink(`${window.location.origin}/?distributor_code=DEMO`);
-    });
+    const code = user.distributorCode || '';
+    const link = code ? `${window.location.origin}/?distributor_code=${code}` : '';
+    if (link) {
+      setShareLink(link);
+      generateQR(link);
+    } else {
+      distributorApi.getShareLink(user.distributorId || '').then((res: any) => {
+        if (res.code === 200 && res.data?.url) {
+          setShareLink(res.data.url);
+          generateQR(res.data.url);
+        }
+      });
+    }
   }, []);
+
+  function generateQR(url: string) {
+    if (!qrCanvasRef.current || !url) return;
+    QRCode.toCanvas(qrCanvasRef.current, url, {
+      width: 200,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+  }
 
   async function handleCopy() {
     await navigator.clipboard.writeText(shareLink);
@@ -52,10 +71,10 @@ export default function SharePage() {
       </header>
 
       <main className="px-4 py-6 space-y-6 pb-8">
-        {/* QR Code placeholder */}
+        {/* QR Code */}
         <div className="bg-white rounded-3xl p-8 shadow-sm flex flex-col items-center">
-          <div className="w-48 h-48 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center mb-4">
-            <QrCode className="w-16 h-16 text-gray-300" />
+          <div className="w-52 h-52 rounded-2xl bg-white border-2 border-gray-100 flex items-center justify-center mb-4 overflow-hidden">
+            <canvas ref={qrCanvasRef} className="w-48 h-48" />
           </div>
           <p className="text-sm text-gray-500">扫描二维码进入购买页面</p>
         </div>

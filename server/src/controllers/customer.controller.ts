@@ -29,6 +29,7 @@ function randomPhoneSuffix(): string {
  */
 export function wechatLogin(req: Request, res: Response): void {
   const openId = String(req.body.openId || '').trim();
+  const distributorCode = String(req.body.distributor_code || '').trim();
 
   if (!openId) {
     error(res, '缺少微信 openId');
@@ -41,6 +42,13 @@ export function wechatLogin(req: Request, res: Response): void {
     return;
   }
 
+  // 解析推荐分销商ID
+  let referrerDistributorId = '';
+  if (distributorCode) {
+    const ref = distributorModel.findByCode(distributorCode);
+    if (ref) referrerDistributorId = ref.id;
+  }
+
   // 1. 查找已绑定该 openId 的用户
   let user = userModel.findByOpenId(openId);
 
@@ -49,6 +57,10 @@ export function wechatLogin(req: Request, res: Response): void {
     if (user.status !== 'active') {
       error(res, '账号已被禁用', 403);
       return;
+    }
+    // 如果之前没有推荐人，现在补上
+    if (!(user as any).referrer_distributor_id && referrerDistributorId) {
+      userModel.update(user.id, { referrer_distributor_id: referrerDistributorId } as any);
     }
   } else {
     // 2. 自动注册新用户（占位手机号，后续可引导绑定）
@@ -60,6 +72,7 @@ export function wechatLogin(req: Request, res: Response): void {
       password_hash: '', // 微信登录无密码
       status: 'active',
       open_id: openId,
+      referrer_distributor_id: referrerDistributorId,
     } as any);
   }
 
@@ -203,6 +216,7 @@ export function customerRegister(req: Request, res: Response): void {
   const phone = String(req.body.phone || '').trim();
   const password = String(req.body.password || '');
   const name = String(req.body.name || '').trim();
+  const distributorCode = String(req.body.distributor_code || '').trim();
 
   if (!phone || !password) {
     error(res, '请输入手机号和密码');
@@ -223,13 +237,21 @@ export function customerRegister(req: Request, res: Response): void {
     return;
   }
 
+  // 解析推荐分销商ID
+  let referrerDistributorId = '';
+  if (distributorCode) {
+    const ref = distributorModel.findByCode(distributorCode);
+    if (ref) referrerDistributorId = ref.id;
+  }
+
   const user = userModel.create({
     phone,
     name: name || '',
     role: 'customer',
     password_hash: hashPassword(password),
     status: 'active',
-  });
+    referrer_distributor_id: referrerDistributorId,
+  } as any);
 
   const token = generateToken({ userId: user.id, role: 'customer' });
   success(res, {
