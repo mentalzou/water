@@ -6,7 +6,8 @@ import { deliverymanModel } from '../models/deliveryman.model';
 import { areaModel } from '../models/area.model';
 import { orderModel } from '../models/order.model';
 import { commissionModel } from '../models/commission.model';
-import { withdrawModel } from '../models/withdraw.model';
+// 提现管理暂屏蔽
+// import { withdrawModel } from '../models/withdraw.model';
 import { userModel } from '../models/user.model';
 import { roleModel } from '../models/role.model';
 import { brandModel } from '../models/brand.model';
@@ -741,8 +742,8 @@ export function updateConfig(req: Request, res: Response): void {
   success(res, null, '配置已更新');
 }
 
-// ============ 提现管理 ============
-
+// ============ 提现管理暂屏蔽 ============
+/*
 export function listWithdraws(req: Request, res: Response): void {
   const page = parseInt(str(req.query.page)) || 1;
   const pageSize = parseInt(str(req.query.pageSize)) || 20;
@@ -775,6 +776,7 @@ export function payWithdraw(req: Request, res: Response): void {
   if (!record) return notFound(res);
   success(res, record, '已标记为已打款');
 }
+*/
 
 // ============ Admin Auth (Login - no auth middleware needed) ============
 export function adminLogin(req: Request, res: Response): void {

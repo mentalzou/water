@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import { success, error, paginated } from '../utils/response';
 import { distributorModel } from '../models/distributor.model';
 import { commissionModel } from '../models/commission.model';
-import { withdrawModel } from '../models/withdraw.model';
+// 提现管理暂屏蔽
+// import { withdrawModel } from '../models/withdraw.model';
 import { userModel } from '../models/user.model';
 import { getDb } from '../utils/db';
 import { generateToken } from '../utils/jwt';
@@ -147,9 +148,9 @@ export function getCommissionRecords(req: Request, res: Response): void {
   paginated(res, data, page, pageSize, total);
 }
 
-// ============ 提现管理 ============
-
-/** 申请提现 */
+// ============ 提现管理暂屏蔽 ============
+/*
+/** 申请提现 * /
 export function requestWithdraw(req: Request, res: Response): void {
   const distributorId = str(req.params.id);
   const amount = parseFloat(str(req.body.amount));
@@ -179,7 +180,7 @@ export function requestWithdraw(req: Request, res: Response): void {
   success(res, wr, '提现申请已提交');
 }
 
-/** 查询提现记录 */
+/** 查询提现记录 * /
 export function getWithdrawRecords(req: Request, res: Response): void {
   const distributorId = str(req.params.id);
   const page = parseInt(str(req.query.page)) || 1;
@@ -187,6 +188,7 @@ export function getWithdrawRecords(req: Request, res: Response): void {
   const { data, total } = withdrawModel.findByDistributor(distributorId, page, pageSize);
   paginated(res, data, page, pageSize, total);
 }
+*/
 
 // ============ 佣金报表导出 ============
 
