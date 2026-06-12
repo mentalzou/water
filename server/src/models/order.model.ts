@@ -151,36 +151,41 @@ export const orderModel = {
     pageSize = 20,
     status?: string,
     options?: { keyword?: string; address?: string; distributor_id?: string; deliveryman_id?: string }
-  ): { data: (Order & { items?: any[]; product?: any; distributor?: any; deliveryman?: any })[]; total: number } {
-    let sql = 'SELECT o.* FROM orders o WHERE 1=1';
+  ): { data: (Order & { items?: any[]; product?: any; distributor?: any; deliveryman?: any; distributor_name?: string; deliveryman_name?: string })[]; total: number } {
+    let where = ' WHERE 1=1';
     const params: any[] = [];
     if (status) {
-      sql += ' AND o.status = ?';
+      where += ' AND o.status = ?';
       params.push(status);
     }
     if (options?.keyword) {
-      sql += " AND (o.order_no LIKE ? OR o.customer_name LIKE ? OR o.customer_phone LIKE ?)";
+      where += " AND (o.order_no LIKE ? OR o.customer_name LIKE ? OR o.customer_phone LIKE ?)";
       const kw = `%${options.keyword}%`;
       params.push(kw, kw, kw);
     }
     if (options?.address) {
-      sql += ' AND o.address LIKE ?';
+      where += ' AND o.address LIKE ?';
       params.push(`%${options.address}%`);
     }
     if (options?.distributor_id) {
-      sql += ' AND o.distributor_id = ?';
+      where += ' AND o.distributor_id = ?';
       params.push(options.distributor_id);
     }
     if (options?.deliveryman_id) {
-      sql += ' AND o.deliveryman_id = ?';
+      where += ' AND o.deliveryman_id = ?';
       params.push(options.deliveryman_id);
     }
-    const countSql = sql.replace(/ORDER BY.*$/, '').replace('SELECT o.*', 'SELECT COUNT(*) as count')
-      .replace(/LIMIT \? OFFSET \?$/, '');
+    const countSql = `SELECT COUNT(*) as count FROM orders o${where}`;
     const total = (db.prepare(countSql).get(...params) as { count: number }).count;
-    sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
+    const dataSql = `SELECT o.*, du.name as distributor_name, dm.name as deliveryman_name
+      FROM orders o
+      LEFT JOIN distributors d ON o.distributor_id = d.id
+      LEFT JOIN users du ON d.user_id = du.id
+      LEFT JOIN deliverymen dm ON o.deliveryman_id = dm.id
+      ${where}
+      ORDER BY o.created_at DESC LIMIT ? OFFSET ?`;
     params.push(pageSize, (page - 1) * pageSize);
-    const rows = db.prepare(sql).all(params) as any[];
+    const rows = db.prepare(dataSql).all(params) as any[];
     
     // 为每个订单查询商品明细
     const data = rows.map((row: any) => ({
@@ -250,10 +255,17 @@ export const orderModel = {
   },
 
   assignDeliveryman(orderId: string, deliverymanId: string): Order | undefined {
-    db.prepare("UPDATE orders SET deliveryman_id = ?, status = 'assigned', assigned_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+    const info = db.prepare("UPDATE orders SET deliveryman_id = ?, status = 'assigned', assigned_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
       .run(deliverymanId, orderId);
+    console.log(`[派单] 订单 ${orderId} 派单结果: changes=${info.changes}, deliveryman=${deliverymanId}`);
+    if (info.changes === 0) {
+      console.error(`[派单] 订单 ${orderId} 未找到或条件不匹配！`);
+      return undefined;
+    }
     db.prepare('UPDATE deliverymen SET total_orders = total_orders + 1 WHERE id = ?').run(deliverymanId);
-    return this.findById(orderId);
+    const updated = this.findById(orderId);
+    console.log(`[派单] 订单 ${orderId} 更新后数据库状态:`, updated?.status, updated?.deliveryman_id);
+    return updated;
   },
 
   markPaid(id: string, transactionId: string): Order | undefined {

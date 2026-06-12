@@ -18,6 +18,25 @@ adminApi.interceptors.request.use((config) => {
 adminApi.interceptors.response.use(
   (response: any) => response.data,
   (error: any) => {
+    const status = error.response?.status;
+    // 401 / 403 → token 过期，清除凭证并跳转登录页
+    if (status === 401 || status === 403) {
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_user');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/admin/login';
+      }
+      return Promise.reject(new Error('登录已过期，请重新登录'));
+    }
+    // 业务 code 401
+    if (error.response?.data?.code === 401) {
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_user');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/admin/login';
+      }
+      return Promise.reject(new Error('登录已过期，请重新登录'));
+    }
     const message = error.response?.data?.message || '网络请求失败';
     return Promise.reject(new Error(message));
   }

@@ -5,8 +5,7 @@ import {
   ShoppingBag, ArrowRightLeft, MapPin, Settings,
   Shield, UserCog, LogOut, Tag, FolderOpen, CreditCard, Image
 } from 'lucide-react';
-
-const API_BASE = '/api';
+import { apiFetch } from '../utils/apiFetch';
 
 function getToken(): string {
   return localStorage.getItem('admin_token') || '';
@@ -78,12 +77,11 @@ export default function AdminLayout() {
     async function fetchProfile() {
       try {
         const token = getToken();
-        if (!token) return;
-        const res = await fetch(`${API_BASE}/admin/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then(r => r.text()).then(text => {
-          try { return JSON.parse(text); } catch { return null; }
-        });
+        if (!token) {
+          navigate('/admin/login', { replace: true });
+          return;
+        }
+        const res = await apiFetch('/api/admin/profile', { tokenKey: 'admin_token' });
         if (res && res.code === 200) {
           localStorage.setItem('admin_user', JSON.stringify(res.data));
           setPermissions(res.data.permissions || []);
@@ -99,7 +97,12 @@ export default function AdminLayout() {
             navigate(firstVisible.path, { replace: true });
           }
         }
-      } catch { /* ignore */ }
+      } catch (e: any) {
+        // token 过期已在 apiFetch 中处理跳转，此处无需额外操作
+        if (e.message !== '登录已过期，请重新登录') {
+          console.error('[AdminLayout] 获取用户信息失败:', e);
+        }
+      }
     }
     fetchProfile();
   }, []);

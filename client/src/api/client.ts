@@ -18,6 +18,22 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    const status = error.response?.status;
+    // 401 / 403 → token 过期，清除凭证并跳转登录页
+    if (status === 401 || status === 403) {
+      localStorage.removeItem('customer_token');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      return Promise.reject(new Error('登录已过期，请重新登录'));
+    }
+    if (error.response?.data?.code === 401) {
+      localStorage.removeItem('customer_token');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      return Promise.reject(new Error('登录已过期，请重新登录'));
+    }
     const message = error.response?.data?.message || '网络请求失败';
     console.error('[API Error]', message);
     return Promise.reject(new Error(message));

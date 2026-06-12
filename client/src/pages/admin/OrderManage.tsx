@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Search, Package, Eye, RefreshCw, Undo2, SearchCheck, UserCheck, Download } from 'lucide-react';
+import { apiFetch } from '../../utils/apiFetch';
 
 const API_BASE = '/api';
-
-function getToken(): string {
-  return localStorage.getItem('admin_token') || '';
-}
 
 const statusMap: Record<string, { label: string; color: string }> = {
   pending: { label: '待支付', color: 'bg-gray-100 text-gray-700' },
@@ -63,25 +60,22 @@ export default function OrderManage() {
   async function loadOrders() {
     try {
       setLoading(true);
-      const token = getToken();
-      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), _t: String(Date.now()) });
       if (statusFilter) params.set('status', statusFilter);
       if (distributorFilter) params.set('distributor_id', distributorFilter);
       if (deliverymanFilter) params.set('deliveryman_id', deliverymanFilter);
       if (search.trim()) params.set('keyword', search.trim());
       if (addressSearch.trim()) params.set('address', addressSearch.trim());
 
-      const res: any = await fetch(`${API_BASE}/admin/orders?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(r => r.text()).then(text => {
-        try { return JSON.parse(text); } catch { return null; }
-      });
+      const res = await apiFetch(`${API_BASE}/admin/orders?${params}`);
       if (res && res.code === 200) {
         setOrders(res.data?.data || res.data || []);
         setTotal(res.pagination?.total || 0);
       }
-    } catch (e) {
-      console.error('[加载订单]', e);
+    } catch (e: any) {
+      if (e.message !== '登录已过期，请重新登录') {
+        console.error('[加载订单]', e);
+      }
     } finally {
       setLoading(false);
     }
@@ -91,7 +85,6 @@ export default function OrderManage() {
   async function exportOrders() {
     try {
       setExporting(true);
-      const token = getToken();
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
       if (distributorFilter) params.set('distributor_id', distributorFilter);
@@ -99,9 +92,7 @@ export default function OrderManage() {
       if (search.trim()) params.set('keyword', search.trim());
       if (addressSearch.trim()) params.set('address', addressSearch.trim());
 
-      const res = await fetch(`${API_BASE}/admin/orders/export?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res: Response = await apiFetch(`${API_BASE}/admin/orders/export?${params}`, { rawResponse: true });
       if (!res.ok) {
         alert('导出失败，请重试');
         return;
@@ -119,7 +110,9 @@ export default function OrderManage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      alert('导出失败: ' + (e.message || '网络错误'));
+      if (e.message !== '登录已过期，请重新登录') {
+        alert('导出失败: ' + (e.message || '网络错误'));
+      }
     } finally {
       setExporting(false);
     }
@@ -127,12 +120,7 @@ export default function OrderManage() {
 
   async function loadDistributors() {
     try {
-      const token = getToken();
-      const res: any = await fetch(`${API_BASE}/admin/distributors`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(r => r.text()).then(text => {
-        try { return JSON.parse(text); } catch { return null; }
-      });
+      const res = await apiFetch(`${API_BASE}/admin/distributors`);
       if (res && res.code === 200 && Array.isArray(res.data)) {
         setDistributors((res.data.data || res.data).map((d: any) => ({
           id: d.id,
@@ -145,12 +133,7 @@ export default function OrderManage() {
 
   async function loadDeliverymen() {
     try {
-      const token = getToken();
-      const res: any = await fetch(`${API_BASE}/admin/deliverymen`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(r => r.text()).then(text => {
-        try { return JSON.parse(text); } catch { return null; }
-      });
+      const res = await apiFetch(`${API_BASE}/admin/deliverymen`);
       if (res && res.code === 200 && Array.isArray(res.data)) {
         setDeliverymen((res.data.data || res.data).map((d: any) => ({ id: d.id, name: d.name })));
       }
@@ -159,18 +142,9 @@ export default function OrderManage() {
 
   /** 向合利宝查询退款状态 */
   async function queryRefund(order: any) {
-    const token = getToken();
     setRefundQueryingOrders(prev => new Set(prev).add(order.id));
     try {
-      const res: any = await fetch(`${API_BASE}/admin/orders/${order.id}/query-refund`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      }).then(r => r.text()).then(text => {
-        try { return JSON.parse(text); } catch { return null; }
-      });
+      const res = await apiFetch(`${API_BASE}/admin/orders/${order.id}/query-refund`, { method: 'POST' });
       if (res && res.code === 200) {
         alert(res.data?.message || res.message || '查询完成');
         if (res.data?.localStatus === 'refunded') {
@@ -180,7 +154,9 @@ export default function OrderManage() {
         alert(res?.message || '退款查询失败');
       }
     } catch (e: any) {
-      alert('退款查询失败: ' + (e.message || '网络错误'));
+      if (e.message !== '登录已过期，请重新登录') {
+        alert('退款查询失败: ' + (e.message || '网络错误'));
+      }
     } finally {
       setRefundQueryingOrders(prev => {
         const next = new Set(prev);
@@ -194,18 +170,9 @@ export default function OrderManage() {
   async function requestRefund(order: any) {
     if (!confirm(`确定要对该订单发起退款吗？\n\n订单号：${order.order_no}\n金额：¥${Number(order.total_amount || 0).toFixed(2)}\n\n退款请求提交后将不可撤销。`)) return;
 
-    const token = getToken();
     setRefundingOrders(prev => new Set(prev).add(order.id));
     try {
-      const res: any = await fetch(`${API_BASE}/admin/orders/${order.id}/refund`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      }).then(r => r.text()).then(text => {
-        try { return JSON.parse(text); } catch { return null; }
-      });
+      const res = await apiFetch(`${API_BASE}/admin/orders/${order.id}/refund`, { method: 'POST' });
       if (res && res.code === 200) {
         alert(res.data?.message || res.message || '退款请求已提交');
         loadOrders();
@@ -213,7 +180,9 @@ export default function OrderManage() {
         alert(res?.message || '退款请求失败');
       }
     } catch (e: any) {
-      alert('退款请求失败: ' + (e.message || '网络错误'));
+      if (e.message !== '登录已过期，请重新登录') {
+        alert('退款请求失败: ' + (e.message || '网络错误'));
+      }
     } finally {
       setRefundingOrders(prev => {
         const next = new Set(prev);
@@ -225,18 +194,9 @@ export default function OrderManage() {
 
   /** 向合利宝查询交易状态 */
   async function queryPayment(order: any) {
-    const token = getToken();
     setQueryingOrders(prev => new Set(prev).add(order.id));
     try {
-      const res: any = await fetch(`${API_BASE}/admin/orders/${order.id}/query-payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      }).then(r => r.text()).then(text => {
-        try { return JSON.parse(text); } catch { return null; }
-      });
+      const res = await apiFetch(`${API_BASE}/admin/orders/${order.id}/query-payment`, { method: 'POST' });
       if (res && res.code === 200) {
         alert(res.data?.message || res.message || '查询完成');
         // 如果支付成功，刷新列表
@@ -247,7 +207,9 @@ export default function OrderManage() {
         alert(res?.message || '查询失败');
       }
     } catch (e: any) {
-      alert('查询失败: ' + (e.message || '网络错误'));
+      if (e.message !== '登录已过期，请重新登录') {
+        alert('查询失败: ' + (e.message || '网络错误'));
+      }
     } finally {
       setQueryingOrders(prev => {
         const next = new Set(prev);
@@ -259,33 +221,34 @@ export default function OrderManage() {
 
   /** 手动分配派送员 */
   async function assignDeliveryman(orderId: string) {
-    const token = getToken();
     if (!selectedDeliverymanId) {
       alert('请选择派送员');
       return;
     }
     setAssigningOrders(prev => new Set(prev).add(orderId));
     try {
-      const res: any = await fetch(`${API_BASE}/admin/orders/${orderId}/assign-deliveryman`, {
+      const res = await apiFetch(`${API_BASE}/admin/orders/${orderId}/assign-deliveryman`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ deliveryman_id: selectedDeliverymanId }),
-      }).then(r => r.text()).then(text => {
-        try { return JSON.parse(text); } catch { return null; }
       });
+      console.log('[分配派送员] 响应:', res);
       if (res && res.code === 200) {
         alert(res.message || '分配成功');
         setAssignModal(null);
         setSelectedDeliverymanId('');
+        // 如果当前筛选导致订单不可见，重置筛选条件
+        if (statusFilter && (res.data?.status || '') !== statusFilter) {
+          setStatusFilter('');
+          setPage(1);
+        }
         loadOrders();
       } else {
         alert(res?.message || '分配失败');
       }
     } catch (e: any) {
-      alert('分配失败: ' + (e.message || '网络错误'));
+      if (e.message !== '登录已过期，请重新登录') {
+        alert('分配失败: ' + (e.message || '网络错误'));
+      }
     } finally {
       setAssigningOrders(prev => {
         const next = new Set(prev);
@@ -476,11 +439,11 @@ export default function OrderManage() {
 
         {/* Detail Modal */}
         {selectedOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedOrder(null)}>
-            <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="flex justify-between items-start mb-5">
+          <div className="fixed inset-0 z-50 flex items-start justify-center py-6 px-4 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={() => setSelectedOrder(null)}>
+            <div className="bg-white rounded-2xl w-full max-w-lg max-h-[95vh] overflow-y-auto p-6 shadow-2xl my-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-5 sticky top-0 bg-white z-10 -mx-2 px-2 py-1">
                 <div><h2 className="font-bold text-lg text-gray-800">订单详情</h2><p className="text-xs text-gray-400 font-mono mt-0.5">{selectedOrder.order_no}</p></div>
-                <button onClick={() => setSelectedOrder(null)} className="p-1 hover:bg-gray-100 rounded-lg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+                <button onClick={() => setSelectedOrder(null)} className="p-1 hover:bg-gray-100 rounded-lg flex-shrink-0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
               </div>
               <div className="space-y-3 text-sm">
                 {/* 基本信息 */}
@@ -540,9 +503,9 @@ export default function OrderManage() {
 
         {/* Assign Deliveryman Modal */}
         {assignModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setAssignModal(null)}>
-            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="flex justify-between items-start mb-5">
+          <div className="fixed inset-0 z-50 flex items-start justify-center py-6 px-4 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={() => setAssignModal(null)}>
+            <div className="bg-white rounded-2xl w-full max-w-md max-h-[95vh] overflow-y-auto p-6 shadow-2xl my-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-5 sticky top-0 bg-white z-10 -mx-2 px-2 py-1">
                 <div>
                   <h2 className="font-bold text-lg text-gray-800">分配派送员</h2>
                   <p className="text-xs text-gray-400 font-mono mt-0.5">{assignModal.orderNo}</p>
@@ -550,7 +513,7 @@ export default function OrderManage() {
                     <p className="text-xs text-orange-500 mt-1">当前派送员：{assignModal.currentDeliverymanName}（可重新分配）</p>
                   )}
                 </div>
-                <button onClick={() => setAssignModal(null)} className="p-1 hover:bg-gray-100 rounded-lg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+                <button onClick={() => setAssignModal(null)} className="p-1 hover:bg-gray-100 rounded-lg flex-shrink-0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
               </div>
               <div className="space-y-4">
                 <select
