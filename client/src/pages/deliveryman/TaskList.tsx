@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Package, CheckCircle2, Clock, MapPin, Phone, Sparkles, TrendingUp, ClipboardList } from 'lucide-react';
+import { Truck, Package, CheckCircle2, Clock, MapPin, Phone, Sparkles, TrendingUp, ClipboardList, Navigation, CircleCheck } from 'lucide-react';
+import { apiFetch } from '../../utils/apiFetch';
 
 const API_BASE = '/api';
 
@@ -33,6 +34,7 @@ export default function TaskList() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('assigned');
+  const [actingIds, setActingIds] = useState<Set<string>>(new Set());
 
   async function loadTasks() {
     if (!dmId) return;
@@ -50,6 +52,40 @@ export default function TaskList() {
   }
 
   useEffect(() => { loadTasks(); }, [activeTab]);
+
+  /** 开始配送 */
+  async function handleStartDelivery(taskId: string) {
+    setActingIds(prev => new Set(prev).add(taskId));
+    try {
+      const res = await apiFetch(`${API_BASE}/tasks/${taskId}/accept`, {
+        method: 'POST',
+        tokenKey: 'deliveryman_token',
+      });
+      if (res && res.code === 200) {
+        loadTasks();
+      }
+    } catch { /* handled by apiFetch */ }
+    finally {
+      setActingIds(prev => { const next = new Set(prev); next.delete(taskId); return next; });
+    }
+  }
+
+  /** 确认送达 */
+  async function handleComplete(taskId: string) {
+    setActingIds(prev => new Set(prev).add(taskId));
+    try {
+      const res = await apiFetch(`${API_BASE}/tasks/${taskId}/complete`, {
+        method: 'POST',
+        tokenKey: 'deliveryman_token',
+      });
+      if (res && res.code === 200) {
+        loadTasks();
+      }
+    } catch { /* handled by apiFetch */ }
+    finally {
+      setActingIds(prev => { const next = new Set(prev); next.delete(taskId); return next; });
+    }
+  }
 
   const tabs = [
     { key: 'assigned',   label: '待配送', count: summary?.pending || 0     },
@@ -174,6 +210,40 @@ export default function TaskList() {
                   <span className="text-gray-600 text-sm">{task.customer_phone}</span>
                 </div>
               </div>
+
+              {/* 操作按钮 */}
+              {task.status === 'assigned' && (
+                <div className="mb-3">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleStartDelivery(task.id); }}
+                    disabled={actingIds.has(task.id)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-sm font-semibold shadow-md shadow-teal-200/40 active:scale-[0.98] transition-transform disabled:opacity-50"
+                  >
+                    {actingIds.has(task.id) ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Navigation className="w-4 h-4" />
+                    )}
+                    开始配送
+                  </button>
+                </div>
+              )}
+              {task.status === 'delivering' && (
+                <div className="mb-3">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleComplete(task.id); }}
+                    disabled={actingIds.has(task.id)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-green-400 to-emerald-500 text-white text-sm font-semibold shadow-md shadow-green-200/40 active:scale-[0.98] transition-transform disabled:opacity-50"
+                  >
+                    {actingIds.has(task.id) ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <CircleCheck className="w-4 h-4" />
+                    )}
+                    确认送达
+                  </button>
+                </div>
+              )}
 
               {/* 底部：商品 + 金额 */}
               <div className="flex items-center justify-between pt-3 border-t border-dashed border-gray-100">

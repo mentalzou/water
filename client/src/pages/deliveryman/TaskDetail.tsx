@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Phone, Package, CheckCircle2, Truck, Navigation, Clock } from 'lucide-react';
-import { deliverymanApi } from '../../api/deliveryman.api';
+import { apiFetch } from '../../utils/apiFetch';
+
+const API_BASE = '/api';
 
 export default function TaskDetail() {
   const { id: taskId } = useParams();
@@ -12,20 +14,23 @@ export default function TaskDetail() {
 
   useEffect(() => {
     if (taskId) {
-      deliverymanApi.getTaskDetail(taskId).then((res: any) => {
-        if (res.code === 200) setTask(res.data);
+      apiFetch(`${API_BASE}/tasks/${taskId}`, { tokenKey: 'deliveryman_token' }).then((res: any) => {
+        if (res && res.code === 200) setTask(res.data);
         setLoading(false);
       });
     }
   }, [taskId]);
 
-  async function handleAccept() {
+  async function handleStartDelivery() {
     if (!taskId || actionLoading) return;
     setActionLoading(true);
     try {
-      const res: any = await deliverymanApi.acceptTask(taskId);
-      if (res.code === 200 && res.data) setTask(res.data);
-    } catch { /* dev */ setTask({ ...task, status: 'delivering' }); }
+      const res = await apiFetch(`${API_BASE}/tasks/${taskId}/accept`, {
+        method: 'POST',
+        tokenKey: 'deliveryman_token',
+      });
+      if (res && res.code === 200 && res.data) setTask(res.data);
+    } catch { /* handled by apiFetch */ }
     finally { setActionLoading(false); }
   }
 
@@ -33,10 +38,13 @@ export default function TaskDetail() {
     if (!taskId || actionLoading) return;
     setActionLoading(true);
     try {
-      const res: any = await deliverymanApi.completeTask(taskId);
-      if (res.code === 200 && res.data) setTask(res.data);
+      const res = await apiFetch(`${API_BASE}/tasks/${taskId}/complete`, {
+        method: 'POST',
+        tokenKey: 'deliveryman_token',
+      });
+      if (res && res.code === 200 && res.data) setTask(res.data);
       alert('配送完成！');
-    } catch { /* dev */ alert('配送完成！'); setTask({ ...task, status: 'completed' }); }
+    } catch { /* handled by apiFetch */ }
     finally { setActionLoading(false); }
   }
 
@@ -71,7 +79,7 @@ export default function TaskDetail() {
           <div className="flex items-center gap-2">
             {task.status === 'completed' ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : task.status === 'delivering' ? <Truck className="w-5 h-5 text-blue-500" /> : <Clock className="w-5 h-5 text-orange-500" />}
             <span className={`font-semibold ${task.status === 'completed' ? 'text-green-600' : task.status === 'delivering' ? 'text-blue-600' : 'text-orange-600'}`}>
-              {task.status === 'assigned' ? '等待接单' : task.status === 'delivering' ? '正在配送' : '已完成'}
+              {task.status === 'assigned' ? '待配送' : task.status === 'delivering' ? '配送中' : '已完成'}
             </span>
           </div>
           <p className={`text-xs mt-1 ${task.status === 'completed' ? 'text-green-500/70' : task.status === 'delivering' ? 'text-blue-500/70' : 'text-orange-500/70'}`}>{task.order_no}</p>
@@ -128,9 +136,9 @@ export default function TaskDetail() {
       {/* Bottom Actions */}
       {task.status === 'assigned' && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 safe-area-pb">
-          <button onClick={handleAccept} disabled={actionLoading}
-            className="w-full bg-gradient-to-r from-water-light to-water text-white py-4 rounded-2xl font-semibold shadow-lg shadow-water/30 active:scale-[0.98] transition-transform disabled:opacity-50">
-            {actionLoading ? '处理中...' : '确认接单'}
+          <button onClick={handleStartDelivery} disabled={actionLoading}
+            className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white py-4 rounded-2xl font-semibold shadow-lg shadow-teal-200/40 active:scale-[0.98] transition-transform disabled:opacity-50">
+            {actionLoading ? '处理中...' : '开始配送'}
           </button>
         </div>
       )}
