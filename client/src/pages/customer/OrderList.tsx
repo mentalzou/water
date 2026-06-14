@@ -6,6 +6,7 @@ import BottomNav from '../../components/BottomNav';
 
 const statusMap: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: '待支付', color: 'text-orange-500 bg-orange-50', icon: Clock },
+  pending_delivery: { label: '待派送', color: 'text-blue-500 bg-blue-50', icon: Package },
   paid: { label: '已付款', color: 'text-blue-500 bg-blue-50', icon: Package },
   assigned: { label: '待配送', color: 'text-cyan-500 bg-cyan-50', icon: Truck },
   delivering: { label: '配送中', color: 'text-indigo-500 bg-indigo-50', icon: Truck },

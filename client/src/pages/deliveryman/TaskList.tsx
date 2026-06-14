@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Package, CheckCircle2, Clock, MapPin, Phone, Sparkles, TrendingUp, ClipboardList, Navigation, CircleCheck } from 'lucide-react';
+import { Truck, Package, CheckCircle2, Clock, MapPin, Phone, ClipboardList, Navigation, CircleCheck } from 'lucide-react';
 import { apiFetch } from '../../utils/apiFetch';
 
 const API_BASE = '/api';

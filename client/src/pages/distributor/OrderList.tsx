@@ -4,6 +4,7 @@ import { customerApi } from '../../api/customer.api';
 
 const statusMap: Record<string, { label: string; color: string; icon: any; bgColor: string }> = {
   pending: { label: '待支付', color: 'text-orange-600 bg-orange-100', icon: Clock, bgColor: 'bg-orange-50' },
+  pending_delivery: { label: '待派送', color: 'text-blue-600 bg-blue-100', icon: Package, bgColor: 'bg-blue-50' },
   paid: { label: '已付款', color: 'text-blue-600 bg-blue-100', icon: Package, bgColor: 'bg-blue-50' },
   assigned: { label: '待配送', color: 'text-cyan-600 bg-cyan-100', icon: Truck, bgColor: 'bg-cyan-50' },
   delivering: { label: '配送中', color: 'text-indigo-600 bg-indigo-100', icon: Truck, bgColor: 'bg-indigo-50' },
