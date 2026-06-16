@@ -165,6 +165,8 @@ export function initTables(database: Database.Database): void {
       commission_amount REAL NOT NULL,
       status TEXT DEFAULT 'pending' CHECK(status IN ('pending','settled','cancelled')),
       settled_at TEXT DEFAULT '',
+      payout_batch_no TEXT DEFAULT '',
+      payout_date TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -761,6 +763,33 @@ function applyMigrations(db: Database.Database): void {
         created_at TEXT DEFAULT (datetime('now'))
       )`);
       recordMigration(db, 20, 'withdraw_requests 提现申请表');
+    });
+    txn();
+  }
+
+  // === v21: commissions 新增 payout_batch_no / payout_date + payout_batches 表 ===
+  if (currentVersion < 21) {
+    const txn = db.transaction(() => {
+      const commCols = db.prepare('PRAGMA table_info(commissions)').all() as any[];
+      if (!commCols.some((c: any) => c.name === 'payout_batch_no')) {
+        db.exec("ALTER TABLE commissions ADD COLUMN payout_batch_no TEXT DEFAULT ''");
+      }
+      if (!commCols.some((c: any) => c.name === 'payout_date')) {
+        db.exec("ALTER TABLE commissions ADD COLUMN payout_date TEXT DEFAULT ''");
+      }
+      // 创建打款批次表
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS payout_batches (
+          id TEXT PRIMARY KEY,
+          batch_no TEXT NOT NULL UNIQUE,
+          payout_date TEXT NOT NULL,
+          total_amount REAL NOT NULL DEFAULT 0,
+          distributor_count INTEGER NOT NULL DEFAULT 0,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','completed','cancelled')),
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      recordMigration(db, 21, 'commissions 新增 payout_batch_no / payout_date + payout_batches 打款批次表');
     });
     txn();
   }

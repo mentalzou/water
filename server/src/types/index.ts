@@ -141,7 +141,39 @@ export interface CommissionRecord {
   commission_amount: number;
   status: 'pending' | 'settled' | 'cancelled';
   settled_at?: string;
+  payout_batch_no?: string;
+  payout_date?: string;
   created_at: string;
+  // JOIN fields
+  order_no?: string;
+  distributor_code?: string;
+  distributor_name?: string;
+  distributor_phone?: string;
+}
+
+export interface PayoutBatch {
+  id: string;
+  batch_no: string;
+  payout_date: string;
+  total_amount: number;
+  distributor_count: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  created_at: string;
+}
+
+export interface CommissionSummary {
+  total_order_amount: number;
+  total_count: number;
+  total_commission: number;
+}
+
+export interface PayoutRecord {
+  batch_no: string;
+  distributor_id: string;
+  distributor_code: string;
+  distributor_name: string;
+  distributor_phone: string;
+  commission_amount: number;
 }
 
 export interface WithdrawRequest {

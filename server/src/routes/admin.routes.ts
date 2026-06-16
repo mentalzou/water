@@ -105,6 +105,13 @@ router.get('/recharge/orders', adminController.listRechargeOrders);
 router.get('/recharge/stats', adminController.getRechargeStats);
 router.get('/recharge/transactions', adminController.listBalanceTransactions);
 
+// Commission Management
+router.get('/commissions/export', adminController.exportCommissions);
+router.get('/commissions/stats', adminController.commissionStats);
+router.get('/commissions/payout/export', adminController.exportPayoutRecord);
+router.post('/commissions/payout/import', adminController.importPayoutRecord);
+router.get('/commissions', adminController.listCommissions);
+
 // Ad Banners Management
 router.get('/banners', adBannerController.listBanners);
 router.post('/banners/upload', adBannerController.upload.single('file'), adBannerController.uploadFile);

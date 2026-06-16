@@ -119,3 +119,36 @@ export const getRechargeStats = (params?: { start_date?: string; end_date?: stri
     adminApi.get('/recharge/stats', { params });
 export const getBalanceTransactions = (params: { user_id: string; page?: number; pageSize?: number }) =>
     adminApi.get('/recharge/transactions', { params });
+
+// Commission Management
+export const getCommissions = (params: {
+  page?: number; pageSize?: number; order_no?: string;
+  start_date?: string; end_date?: string; status?: string;
+  payout_start_date?: string; payout_end_date?: string; distributor_id?: string;
+}) => adminApi.get('/commissions', { params });
+
+export const getCommissionStats = (params: {
+  order_no?: string; start_date?: string; end_date?: string; status?: string;
+  payout_start_date?: string; payout_end_date?: string; distributor_id?: string;
+}) => adminApi.get('/commissions/stats', { params });
+
+export const exportCommissions = (params: {
+  order_no?: string; start_date?: string; end_date?: string; status?: string;
+  payout_start_date?: string; payout_end_date?: string; distributor_id?: string;
+}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v) query.set(k, v); });
+  return adminApi.get(`/commissions/export?${query.toString()}`, { responseType: 'blob' });
+};
+
+export const exportPayoutRecord = (params: {
+  order_no?: string; start_date?: string; end_date?: string;
+  payout_start_date?: string; payout_end_date?: string; distributor_id?: string;
+}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v) query.set(k, v); });
+  return adminApi.get(`/commissions/payout/export?${query.toString()}`, { responseType: 'blob' });
+};
+
+export const importPayoutRecord = (data: { batch_no: string; payout_date: string; commission_ids?: string[] }) =>
+  adminApi.post('/commissions/payout/import', data);

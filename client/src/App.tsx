@@ -41,6 +41,7 @@ const AdminBrandManage = lazy(() => import('./pages/admin/BrandManage'))
 const AdminConfigPage = lazy(() => import('./pages/admin/ConfigPage'))
 const AdminRechargeManage = lazy(() => import('./pages/admin/RechargeManage'))
 const AdminAdBannerManage = lazy(() => import('./pages/admin/AdBannerManage'))
+const AdminCommissionManage = lazy(() => import('./pages/admin/CommissionManage'))
 
 const DistributorLogin = lazy(() => import('./pages/distributor/Login'))
 const DistributorLayout = lazy(() => import('./components/DistributorLayout'))
@@ -125,6 +126,7 @@ function AppContent() {
                 <Route path="config" element={<AdminConfigPage />} />
                 <Route path="recharge-packages" element={<AdminRechargeManage />} />
                 <Route path="ad-banners" element={<AdminAdBannerManage />} />
+                <Route path="commissions" element={<AdminCommissionManage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

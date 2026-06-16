@@ -1248,3 +1248,160 @@ export function listBalanceTransactions(req: Request, res: Response): void {
   const { data, total } = balanceTransactionModel.findByUserId(userId, page, pageSize);
   paginated(res, data, page, pageSize, total);
 }
+
+// ============ Commission Management ============
+
+/** 佣金明细列表（分页 + 筛选） */
+export function listCommissions(req: Request, res: Response): void {
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.pageSize as string) || 20;
+  const params: Record<string, any> = { page, pageSize };
+  if (req.query.order_no) params.order_no = str(req.query.order_no);
+  if (req.query.start_date) params.start_date = str(req.query.start_date);
+  if (req.query.end_date) params.end_date = str(req.query.end_date);
+  if (req.query.status) params.status = str(req.query.status);
+  if (req.query.payout_start_date) params.payout_start_date = str(req.query.payout_start_date);
+  if (req.query.payout_end_date) params.payout_end_date = str(req.query.payout_end_date);
+  if (req.query.distributor_id) params.distributor_id = str(req.query.distributor_id);
+  const { data, total } = commissionModel.findAllFiltered(params);
+  paginated(res, data, page, pageSize, total);
+}
+
+/** 佣金统计汇总 */
+export function commissionStats(req: Request, res: Response): void {
+  const params: Record<string, any> = {};
+  if (req.query.order_no) params.order_no = str(req.query.order_no);
+  if (req.query.start_date) params.start_date = str(req.query.start_date);
+  if (req.query.end_date) params.end_date = str(req.query.end_date);
+  if (req.query.status) params.status = str(req.query.status);
+  if (req.query.payout_start_date) params.payout_start_date = str(req.query.payout_start_date);
+  if (req.query.payout_end_date) params.payout_end_date = str(req.query.payout_end_date);
+  if (req.query.distributor_id) params.distributor_id = str(req.query.distributor_id);
+  const stats = commissionModel.stats(params);
+  success(res, stats);
+}
+
+/** 导出佣金明细 CSV */
+export function exportCommissions(req: Request, res: Response): void {
+  const params: Record<string, any> = {};
+  if (req.query.order_no) params.order_no = str(req.query.order_no);
+  if (req.query.start_date) params.start_date = str(req.query.start_date);
+  if (req.query.end_date) params.end_date = str(req.query.end_date);
+  if (req.query.status) params.status = str(req.query.status);
+  if (req.query.payout_start_date) params.payout_start_date = str(req.query.payout_start_date);
+  if (req.query.payout_end_date) params.payout_end_date = str(req.query.payout_end_date);
+  if (req.query.distributor_id) params.distributor_id = str(req.query.distributor_id);
+
+  const records = commissionModel.findAllNoPaginate(params);
+  const statusMap: Record<string, string> = { pending: '待结算', settled: '已结算', cancelled: '已取消' };
+
+  const BOM = '\uFEFF';
+  const headers = ['订单号', '订单金额', '返佣比例', '返佣金额', '交易时间', '返佣所属分销商', '分销商手机号', '返佣状态', '打款日期', '打款批次'];
+  const csvEscape = (v: string) => {
+    const s = String(v ?? '');
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+
+  const rows = records.map(r => [
+    (r as any).order_no || '-',
+    Number(r.order_amount || 0).toFixed(2),
+    `${(r.commission_rate * 100).toFixed(0)}%`,
+    Number(r.commission_amount || 0).toFixed(2),
+    r.created_at || '-',
+    (r as any).distributor_name || '-',
+    (r as any).distributor_phone || '-',
+    statusMap[r.status] || r.status,
+    r.payout_date || '-',
+    r.payout_batch_no || '-',
+  ].map(csvEscape).join(','));
+
+  const csv = BOM + [headers.join(','), ...rows].join('\n');
+  const timestamp = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="commission_export_${timestamp}.csv"`);
+  res.send(csv);
+}
+
+/** 导出打款记录（按分销商汇总） */
+export function exportPayoutRecord(req: Request, res: Response): void {
+  const params: Record<string, any> = {};
+  if (req.query.order_no) params.order_no = str(req.query.order_no);
+  if (req.query.start_date) params.start_date = str(req.query.start_date);
+  if (req.query.end_date) params.end_date = str(req.query.end_date);
+  if (req.query.payout_start_date) params.payout_start_date = str(req.query.payout_start_date);
+  if (req.query.payout_end_date) params.payout_end_date = str(req.query.payout_end_date);
+  if (req.query.distributor_id) params.distributor_id = str(req.query.distributor_id);
+
+  const records = commissionModel.getPayoutRecords(params);
+  if (records.length === 0) {
+    error(res, '没有符合条件的待结算佣金记录');
+    return;
+  }
+
+  // 生成打款编号：YYYYMMDDHHmmss + 4位流水
+  const now = new Date();
+  const prefix = now.getFullYear() +
+    String(now.getMonth() + 1).padStart(2, '0') +
+    String(now.getDate()).padStart(2, '0') +
+    String(now.getHours()).padStart(2, '0') +
+    String(now.getMinutes()).padStart(2, '0') +
+    String(now.getSeconds()).padStart(2, '0');
+
+  const batchNo = prefix + String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+
+  const BOM = '\uFEFF';
+  const headers = ['打款编号', '所属分销商名称', '注册手机号', '返佣金额'];
+  const csvEscape = (v: string) => {
+    const s = String(v ?? '');
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+
+  const rows = records.map(r => [
+    batchNo,
+    r.distributor_name || '-',
+    r.distributor_phone || '-',
+    Number(r.commission_amount || 0).toFixed(2),
+  ].map(csvEscape).join(','));
+
+  const csv = BOM + [headers.join(','), ...rows].join('\n');
+  const timestamp = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="payout_record_${batchNo}.csv"`);
+  res.send(csv);
+}
+
+/** 导入打款记录（批量结算） */
+export function importPayoutRecord(req: Request, res: Response): void {
+  const { batch_no, payout_date } = req.body;
+  if (!batch_no || !payout_date) {
+    error(res, '请提供打款编号和打款日期');
+    return;
+  }
+
+  // 获取该状态下的所有待结算佣金ID
+  const params: Record<string, any> = {};
+  // 如果能确定是哪个批次的，直接用日期范围
+  if (payout_date) {
+    // 获取所有待结算记录的ID
+    const db = getDb();
+    const pendingRecords = db.prepare(
+      "SELECT id FROM commissions WHERE status = 'pending'"
+    ).all() as { id: string }[];
+    
+    if (pendingRecords.length === 0) {
+      error(res, '没有待结算的佣金记录');
+      return;
+    }
+
+    const ids = pendingRecords.map(r => r.id);
+    const { settled } = commissionModel.batchSettle(batch_no, payout_date, ids);
+
+    success(res, { settled, batch_no, payout_date }, `结算完成，共 ${settled} 笔佣金已结算`);
+  }
+}
