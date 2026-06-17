@@ -168,27 +168,6 @@ export default function AdminCommissionManage() {
           <h1 className="text-2xl font-bold text-gray-800">佣金管理</h1>
           <p className="text-sm text-gray-500 mt-1">管理分销商返佣明细与结算</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleExportDetail}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
-          >
-            <Download className="w-4 h-4" /> 导出明细
-          </button>
-          <button
-            onClick={handleExportPayout}
-            disabled={payoutExporting}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-cyan-300 text-cyan-700 rounded-lg hover:bg-cyan-50 text-sm font-medium disabled:opacity-50"
-          >
-            <FileText className="w-4 h-4" /> {payoutExporting ? '生成中...' : '导出打款记录'}
-          </button>
-          <button
-            onClick={() => setImportModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 text-sm font-medium shadow-sm"
-          >
-            <Upload className="w-4 h-4" /> 导入打款记录
-          </button>
-        </div>
       </div>
 
       {/* Stats Summary */}
@@ -230,7 +209,7 @@ export default function AdminCommissionManage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">订单号</label>
             <input
@@ -278,19 +257,48 @@ export default function AdminCommissionManage() {
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
             />
           </div>
-          <div className="flex items-end gap-2">
+        </div>
+
+        {/* 操作按钮栏 */}
+        <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* 左侧：查询相关 */}
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleSearch}
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 text-sm font-medium"
+                onClick={handleSearch}
+                className="inline-flex items-center gap-1.5 px-5 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors text-sm font-medium shadow-sm"
             >
-              <Search className="w-4 h-4" /> 查询
+              <Search className="w-4 h-4"/> 查询
             </button>
             <button
-              onClick={handleReset}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
+                onClick={handleReset}
+                className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors text-sm"
             >
-              <RefreshCw className="w-4 h-4" /> 重置
+              <RefreshCw className="w-4 h-4"/> 重置
             </button>
+            <button
+                onClick={handleExportDetail}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-cyan-50 hover:border-cyan-300 hover:text-cyan-700 transition-colors text-sm font-medium"
+            >
+              <Download className="w-4 h-4"/> 生成打款明细
+            </button>
+            <button
+                onClick={handleExportPayout}
+                disabled={payoutExporting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-cyan-50 hover:border-cyan-300 hover:text-cyan-700 transition-colors text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <FileText className="w-4 h-4"/> {payoutExporting ? '生成中...' : '打款明细'}
+            </button>
+            <button
+                onClick={() => setImportModal(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors text-sm font-medium shadow-sm"
+            >
+              <Upload className="w-4 h-4"/> 导入打款记录
+            </button>
+          </div>
+
+          {/* 右侧：导出/导入操作 */}
+          <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
+
           </div>
         </div>
       </div>
@@ -298,19 +306,19 @@ export default function AdminCommissionManage() {
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-8 h-8 border-3 border-cyan-200 border-t-cyan-500 rounded-full animate-spin" />
-          </div>
+            <div className="flex justify-center py-20">
+              <div className="w-8 h-8 border-3 border-cyan-200 border-t-cyan-500 rounded-full animate-spin"/>
+            </div>
         ) : records.length === 0 ? (
-          <div className="text-center py-16">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-400">暂无佣金记录</p>
-          </div>
+            <div className="text-center py-16">
+              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4"/>
+              <p className="text-gray-400">暂无佣金记录</p>
+            </div>
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">订单号</th>
                     <th className="px-4 py-3 text-right font-semibold text-gray-600">订单金额</th>
@@ -322,7 +330,7 @@ export default function AdminCommissionManage() {
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">打款日期</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">打款批次</th>
                   </tr>
-                </thead>
+                  </thead>
                 <tbody className="divide-y divide-gray-100">
                   {records.map((r: any) => {
                     const st = statusMap[r.status] || statusMap.pending;
