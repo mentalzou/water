@@ -19,6 +19,8 @@ export function getDb(): Database.Database {
     db.pragma('foreign_keys = ON');
     initTables(db);
   }
+  // 每次调用都尝试增量迁移（版本号保证幂等，热重载也能生效）
+  applyMigrations(db);
   return db;
 }
 
@@ -134,6 +136,8 @@ export function initTables(database: Database.Database): void {
       pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
       from_balance REAL DEFAULT 0,
       from_bonus REAL DEFAULT 0,
+      delivery_date TEXT DEFAULT '',
+      delivery_time TEXT DEFAULT '',
       transaction_id TEXT DEFAULT '',
       remark TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now')),
@@ -296,7 +300,7 @@ function recordMigration(db: Database.Database, version: number, description: st
  */
 function applyMigrations(db: Database.Database): void {
   const currentVersion = getCurrentVersion(db);
-  const LATEST_VERSION = 20;
+  const LATEST_VERSION = 24;
 
   // 已达最新版本，无需迁移，静默返回（避免每次启动都刷日志）
   if (currentVersion >= LATEST_VERSION) return;
@@ -790,6 +794,55 @@ function applyMigrations(db: Database.Database): void {
         )
       `);
       recordMigration(db, 21, 'commissions 新增 payout_batch_no / payout_date + payout_batches 打款批次表');
+    });
+    txn();
+  }
+
+  // === v22: regions 省市区管理表 ===
+  if (currentVersion < 22) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS regions (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        parent_id TEXT,
+        level INTEGER NOT NULL DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 22, 'regions 省市区管理表');
+    });
+    txn();
+  }
+
+  // === v23: regions 表补充创建（兜底 v22 已执行但 regions 未创建的情况） ===
+  if (currentVersion < 23) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS regions (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        parent_id TEXT,
+        level INTEGER NOT NULL DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      recordMigration(db, 23, 'regions 省市区管理表（兜底创建）');
+    });
+    txn();
+  }
+
+  // === v24: orders 表补充 delivery_date / delivery_time（兜底 v18 已记录但列未实际添加） ===
+  if (currentVersion < 24) {
+    const txn = db.transaction(() => {
+      const orderCols = db.prepare('PRAGMA table_info(orders)').all() as any[];
+      if (!orderCols.some((c: any) => c.name === 'delivery_date')) {
+        db.exec("ALTER TABLE orders ADD COLUMN delivery_date TEXT DEFAULT ''");
+      }
+      if (!orderCols.some((c: any) => c.name === 'delivery_time')) {
+        db.exec("ALTER TABLE orders ADD COLUMN delivery_time TEXT DEFAULT ''");
+      }
+      recordMigration(db, 24, 'orders 补充 delivery_date / delivery_time（兜底）');
     });
     txn();
   }

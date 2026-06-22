@@ -4,6 +4,7 @@ import { productModel } from '../models/product.model';
 import { orderModel } from '../models/order.model';
 import { distributorModel } from '../models/distributor.model';
 import { userModel } from '../models/user.model';
+import { regionModel } from '../models/region.model';
 import addressModel from '../models/address.model';
 import { createCustomerOrder, processPaymentSuccess } from '../services/order.service';
 import { generateToken } from '../utils/jwt';
@@ -503,6 +504,12 @@ export function deleteAddress(req: Request, res: Response): void {
   } else {
     error(res, '地址不存在或无权删除', 404);
   }
+}
+
+// ============ Region Tree（公开，省市区级联选择） ============
+export function getRegionTree(_req: Request, res: Response): void {
+  const tree = regionModel.getTree(false); // 只返回 active 的
+  success(res, tree);
 }
 
 // ============ Points Management ============

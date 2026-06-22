@@ -77,11 +77,20 @@ export const updateDeliveryman = (id: string, data: any) =>
 export const deleteDeliveryman = (id: string) =>
   adminApi.delete(`/deliverymen/${id}`);
 
-// Areas
+// Areas (旧配送区域 - 保留兼容)
 export const getAreas = () => adminApi.get('/areas');
 export const createArea = (data: any) => adminApi.post('/areas', data);
 export const updateArea = (id: string, data: any) => adminApi.put(`/areas/${id}`, data);
 export const deleteArea = (id: string) => adminApi.delete(`/areas/${id}`);
+
+// Regions (省市区管理)
+export const getRegions = () => adminApi.get('/regions');
+export const getRegionsFlat = () => adminApi.get('/regions/flat');
+export const createRegion = (data: { name: string; parent_id?: string }) =>
+  adminApi.post('/regions', data);
+export const updateRegion = (id: string, data: { name?: string; sort_order?: number; status?: string }) =>
+  adminApi.put(`/regions/${id}`, data);
+export const deleteRegion = (id: string) => adminApi.delete(`/regions/${id}`);
 
 // Products
 export const getProducts = () => adminApi.get('/products');

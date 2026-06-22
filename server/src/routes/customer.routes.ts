@@ -33,6 +33,9 @@ router.get('/categories', (_req, res) => {
     success(res, categoryModel.findAll(true));
 });
 
+// Public: 省市区树（收货地址级联选择）
+router.get('/regions/tree', customerController.getRegionTree);
+
 // Recharge - public (get packages list)
 router.get('/customers/recharge/packages', getPackages);
 

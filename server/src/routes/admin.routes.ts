@@ -50,11 +50,18 @@ router.put('/deliverymen/:id/reset-password', adminController.resetDeliverymanPa
 router.put('/deliverymen/:id', adminController.updateDeliveryman);
 router.delete('/deliverymen/:id', adminController.deleteDeliveryman);
 
-// Areas CRUD
+// Areas CRUD（旧配送区域，保留兼容）
 router.get('/areas', adminController.listAreas);
 router.post('/areas', adminController.createArea);
 router.put('/areas/:id', adminController.updateArea);
 router.delete('/areas/:id', adminController.deleteArea);
+
+// Regions (省市区管理)
+router.get('/regions', adminController.listRegions);
+router.get('/regions/flat', adminController.listRegionsFlat);
+router.post('/regions', adminController.createRegion);
+router.put('/regions/:id', adminController.updateRegion);
+router.delete('/regions/:id', adminController.deleteRegion);
 
 // Categories CRUD
 router.get('/categories', adminController.listCategories);

@@ -5,7 +5,14 @@ import {
 } from 'lucide-react';
 import { customerApi } from '../../api/customer.api';
 import BottomNav from '../../components/BottomNav';
-import { getProvinces, getCities, getDistricts } from '../../data/regions';
+
+interface RegionNode {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  level: number;
+  children: RegionNode[];
+}
 
 export default function AddressPage() {
   const navigate = useNavigate();
@@ -16,16 +23,25 @@ export default function AddressPage() {
     contact_name: '', contact_phone: '', province: '', city: '', district: '', detail: '', is_default: false
   });
   const [loading, setLoading] = useState(false);
-  const [cities, setCities] = useState<string[]>([]);
-  const [districts, setDistricts] = useState<string[]>([]);
+
+  // 省市区树数据
+  const [regionTree, setRegionTree] = useState<RegionNode[]>([]);
+  const [cities, setCities] = useState<RegionNode[]>([]);
+  const [districts, setDistricts] = useState<RegionNode[]>([]);
 
   const fromPage = location.state?.from;
 
-  console.log('location.state');
-  console.log(fromPage);
-
   // 省份列表
-  const provinces = getProvinces();
+  const provinces = regionTree;
+
+  // 加载省市区数据
+  useEffect(() => {
+    customerApi.getRegionTree().then((res: any) => {
+      if (res.code === 200) {
+        setRegionTree(res.data || []);
+      }
+    }).catch(() => {});
+  }, []);
 
   function handleBack() {
     if (fromPage === 'confirm-order') {
@@ -52,31 +68,33 @@ export default function AddressPage() {
   useEffect(() => { loadAddresses(); }, []);
 
   // 当省份变化时，更新城市列表
-  function handleProvinceChange(province: string) {
-    const cityList = getCities(province);
+  function handleProvinceChange(provinceName: string) {
+    const province = regionTree.find(p => p.name === provinceName);
+    const cityList = province?.children || [];
     setCities(cityList);
     setDistricts([]);
     setForm(f => ({
       ...f,
-      province,
-      city: cityList.length === 1 ? cityList[0] : '',
+      province: provinceName,
+      city: cityList.length === 1 ? cityList[0].name : '',
       district: '',
     }));
-    // 如果只有一个城市，自动加载区县
     if (cityList.length === 1) {
-      const districtList = getDistricts(province, cityList[0]);
+      const districtList = cityList[0].children || [];
       setDistricts(districtList);
     }
   }
 
   // 当城市变化时，更新区县列表
-  function handleCityChange(city: string) {
-    const districtList = getDistricts(form.province, city);
+  function handleCityChange(cityName: string) {
+    const province = regionTree.find(p => p.name === form.province);
+    const city = province?.children?.find(c => c.name === cityName);
+    const districtList = city?.children || [];
     setDistricts(districtList);
     setForm(f => ({
       ...f,
-      city,
-      district: districtList.length === 1 ? districtList[0] : '',
+      city: cityName,
+      district: districtList.length === 1 ? districtList[0].name : '',
     }));
   }
 
@@ -95,8 +113,13 @@ export default function AddressPage() {
         detail: addr.detail,
         is_default: !!addr.is_default,
       });
-      if (p) setCities(getCities(p));
-      if (p && c) setDistricts(getDistricts(p, c));
+      // 根据已保存的省/市加载子级列表
+      const province = regionTree.find(r => r.name === p);
+      if (province) {
+        setCities(province.children || []);
+        const city = province.children?.find(r => r.name === c);
+        if (city) setDistricts(city.children || []);
+      }
     } else {
       setEditing('new');
       setForm({ contact_name: '', contact_phone: '', province: '', city: '', district: '', detail: '', is_default: false });
@@ -180,17 +203,17 @@ export default function AddressPage() {
                   <select value={form.province} onChange={e => handleProvinceChange(e.target.value)} required
                           className="px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20">
                     <option value="">请选择省</option>
-                    {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                    {provinces.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                   </select>
                   <select value={form.city} onChange={e => handleCityChange(e.target.value)} required
                           className="px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20">
                     <option value="">请选择市</option>
-                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                    {cities.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                   <select value={form.district} onChange={e => setForm(f => ({ ...f, district: e.target.value }))} required
                           className="px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20">
                     <option value="">请选择区</option>
-                    {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                    {districts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                   </select>
                 </div>
 

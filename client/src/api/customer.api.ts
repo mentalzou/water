@@ -78,4 +78,7 @@ export const customerApi = {
   // 微信 OAuth - code 换 openId
   getWechatOpenId: (code: string, type: string = 'oa') =>
       api.post('/wechat/openid', { code, type }),
+
+  // 省市区树（收货地址级联选择）
+  getRegionTree: () => api.get('/regions/tree'),
 };

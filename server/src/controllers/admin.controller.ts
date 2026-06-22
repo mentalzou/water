@@ -4,6 +4,7 @@ import { productModel } from '../models/product.model';
 import { distributorModel } from '../models/distributor.model';
 import { deliverymanModel } from '../models/deliveryman.model';
 import { areaModel } from '../models/area.model';
+import { regionModel } from '../models/region.model';
 import { orderModel } from '../models/order.model';
 import { commissionModel } from '../models/commission.model';
 // 提现管理暂屏蔽
@@ -248,6 +249,51 @@ export function deleteArea(req: Request, res: Response): void {
   const id = str(req.params.id);
   areaModel.delete(id);
   success(res, null, '删除成功');
+}
+
+// ============ Regions (省市区管理) ============
+export function createRegion(req: Request, res: Response): void {
+  const name = str(req.body.name);
+  const parent_id = req.body.parent_id ? str(req.body.parent_id) : undefined;
+  if (!name) { error(res, '请输入区域名称'); return; }
+  // 如果指定了 parent_id，验证其存在且 level < 3
+  if (parent_id) {
+    const parent = regionModel.findById(parent_id);
+    if (!parent) { error(res, '父级区域不存在'); return; }
+    if (parent.level >= 3) { error(res, '区级下不能再添加子级'); return; }
+  }
+  const result = regionModel.create({ name, parent_id: parent_id || null });
+  success(res, result, '区域创建成功');
+}
+
+export function listRegions(_req: Request, res: Response): void {
+  const tree = regionModel.getTree(true);
+  success(res, tree);
+}
+
+/** 获取扁平区域列表（用于下拉选择） */
+export function listRegionsFlat(_req: Request, res: Response): void {
+  const list = regionModel.findAll();
+  success(res, list);
+}
+
+export function updateRegion(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  const { name, sort_order, status } = req.body;
+  const result = regionModel.update(id, {
+    name: name !== undefined ? str(name) : undefined,
+    sort_order: sort_order !== undefined ? Number(sort_order) : undefined,
+    status: (status !== undefined ? str(status) : undefined) as 'active' | 'inactive' | undefined,
+  });
+  if (!result) return notFound(res);
+  success(res, result, '更新成功');
+}
+
+export function deleteRegion(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  const result = regionModel.delete(id);
+  if (result.deleted === 0) return notFound(res);
+  success(res, { deleted: result.deleted }, `已删除 ${result.deleted} 个区域`);
 }
 
 // ============ Categories ============

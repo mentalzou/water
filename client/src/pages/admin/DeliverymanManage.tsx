@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, X, UserPlus, Lock, KeyRound, Eye, EyeOff, Power, PowerOff } from 'lucide-react';
-import { getProvinces, getCities, getDistricts } from '../../data/regions';
+import { getRegions } from '../../api/admin.api';
 
 const API_BASE = '/api';
 
@@ -22,10 +22,11 @@ export default function DeliverymanManage() {
   const [search, setSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // 级联选择器数据
-  const provinces = getProvinces();
-  const [cities, setCities] = useState<string[]>([]);
-  const [districts, setDistricts] = useState<string[]>([]);
+  // 级联选择器数据（从服务端 region 树加载）
+  const [regionTree, setRegionTree] = useState<any[]>([]);
+  const provinces = regionTree;
+  const [cities, setCities] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<any[]>([]);
 
   // Reset password modal state
   const [showResetPwd, setShowResetPwd] = useState(false);
@@ -40,7 +41,7 @@ export default function DeliverymanManage() {
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(20);
 
-  useEffect(() => { loadData(); loadAreas(); }, [page, pageSize]);
+  useEffect(() => { loadData(); loadAreas(); loadRegions(); }, [page, pageSize]);
 
   async function loadAreas() {
     try {
@@ -57,6 +58,15 @@ export default function DeliverymanManage() {
     } catch { /* ignore */ } finally {
       setAreasLoading(false);
     }
+  }
+
+  async function loadRegions() {
+    try {
+      const res: any = await getRegions();
+      if (res.code === 200) {
+        setRegionTree(res.data || []);
+      }
+    } catch { /* ignore */ }
   }
 
   async function loadData() {
@@ -86,18 +96,21 @@ export default function DeliverymanManage() {
 
   // 省份变化
   function handleProvinceChange(p: string) {
-    const cityList = getCities(p);
+    const province = regionTree.find((r: any) => r.name === p);
+    const cityList = province?.children || [];
     setCities(cityList);
     setDistricts([]);
-    setForm(f => ({ ...f, province: p, city: cityList.length === 1 ? cityList[0] : '', districts: [] }));
+    setForm(f => ({ ...f, province: p, city: cityList.length === 1 ? cityList[0].name : '', districts: [] }));
     if (cityList.length === 1) {
-      setDistricts(getDistricts(p, cityList[0]));
+      setDistricts(cityList[0].children || []);
     }
   }
 
   // 城市变化
   function handleCityChange(c: string) {
-    const districtList = getDistricts(form.province, c);
+    const province = regionTree.find((r: any) => r.name === form.province);
+    const city = province?.children?.find((cc: any) => cc.name === c);
+    const districtList = city?.children || [];
     setDistricts(districtList);
     setForm(f => ({ ...f, city: c, districts: [] }));
   }
@@ -304,8 +317,12 @@ export default function DeliverymanManage() {
                         const dsts = Array.isArray(d.districts) ? d.districts : (d.district ? [d.district] : []);
                         setEditId(d.id);
                         setForm({ name: d.name, phone: d.phone, password: '', areas: d.area_ids || [], province: p, city: c, districts: dsts });
-                        setCities(p ? getCities(p) : []);
-                        setDistricts(p && c ? getDistricts(p, c) : []);
+                        const prov = regionTree.find((r: any) => r.name === p);
+                        if (prov) {
+                          setCities(prov.children || []);
+                          const ct = prov.children?.find((cc: any) => cc.name === c);
+                          if (ct) setDistricts(ct.children || []);
+                        }
                         setShowForm(true);
                       }}
                         className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500 transition-colors" title="编辑">
@@ -391,24 +408,24 @@ export default function DeliverymanManage() {
                     <select value={form.province} onChange={e => handleProvinceChange(e.target.value)} required
                             className="px-2 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 ring-water/30">
                       <option value="">选择省份</option>
-                      {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                      {provinces.map((p: any) => <option key={p.id} value={p.name}>{p.name}</option>)}
                     </select>
                     <select value={form.city} onChange={e => handleCityChange(e.target.value)} required
                             className="px-2 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 ring-water/30">
                       <option value="">选择城市</option>
-                      {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                      {cities.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                   {districts.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-lg border border-gray-100 max-h-32 overflow-y-auto">
-                      {districts.map(d => (
-                        <label key={d}
+                      {districts.map((d: any) => (
+                        <label key={d.id || d}
                           className={`cursor-pointer px-2 py-1 rounded-md text-xs font-medium transition-all border ${
-                            form.districts.includes(d) ? 'bg-water text-white border-water' : 'bg-white text-gray-600 border-gray-200 hover:border-water/30'
+                            form.districts.includes(d.name || d) ? 'bg-water text-white border-water' : 'bg-white text-gray-600 border-gray-200 hover:border-water/30'
                           }`}>
-                          <input type="checkbox" hidden checked={form.districts.includes(d)}
-                            onChange={() => toggleDistrict(d)} />
-                          {d}
+                          <input type="checkbox" hidden checked={form.districts.includes(d.name || d)}
+                            onChange={() => toggleDistrict(d.name || d)} />
+                          {d.name || d}
                         </label>
                       ))}
                     </div>
