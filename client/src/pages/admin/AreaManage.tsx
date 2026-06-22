@@ -18,7 +18,7 @@ interface RegionNode {
   created_at: string;
 }
 
-const levelLabels = { 1: '省/直辖市', 2: '市', 3: '区/县' };
+const levelLabels: Record<number, string> = { 1: '省/直辖市', 2: '市', 3: '区/县' };
 const levelIcons: Record<number, React.ReactNode> = {
   1: <MapPinned className="w-4 h-4" />,
   2: <Building2 className="w-4 h-4" />,
