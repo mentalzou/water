@@ -29,6 +29,8 @@ export interface Distributor {
   total_commission: number;
   available_commission: number;
   frozen_commission: number;
+  commission_type: 'percentage' | 'fixed';
+  commission_rate: number;
   status: 'active' | 'inactive' | 'frozen';
   created_at: string;
   user?: User;

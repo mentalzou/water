@@ -6,9 +6,11 @@ import type { Distributor } from '../types';
 const db = getDb();
 
 export const distributorModel = {
-  create(userId: string, data: { name: string; phone: string; password?: string }): Distributor & { user?: any } {
+  create(userId: string, data: { name: string; phone: string; password?: string; commission_type?: string; commission_rate?: number }): Distributor & { user?: any } {
     const id = uuidv4();
     const code = `DM${Date.now().toString(36).toUpperCase()}`;
+    const commissionType = data.commission_type || 'percentage';
+    const commissionRate = data.commission_rate ?? 5;
     
     // Create user first
     const existingUser = db.prepare('SELECT id FROM users WHERE phone = ?').get(data.phone);
@@ -21,8 +23,8 @@ export const distributorModel = {
     }
 
     db.prepare(
-      'INSERT INTO distributors (id, user_id, code) VALUES (?, ?, ?)'
-    ).run(id, userIdToUse, code);
+      'INSERT INTO distributors (id, user_id, code, commission_type, commission_rate) VALUES (?, ?, ?, ?, ?)'
+    ).run(id, userIdToUse, code, commissionType, commissionRate);
     
     return this.findByIdWithUser(id)!;
   },

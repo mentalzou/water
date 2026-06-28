@@ -91,8 +91,8 @@ export default function ConfigPage() {
         {/* Commission Config */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
           <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-water/5 to-cyan-50/50">
-            <h2 className="font-semibold text-gray-800 flex items-center gap-2">💰 返佣规则配置</h2>
-            <p className="text-xs text-gray-400 mt-1">设置分销商推广返佣的计算方式</p>
+            <h2 className="font-semibold text-gray-800 flex items-center gap-2">💰 返佣规则配置（全局默认）</h2>
+            <p className="text-xs text-gray-400 mt-1">未设置个性化规则的分销商将使用此默认返佣方式。可在分销商管理页面为每位分销商单独配置。</p>
           </div>
 
           <div className="p-6 space-y-5">

@@ -11,7 +11,7 @@ export default function DistributorManage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', password: '' });
+  const [form, setForm] = useState({ name: '', phone: '', password: '', commission_type: 'percentage', commission_rate: '5' });
   const [editId, setEditId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -48,7 +48,7 @@ export default function DistributorManage() {
   }
 
   function handleAdd() {
-    setForm({ name: '', phone: '', password: '' });
+    setForm({ name: '', phone: '', password: '', commission_type: 'percentage', commission_rate: '5' });
     setEditId(null);
     setShowForm(true);
   }
@@ -68,17 +68,18 @@ export default function DistributorManage() {
     try {
       const token = getToken();
       if (editId) {
+        const body: any = { name: form.name, phone: form.phone, commission_type: form.commission_type, commission_rate: Number(form.commission_rate) };
         await fetch(`${API_BASE}/admin/distributors/${editId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name: form.name, phone: form.phone }),
+          body: JSON.stringify(body),
         }).then(r => r.json());
         setData(data.map(d => d.id === editId ? { ...d, user_name: form.name, phone: form.phone } : d));
       } else {
         const res: any = await fetch(`${API_BASE}/admin/distributors`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name: form.name, phone: form.phone, password: form.password }),
+          body: JSON.stringify({ name: form.name, phone: form.phone, password: form.password, commission_type: form.commission_type, commission_rate: Number(form.commission_rate) }),
         }).then(r => r.json());
         if (res.code === 200) loadData();
       }
@@ -191,26 +192,31 @@ export default function DistributorManage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <table className="w-full">
             <thead><tr className="bg-gray-50/80 border-b border-gray-100">
-              {['推荐码', '姓名', '手机号', '累计佣金', '可提现', '状态', '操作'].map(h => (
+              {['推荐码', '姓名', '手机号', '返佣规则', '累计佣金', '可提现', '状态', '操作'].map(h => (
                 <th key={h} className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
               ))}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={7} className="py-16 text-center"><div className="w-8 h-8 border-3 border-water/30 border-t-water rounded-full animate-spin mx-auto" /></td></tr>
+                <tr><td colSpan={8} className="py-16 text-center"><div className="w-8 h-8 border-3 border-water/30 border-t-water rounded-full animate-spin mx-auto" /></td></tr>
               ) : data.length === 0 ? (
-                <tr><td colSpan={7} className="py-16 text-center text-gray-400">暂无数据</td></tr>
+                <tr><td colSpan={8} className="py-16 text-center text-gray-400">暂无数据</td></tr>
               ) : data.map((d) => (
                 <tr key={d.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4"><span className="font-mono text-sm bg-water/10 px-2 py-1 rounded-lg text-water font-semibold">{d.code}</span></td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{d.user_name}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{d.phone}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${(d.commission_type || 'percentage') === 'percentage' ? 'bg-purple-50 text-purple-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {(d.commission_type || 'percentage') === 'percentage' ? `${d.commission_rate ?? 5}%` : `¥${d.commission_rate ?? 5}`}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">¥{d.total_commission.toFixed(2)}</td>
                   <td className="px-6 py-4 text-sm font-medium text-green-600">¥{d.available_commission.toFixed(2)}</td>
                   <td className="px-6 py-4"><span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${d.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{d.status === 'active' ? '正常' : '停用'}</span></td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
-                      <button onClick={() => { setEditId(d.id); setForm({ name: d.user_name, phone: d.phone, password: '' }); setShowForm(true); }} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500 transition-colors" title="编辑"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => { setEditId(d.id); setForm({ name: d.user_name, phone: d.phone, password: '', commission_type: d.commission_type || 'percentage', commission_rate: String(d.commission_rate ?? 5) }); setShowForm(true); }} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500 transition-colors" title="编辑"><Edit2 className="w-4 h-4" /></button>
                       <button onClick={() => openResetPwd(d)} className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-500 transition-colors" title="重置密码"><KeyRound className="w-4 h-4" /></button>
                       <button onClick={() => toggleStatus(d)} disabled={togglingId === d.id}
                         className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${d.status === 'active' ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-500'}`}
@@ -261,6 +267,31 @@ export default function DistributorManage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div><label className="block text-sm font-medium text-gray-700 mb-1.5">姓名</label><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30" placeholder="请输入分销商姓名" /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1.5">手机号</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} required type="tel" maxLength={11} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30" placeholder="请输入手机号" /></div>
+                {/* 返佣规则 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">返佣规则</label>
+                  <div className="flex gap-2">
+                    <select value={form.commission_type} onChange={e => setForm({...form, commission_type: e.target.value})}
+                      className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 ring-water/30 bg-white">
+                      <option value="percentage">按比例</option>
+                      <option value="fixed">固定金额</option>
+                    </select>
+                    <div className="relative flex-1">
+                      <input value={form.commission_rate} onChange={e => setForm({...form, commission_rate: e.target.value})}
+                        type="number" min="0" step="0.1" required
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"
+                        placeholder={form.commission_type === 'percentage' ? '如 5 表示 5%' : '如 10 表示 10元'} />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                        {form.commission_type === 'percentage' ? '%' : '元/单'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {form.commission_type === 'percentage'
+                      ? `示例：订单100元 → 分销商得 ${(100 * Number(form.commission_rate || 0) / 100).toFixed(2)} 元`
+                      : `每笔订单固定返佣 ${form.commission_rate || 0} 元`}
+                  </p>
+                </div>
                 {!editId && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">登录密码</label>

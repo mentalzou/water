@@ -300,7 +300,7 @@ function recordMigration(db: Database.Database, version: number, description: st
  */
 function applyMigrations(db: Database.Database): void {
   const currentVersion = getCurrentVersion(db);
-  const LATEST_VERSION = 24;
+  const LATEST_VERSION = 25;
 
   // 已达最新版本，无需迁移，静默返回（避免每次启动都刷日志）
   if (currentVersion >= LATEST_VERSION) return;
@@ -843,6 +843,21 @@ function applyMigrations(db: Database.Database): void {
         db.exec("ALTER TABLE orders ADD COLUMN delivery_time TEXT DEFAULT ''");
       }
       recordMigration(db, 24, 'orders 补充 delivery_date / delivery_time（兜底）');
+    });
+    txn();
+  }
+
+  // === v25: distributors 新增佣金配置字段（个性化返佣规则） ===
+  if (currentVersion < 25) {
+    const txn = db.transaction(() => {
+      const cols = db.prepare('PRAGMA table_info(distributors)').all() as any[];
+      if (!cols.some((c: any) => c.name === 'commission_type')) {
+        db.exec("ALTER TABLE distributors ADD COLUMN commission_type TEXT DEFAULT 'percentage' CHECK(commission_type IN ('percentage','fixed'))");
+      }
+      if (!cols.some((c: any) => c.name === 'commission_rate')) {
+        db.exec('ALTER TABLE distributors ADD COLUMN commission_rate REAL DEFAULT 5');
+      }
+      recordMigration(db, 25, 'distributors 个性化返佣规则（commission_type / commission_rate）');
     });
     txn();
   }

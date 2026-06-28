@@ -78,6 +78,8 @@ export function createDistributor(req: Request, res: Response): void {
   const name = str(req.body.name);
   const phone = str(req.body.phone);
   const password = str(req.body.password);
+  const commission_type = req.body.commission_type ? str(req.body.commission_type) : undefined;
+  const commission_rate = req.body.commission_rate !== undefined ? Number(req.body.commission_rate) : undefined;
   if (!name || !phone) {
     error(res, '请提供姓名和手机号');
     return;
@@ -86,7 +88,7 @@ export function createDistributor(req: Request, res: Response): void {
     error(res, '密码长度不能少于6位');
     return;
   }
-  const result = distributorModel.create('', { name, phone, password });
+  const result = distributorModel.create('', { name, phone, password, commission_type, commission_rate });
   success(res, result, '分销商创建成功');
 }
 
