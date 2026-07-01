@@ -91,6 +91,7 @@ router.post('/orders/:id/query-payment', adminController.queryOrderPayment);
 router.post('/orders/:id/refund', adminController.refundOrder);
 router.post('/orders/:id/query-refund', adminController.queryRefundOrder);
 router.post('/orders/:id/assign-deliveryman', adminController.assignOrderDeliveryman);
+router.post('/orders/:id/close', adminController.closeOrder);
 
 // Helipay terminal info
 router.get('/helipay/terminal', adminController.getHelipayTerminalInfo);

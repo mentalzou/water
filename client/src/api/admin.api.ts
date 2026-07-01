@@ -105,6 +105,9 @@ export const getOrders = (page = 1, pageSize = 20, status?: string) => {
   return adminApi.get(url);
 };
 
+export const closeOrder = (id: string) =>
+  adminApi.post(`/orders/${id}/close`);
+
 // Configs
 export const getConfigs = () => adminApi.get('/configs');
 export const updateConfig = (key: string, value: string) =>

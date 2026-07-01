@@ -292,4 +292,18 @@ export const orderModel = {
       .run(id);
     return this.findById(id);
   },
+
+  /** 取消订单（关闭订单） */
+  cancelOrder(id: string): Order | undefined {
+    db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?")
+      .run(id);
+    return this.findById(id);
+  },
+
+  /** 查找超过指定小时数仍未支付的待支付订单 */
+  findPendingOlderThan(hours: number): Array<{ id: string; order_no: string }> {
+    return db.prepare(
+      `SELECT id, order_no FROM orders WHERE status = 'pending' AND created_at < datetime('now', ?)`
+    ).all(`-${hours} hours`) as Array<{ id: string; order_no: string }>;
+  },
 };

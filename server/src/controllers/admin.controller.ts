@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+ import { Request, Response } from 'express';
 import { success, paginated, error, notFound } from '../utils/response';
 import { productModel } from '../models/product.model';
 import { distributorModel } from '../models/distributor.model';
@@ -710,6 +710,20 @@ export function assignOrderDeliveryman(req: Request, res: Response): void {
   const result = orderModel.assignDeliveryman(order.id, deliverymanId);
   console.log(`[手动派单] 订单 ${order.order_no} 已分配给派送员 ${deliveryman.name}(${deliveryman.phone})`);
   success(res, result, `已分配给派送员 ${deliveryman.name}`);
+}
+
+// ============ 关闭订单 ============
+export function closeOrder(req: Request, res: Response): void {
+  const id = str(req.params.id);
+
+  const { closePendingOrder: doClose } = require('../services/order.service');
+  const result = doClose(id);
+
+  if (result.success) {
+    success(res, null, result.message);
+  } else {
+    error(res, result.message);
+  }
 }
 
 // ============ 合利宝终端信息 ============

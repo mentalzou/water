@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Package, Eye, RefreshCw, Undo2, SearchCheck, UserCheck, Download } from 'lucide-react';
+import { Search, Package, Eye, RefreshCw, Undo2, SearchCheck, UserCheck, Download, XCircle } from 'lucide-react';
 import { apiFetch } from '../../utils/apiFetch';
 
 const API_BASE = '/api';
@@ -13,6 +13,7 @@ const statusMap: Record<string, { label: string; color: string }> = {
   assigned: { label: '待配送', color: 'bg-orange-100 text-orange-700' },
   delivering: { label: '配送中', color: 'bg-indigo-100 text-indigo-700' },
   completed: { label: '已完成', color: 'bg-green-100 text-green-700' },
+  cancelled: { label: '已关闭', color: 'bg-gray-200 text-gray-500' },
 };
 
 const payMethodMap: Record<string, string> = {
@@ -41,6 +42,8 @@ export default function OrderManage() {
   const [refundingOrders, setRefundingOrders] = useState<Set<string>>(new Set());
   // 退款查询中
   const [refundQueryingOrders, setRefundQueryingOrders] = useState<Set<string>>(new Set());
+  // 关闭订单中
+  const [closingOrders, setClosingOrders] = useState<Set<string>>(new Set());
   // 分配派送员中
   const [assigningOrders, setAssigningOrders] = useState<Set<string>>(new Set());
   // 分配派送员弹窗 { orderId, orderNo }
@@ -159,6 +162,32 @@ export default function OrderManage() {
       }
     } finally {
       setRefundQueryingOrders(prev => {
+        const next = new Set(prev);
+        next.delete(order.id);
+        return next;
+      });
+    }
+  }
+
+  /** 关闭未支付订单，释放冻结库存 */
+  async function closeOrderHandler(order: any) {
+    if (!confirm(`确定要关闭该订单吗？\n\n订单号：${order.order_no}\n金额：¥${Number(order.total_amount || 0).toFixed(2)}\n\n关闭后将释放冻结库存。`)) return;
+
+    setClosingOrders(prev => new Set(prev).add(order.id));
+    try {
+      const res = await apiFetch(`${API_BASE}/admin/orders/${order.id}/close`, { method: 'POST' });
+      if (res && res.code === 200) {
+        alert(res.message || '订单已关闭');
+        loadOrders();
+      } else {
+        alert(res?.message || '关闭订单失败');
+      }
+    } catch (e: any) {
+      if (e.message !== '登录已过期，请重新登录') {
+        alert('关闭订单失败: ' + (e.message || '网络错误'));
+      }
+    } finally {
+      setClosingOrders(prev => {
         const next = new Set(prev);
         next.delete(order.id);
         return next;
@@ -303,6 +332,7 @@ export default function OrderManage() {
             <option value="pending_delivery">待派送</option>
             <option value="refunding">退款中</option>
             <option value="refunded">已退款</option>
+            <option value="cancelled">已关闭</option>
             <option value="assigned">待配送</option>
             <option value="delivering">配送中</option>
             <option value="completed">已完成</option>
@@ -372,6 +402,20 @@ export default function OrderManage() {
                             <div className="w-4 h-4 border-2 border-orange-300 border-t-orange-500 rounded-full animate-spin" />
                           ) : (
                             <RefreshCw className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                      {o.status === 'pending' && (
+                        <button
+                          onClick={() => closeOrderHandler(o)}
+                          disabled={closingOrders.has(o.id)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="关闭订单并释放冻结库存"
+                        >
+                          {closingOrders.has(o.id) ? (
+                            <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
+                          ) : (
+                            <XCircle className="w-4 h-4" />
                           )}
                         </button>
                       )}

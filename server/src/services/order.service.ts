@@ -244,4 +244,44 @@ function stockOperationOnStatus(orderId: string, action: 'deduct' | 'release'): 
   }
 }
 
+/** 关闭未支付订单：取消订单并释放冻结库存 */
+export function closePendingOrder(orderId: string): { success: boolean; message: string } {
+  const order = orderModel.findById(orderId);
+  if (!order) {
+    return { success: false, message: '订单不存在' };
+  }
+  if (order.status !== 'pending') {
+    return { success: false, message: `订单状态为"${order.status}"，只能关闭待支付订单` };
+  }
+
+  // 1. 更新状态为 cancelled
+  orderModel.cancelOrder(orderId);
+
+  // 2. 释放冻结库存
+  stockOperationOnStatus(orderId, 'release');
+
+  console.log(`[订单关闭] 订单 ${order.order_no} 已关闭，冻结库存已释放`);
+  return { success: true, message: `订单 ${order.order_no} 已关闭` };
+}
+
+/** 自动关闭超过指定小时数未支付的订单，返回关闭数量 */
+export function autoCloseExpiredOrders(hours: number = 24): number {
+  const expiredOrders = orderModel.findPendingOlderThan(hours);
+  let closedCount = 0;
+
+  for (const o of expiredOrders) {
+    try {
+      const result = closePendingOrder(o.id);
+      if (result.success) closedCount++;
+    } catch (err: any) {
+      console.error(`[自动关闭] 订单 ${o.order_no} 关闭失败:`, err.message);
+    }
+  }
+
+  if (closedCount > 0) {
+    console.log(`[自动关闭] 共扫描 ${expiredOrders.length} 个超时订单，已自动关闭 ${closedCount} 个`);
+  }
+  return closedCount;
+}
+
 

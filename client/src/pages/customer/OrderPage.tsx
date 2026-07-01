@@ -123,14 +123,30 @@ export default function OrderPage() {
       const current = prev[productId] || 0;
       let next: number;
       if (current === 0 && delta > 0) {
-        // 首次添加：默认最低起送量
+        // 首次添加：默认最低起送量；库存不足时提示
+        if (maxQty === 0) {
+          alert('该商品库存不足，暂时无法购买');
+          return prev;
+        }
+        if (minQty > maxQty) {
+          alert(`该商品最低起送 ${minQty} 件，当前库存仅 ${maxQty} 件，无法满足起送要求`);
+          return prev;
+        }
         next = Math.min(maxQty, minQty);
       } else if (delta < 0) {
         // 减少：如果结果小于起送量且 >0，则直接移除（变 0）
         const candidate = current + delta;
         next = (candidate > 0 && candidate < minQty) ? 0 : Math.min(maxQty, Math.max(0, candidate));
+      } else if (delta > 0 && current >= maxQty) {
+        // 增加但已达库存上限
+        alert(`该商品库存不足，当前最多可购 ${maxQty} 件`);
+        return prev;
       } else {
         next = Math.min(maxQty, Math.max(0, current + delta));
+        if (delta > 0 && next === maxQty && current < maxQty) {
+          // 本次操作触达库存上限
+          alert(`该商品库存不足，当前最多可购 ${maxQty} 件`);
+        }
       }
       return { ...prev, [productId]: next };
     });
@@ -138,7 +154,11 @@ export default function OrderPage() {
   function setQty(productId: string, value: number) {
     const product = products.find(p => p.id === productId);
     const maxQty = product ? Math.max(0, (product.stock ?? 99999) - (product.frozen_stock ?? 0)) : 999;
-    const clamped = Math.min(maxQty, Math.max(0, Math.round(value) || 0));
+    const rounded = Math.round(value) || 0;
+    if (rounded > maxQty) {
+      alert(`该商品库存不足，当前最多可购 ${maxQty} 件`);
+    }
+    const clamped = Math.min(maxQty, Math.max(0, rounded));
     setItemQuantities(prev => ({ ...prev, [productId]: clamped }));
   }
   function removeFromCart(productId: string) {
@@ -489,7 +509,7 @@ export default function OrderPage() {
                                 <button
                                     type="button"
                                     onClick={() => updateQty(item.product.id, 1)}
-                                    disabled={item.quantity >= 999}
+                                    disabled={item.quantity >= Math.max(0, (item.product.stock ?? 99999) - (item.product.frozen_stock ?? 0))}
                                     className="w-6 h-6 rounded-full bg-water text-white flex items-center justify-center hover:bg-water/90 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   <Plus className="w-3 h-3"/>
