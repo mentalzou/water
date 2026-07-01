@@ -9,7 +9,7 @@ export const productModel = {
   create(data: Partial<Product>): Product {
     const id = `prod-${Date.now()}`;
     db.prepare(
-      'INSERT INTO products (id, name, description, price, unit, image, stock, brand_id, category_id, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO products (id, name, description, price, unit, image, stock, frozen_stock, min_order_quantity, brand_id, category_id, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       id,
       data.name || '',
@@ -18,6 +18,8 @@ export const productModel = {
       data.unit || '瓶',
       data.image || '',
       data.stock ?? 99999,
+      data.frozen_stock ?? 0,
+      data.min_order_quantity ?? 1,
       data.brand_id || '',
       data.category_id || '',
       data.status || 'active',
@@ -103,5 +105,20 @@ export const productModel = {
   delete(id: string): boolean {
     const result = db.prepare('DELETE FROM products WHERE id = ?').run(id);
     return result.changes > 0;
+  },
+
+  /** 冻结库存（下单时调用） */
+  freezeStock(productId: string, quantity: number): void {
+    db.prepare('UPDATE products SET frozen_stock = frozen_stock + ? WHERE id = ?').run(quantity, productId);
+  },
+
+  /** 扣减库存 + 释放冻结（派送完成时调用） */
+  deductFrozenStock(productId: string, quantity: number): void {
+    db.prepare('UPDATE products SET stock = stock - ?, frozen_stock = frozen_stock - ? WHERE id = ?').run(quantity, quantity, productId);
+  },
+
+  /** 释放冻结库存（取消/退款时调用） */
+  releaseFrozenStock(productId: string, quantity: number): void {
+    db.prepare('UPDATE products SET frozen_stock = frozen_stock - ? WHERE id = ?').run(quantity, productId);
   },
 };

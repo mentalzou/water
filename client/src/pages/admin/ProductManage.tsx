@@ -26,6 +26,9 @@ interface Product {
   price: number;
   unit: string;
   image?: string;
+  stock?: number;
+  frozen_stock?: number;
+  min_order_quantity?: number;
   status: string;
   sort_order: number;
   brand_id?: string;
@@ -41,7 +44,7 @@ export default function ProductManage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', price: '', unit: '瓶', category_id: '', brand_id: '', image: '' });
+  const [form, setForm] = useState({ name: '', description: '', price: '', unit: '瓶', category_id: '', brand_id: '', image: '', stock: '99999', min_order_quantity: '1' });
   const [editId, setEditId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -175,6 +178,8 @@ export default function ProductManage() {
         description: form.description,
         price: parseFloat(form.price),
         unit: form.unit,
+        stock: parseInt(form.stock) || 99999,
+        min_order_quantity: parseInt(form.min_order_quantity) || 1,
         category_id: form.category_id || undefined,
         brand_id: form.brand_id || undefined
       };
@@ -224,7 +229,7 @@ export default function ProductManage() {
   }
 
   function openCreate() {
-    setForm({ name: '', description: '', price: '', unit: '瓶', category_id: '', brand_id: '', image: '' });
+    setForm({ name: '', description: '', price: '', unit: '瓶', category_id: '', brand_id: '', image: '', stock: '99999', min_order_quantity: '1' });
     setEditId(null);
     setShowForm(true);
   }
@@ -238,7 +243,9 @@ export default function ProductManage() {
       unit: p.unit,
       category_id: p.category_id || '',
       brand_id: p.brand_id || '',
-      image: p.image || ''
+      image: p.image || '',
+      stock: String(p.stock ?? 99999),
+      min_order_quantity: String(p.min_order_quantity ?? 1),
     });
     setShowForm(true);
   }
@@ -314,8 +321,22 @@ export default function ProductManage() {
                 )}
               </div>
 
+
               <h3 className="font-semibold text-gray-800">{p.name}</h3>
               <p className="text-xs text-gray-400 mt-1 line-clamp-2 min-h-[28px]">{p.description || '暂无描述'}</p>
+
+              {/* 库存 + 起送量 */}
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs text-gray-500">
+                  库存: {p.stock != null ? (p.stock - (p.frozen_stock ?? 0)) : '∞'}
+                </span>
+                {(p.frozen_stock ?? 0) > 0 && (
+                  <span className="text-xs text-orange-500">(冻结{p.frozen_stock})</span>
+                )}
+                {(p.min_order_quantity ?? 1) > 1 && (
+                  <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-[10px] font-medium">{p.min_order_quantity}件起送</span>
+                )}
+              </div>
 
               <div className="mt-3 pt-3 border-t border-dashed border-gray-100 flex justify-between items-end">
                 <div>
@@ -436,6 +457,20 @@ export default function ProductManage() {
                   <input value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })}
                          className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"
                          placeholder="瓶/桶"/>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">库存数量</label>
+                  <input type="number" step="1" min="0" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })}
+                         className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"
+                         placeholder="默认99999"/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">起送量（件）</label>
+                  <input type="number" step="1" min="1" value={form.min_order_quantity} onChange={e => setForm({ ...form, min_order_quantity: e.target.value })}
+                         className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"
+                         placeholder="1"/>
                 </div>
               </div>
               <div className="flex gap-3 pt-1">

@@ -114,6 +114,8 @@ export function initTables(database: Database.Database): void {
       unit TEXT DEFAULT '瓶',
       image TEXT DEFAULT '',
       stock INTEGER DEFAULT 99999,
+      frozen_stock INTEGER DEFAULT 0,
+      min_order_quantity INTEGER DEFAULT 1,
       brand_id TEXT DEFAULT '' REFERENCES brands(id),
       category_id TEXT DEFAULT '' REFERENCES product_categories(id),
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
@@ -300,7 +302,7 @@ function recordMigration(db: Database.Database, version: number, description: st
  */
 function applyMigrations(db: Database.Database): void {
   const currentVersion = getCurrentVersion(db);
-  const LATEST_VERSION = 25;
+  const LATEST_VERSION = 26;
 
   // 已达最新版本，无需迁移，静默返回（避免每次启动都刷日志）
   if (currentVersion >= LATEST_VERSION) return;
@@ -858,6 +860,21 @@ function applyMigrations(db: Database.Database): void {
         db.exec('ALTER TABLE distributors ADD COLUMN commission_rate REAL DEFAULT 5');
       }
       recordMigration(db, 25, 'distributors 个性化返佣规则（commission_type / commission_rate）');
+    });
+    txn();
+  }
+
+  // === v26: products 新增 frozen_stock / min_order_quantity ===
+  if (currentVersion < 26) {
+    const txn = db.transaction(() => {
+      const cols = db.prepare('PRAGMA table_info(products)').all() as any[];
+      if (!cols.some((c: any) => c.name === 'frozen_stock')) {
+        db.exec('ALTER TABLE products ADD COLUMN frozen_stock INTEGER DEFAULT 0');
+      }
+      if (!cols.some((c: any) => c.name === 'min_order_quantity')) {
+        db.exec('ALTER TABLE products ADD COLUMN min_order_quantity INTEGER DEFAULT 1');
+      }
+      recordMigration(db, 26, 'products 新增 frozen_stock / min_order_quantity（库存冻结 + 起送量）');
     });
     txn();
   }

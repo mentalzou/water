@@ -20,6 +20,9 @@ interface Product {
   description?: string;
   price: number;
   unit?: string;
+  stock?: number;
+  frozen_stock?: number;
+  min_order_quantity?: number;
   brand_id?: string;
   brand_name?: string;
   category_id?: string;
@@ -114,13 +117,28 @@ export default function OrderPage() {
 
   function updateQty(productId: string, delta: number) {
     setItemQuantities(prev => {
+      const product = products.find(p => p.id === productId);
+      const maxQty = product ? Math.max(0, (product.stock ?? 99999) - (product.frozen_stock ?? 0)) : 999;
+      const minQty = product ? (product.min_order_quantity ?? 1) : 1;
       const current = prev[productId] || 0;
-      const next = Math.min(999, Math.max(0, current + delta));
+      let next: number;
+      if (current === 0 && delta > 0) {
+        // 首次添加：默认最低起送量
+        next = Math.min(maxQty, minQty);
+      } else if (delta < 0) {
+        // 减少：如果结果小于起送量且 >0，则直接移除（变 0）
+        const candidate = current + delta;
+        next = (candidate > 0 && candidate < minQty) ? 0 : Math.min(maxQty, Math.max(0, candidate));
+      } else {
+        next = Math.min(maxQty, Math.max(0, current + delta));
+      }
       return { ...prev, [productId]: next };
     });
   }
   function setQty(productId: string, value: number) {
-    const clamped = Math.min(999, Math.max(0, Math.round(value) || 0));
+    const product = products.find(p => p.id === productId);
+    const maxQty = product ? Math.max(0, (product.stock ?? 99999) - (product.frozen_stock ?? 0)) : 999;
+    const clamped = Math.min(maxQty, Math.max(0, Math.round(value) || 0));
     setItemQuantities(prev => ({ ...prev, [productId]: clamped }));
   }
   function removeFromCart(productId: string) {
@@ -344,6 +362,17 @@ export default function OrderPage() {
                           {product.sales_count && (
                               <p className="text-xs text-gray-400">30天销量 {product.sales_count}</p>
                           )}
+                          {/* 库存 & 起送量提示 */}
+                          {(product.min_order_quantity ?? 1) > 1 && (
+                            <span className="inline-block mt-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-[10px] font-medium">
+                              {product.min_order_quantity}件起送
+                            </span>
+                          )}
+                          {product.stock != null && (product.stock - (product.frozen_stock ?? 0)) <= 10 && (
+                            <span className="inline-block mt-0.5 ml-1 px-1.5 py-0.5 bg-red-50 text-red-500 rounded text-[10px] font-medium">
+                              仅剩{product.stock - (product.frozen_stock ?? 0)}件
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center justify-between mt-2">
@@ -366,7 +395,7 @@ export default function OrderPage() {
                                     type="number"
                                     inputMode="numeric"
                                     min={1}
-                                    max={999}
+                                    max={Math.max(0, (product.stock ?? 99999) - (product.frozen_stock ?? 0))}
                                     value={qty}
                                     onChange={e => setQty(product.id, parseInt(e.target.value) || 1)}
                                     className="w-12 h-8 text-center text-sm font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-water [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -374,7 +403,7 @@ export default function OrderPage() {
                                 <button
                                     type="button"
                                     onClick={() => updateQty(product.id, 1)}
-                                    disabled={qty >= 999}
+                                    disabled={qty >= Math.max(0, (product.stock ?? 99999) - (product.frozen_stock ?? 0))}
                                     className="w-7 h-7 rounded-full bg-water text-white flex items-center justify-center hover:bg-water/90 transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   <Plus className="w-4 h-4"/>

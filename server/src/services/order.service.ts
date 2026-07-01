@@ -15,6 +15,7 @@ export interface OrderItemInput {
 export interface CreateOrderResult {
   order: Order;
   balanceError?: string; // 余额支付时的错误信息
+  stockError?: string;   // 库存不足时的错误信息
 }
 
 /** 创建客户订单（支持多商品，支持 pay_method） */
@@ -42,6 +43,19 @@ export function createCustomerOrder(data: {
   for (const item of data.items) {
     const product = productModel.findById(item.product_id);
     if (!product) return null;
+
+    // 校验起送量
+    const minQty = product.min_order_quantity ?? 1;
+    if (item.quantity < minQty) {
+      return { order: null as any, stockError: `"${product.name}" ${minQty}件起送，当前选择了${item.quantity}件` };
+    }
+
+    // 校验可售库存（stock - frozen_stock）
+    const frozen = product.frozen_stock ?? 0;
+    const availableStock = (product.stock ?? 99999) - frozen;
+    if (availableStock < item.quantity) {
+      return { order: null as any, stockError: `"${product.name}" 库存不足（可售${availableStock}件，需要${item.quantity}件）` };
+    }
 
     const itemTotal = Math.round(product.price * item.quantity * 100) / 100;
     totalAmount += itemTotal;
@@ -173,6 +187,11 @@ export function createCustomerOrder(data: {
     delivery_time: data.delivery_time || '',
   });
 
+  // 冻结库存
+  for (const item of processedItems) {
+    productModel.freezeStock(item.product_id, item.quantity);
+  }
+
   return { order };
 }
 
@@ -190,14 +209,39 @@ export function processPaymentSuccess(orderId: string, transactionId: string): O
 }
 
 export function updateOrderStatus(orderId: string, status: Order['status']): Order | undefined {
+  const orderBefore = orderModel.findById(orderId);
+
   const order = orderModel.updateStatus(orderId, status);
 
+  if (!order) return undefined;
+
+  // 库存操作
+  if (status === 'completed') {
+    // 派送完成 → 扣减库存
+    stockOperationOnStatus(orderId, 'deduct');
+  } else if (status === 'cancelled' || status === 'refunded') {
+    // 取消/退款 → 释放冻结库存
+    stockOperationOnStatus(orderId, 'release');
+  }
+
   // 订单完成时发放积分
-  if (status === 'completed' && order) {
+  if (status === 'completed') {
     rewardPointsForOrder(orderId, order.total_amount, order.customer_phone);
   }
 
   return order;
+}
+
+/** 对订单中的每个商品执行库存操作：deduct（扣减） / release（释放冻结） */
+function stockOperationOnStatus(orderId: string, action: 'deduct' | 'release'): void {
+  const items = orderModel.getOrderItems(orderId);
+  for (const item of items) {
+    if (action === 'deduct') {
+      productModel.deductFrozenStock(item.product_id, item.quantity);
+    } else if (action === 'release') {
+      productModel.releaseFrozenStock(item.product_id, item.quantity);
+    }
+  }
 }
 
 

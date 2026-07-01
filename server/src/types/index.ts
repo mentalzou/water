@@ -91,6 +91,8 @@ export interface Product {
   unit?: string;
   image?: string;
   stock?: number;
+  frozen_stock?: number;
+  min_order_quantity?: number;
   brand_id?: string;
   brand_name?: string;
   category_id?: string;

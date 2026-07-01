@@ -328,8 +328,15 @@ export function createOrder(req: Request, res: Response): void {
     delivery_time: delivery_time || '',
   });
 
+
   if (!result) {
     error(res, '创建订单失败，请检查商品信息');
+    return;
+  }
+
+  // 库存/起送量校验失败
+  if (result.stockError) {
+    error(res, result.stockError, 400);
     return;
   }
 

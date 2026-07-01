@@ -36,12 +36,14 @@ export async function apiFetch(
     cache: 'no-store',
   });
 
-  // 401 / 403 → 清除 token 并跳转登录页
+  // 401 / 403 → 清除 token 并跳转登录页（保留返回地址）
   if (response.status === 401 || response.status === 403) {
     localStorage.removeItem(tokenKey);
     const target = loginPath || LOGIN_PATHS[tokenKey] || '/login';
     if (typeof window !== 'undefined') {
-      window.location.href = target;
+      const from = encodeURIComponent(window.location.pathname + window.location.search);
+      const sep = target.includes('?') ? '&' : '?';
+      window.location.href = `${target}${sep}from=${from}`;
     }
     throw new Error('登录已过期，请重新登录');
   }
@@ -59,7 +61,9 @@ export async function apiFetch(
       localStorage.removeItem(tokenKey);
       const target = loginPath || LOGIN_PATHS[tokenKey] || '/login';
       if (typeof window !== 'undefined') {
-        window.location.href = target;
+        const from = encodeURIComponent(window.location.pathname + window.location.search);
+        const sep = target.includes('?') ? '&' : '?';
+        window.location.href = `${target}${sep}from=${from}`;
       }
       throw new Error('登录已过期，请重新登录');
     }
