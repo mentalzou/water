@@ -28,12 +28,34 @@ export default function ConfigPage() {
 
   const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
-  function getToken() {
+  function getToken(): string {
+    return localStorage.getItem('admin_token') || '';
+  }
+
+  async function fetchConfigs() {
     try {
-      const user = localStorage.getItem('user');
-      if (user) return JSON.parse(user).token || '';
-    } catch {}
-    return '';
+      const res = await fetch(`${API_BASE}/admin/configs`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        const grouped = data.data || {};
+        // 从分组结构中提取 flat key-value
+        const configMap: Record<string, string> = {};
+        for (const group of Object.values(grouped) as any[]) {
+          for (const item of group) {
+            configMap[item.key] = String(item.value);
+          }
+        }
+        setConfigs(prev => ({
+          commission_type: configMap.commission_type || prev.commission_type,
+          commission_rate: configMap.commission_rate || prev.commission_rate,
+          site_name: configMap.site_name || prev.site_name,
+        }));
+      }
+    } catch (e) {
+      console.error('获取配置失败', e);
+    }
   }
 
   async function fetchTerminalInfo() {
@@ -76,12 +98,43 @@ export default function ConfigPage() {
   }
 
   useEffect(() => {
+    fetchConfigs();
     fetchTerminalInfo();
   }, []);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  async function handleSave() {
+    try {
+      const token = getToken();
+      const configsToSave = [
+        { key: 'commission_type', value: configs.commission_type },
+        { key: 'commission_rate', value: configs.commission_rate },
+        { key: 'site_name', value: configs.site_name },
+      ];
+
+      for (const cfg of configsToSave) {
+        const res = await fetch(`${API_BASE}/admin/configs`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(cfg),
+        });
+        const data = await res.json();
+        if (data.code !== 200) {
+          alert(`保存 ${cfg.key} 失败: ${data.message || '未知错误'}`);
+          return;
+        }
+      }
+
+      // 保存后从服务端刷新，确保显示的是实际持久化的值
+      await fetchConfigs();
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e: any) {
+      alert('保存失败: ' + (e.message || '网络错误'));
+    }
   }
 
   return (

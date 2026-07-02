@@ -69,12 +69,18 @@ export default function DistributorManage() {
       const token = getToken();
       if (editId) {
         const body: any = { name: form.name, phone: form.phone, commission_type: form.commission_type, commission_rate: Number(form.commission_rate) };
-        await fetch(`${API_BASE}/admin/distributors/${editId}`, {
+        const editRes: any = await fetch(`${API_BASE}/admin/distributors/${editId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(body),
         }).then(r => r.json());
-        setData(data.map(d => d.id === editId ? { ...d, user_name: form.name, phone: form.phone } : d));
+        if (editRes.code === 200) {
+          loadData();
+        } else {
+          alert(editRes?.message || '保存失败');
+          setSubmitting(false);
+          return;
+        }
       } else {
         const res: any = await fetch(`${API_BASE}/admin/distributors`, {
           method: 'POST',

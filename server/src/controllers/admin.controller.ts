@@ -104,12 +104,24 @@ export function listDistributors(req: Request, res: Response): void {
 
 export function updateDistributor(req: Request, res: Response): void {
   const id = str(req.params.id);
-  const result = distributorModel.update(id, req.body as any);
+
+  // name / phone belong to users table, not distributors table
+  const { name, phone, ...distributorFields } = req.body;
+
+  const result = distributorModel.update(id, distributorFields);
   if (!result) return notFound(res);
 
-  // Sync status to user table
-  if (req.body.status && (result as any).user_id) {
-    userModel.update((result as any).user_id, { status: req.body.status });
+  // Update user table fields (name, phone, status)
+  const userId = (result as any).user_id;
+  if (userId) {
+    const userUpdates: any = {};
+    if (name !== undefined) userUpdates.name = name;
+    if (phone !== undefined) userUpdates.phone = phone;
+    if (req.body.status) userUpdates.status = req.body.status;
+
+    if (Object.keys(userUpdates).length > 0) {
+      userModel.update(userId, userUpdates);
+    }
   }
 
   success(res, result, '更新成功');
@@ -800,7 +812,13 @@ export function updateConfig(req: Request, res: Response): void {
   const value = str(req.body.value);
   if (!key) { error(res, '请提供配置项'); return; }
   const db = getDb();
-  db.prepare("UPDATE system_config SET value = ? WHERE key = ?").run(value, key);
+  // 使用 INSERT OR REPLACE 确保 key 不存在时也能写入，而非静默影响 0 行
+  const existing = db.prepare('SELECT key FROM system_config WHERE key = ?').get(key);
+  if (existing) {
+    db.prepare('UPDATE system_config SET value = ? WHERE key = ?').run(value, key);
+  } else {
+    db.prepare("INSERT INTO system_config (key, value) VALUES (?, ?)").run(key, value);
+  }
   success(res, null, '配置已更新');
 }
 
