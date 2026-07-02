@@ -178,7 +178,7 @@ export default function ProductManage() {
         description: form.description,
         price: parseFloat(form.price),
         unit: form.unit,
-        stock: parseInt(form.stock) || 99999,
+        stock: form.stock.trim() === '' ? 99999 : parseInt(form.stock),
         min_order_quantity: parseInt(form.min_order_quantity) || 1,
         category_id: form.category_id || undefined,
         brand_id: form.brand_id || undefined
@@ -464,7 +464,7 @@ export default function ProductManage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">库存数量</label>
                   <input type="number" step="1" min="0" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })}
                          className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"
-                         placeholder="默认99999"/>
+                         placeholder="留空默认99999，0表示已售罄"/>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">起送量（件）</label>
