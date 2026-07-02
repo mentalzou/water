@@ -48,6 +48,7 @@ export default function OrderPage() {
   const [orderResult, setOrderResult] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showCartDetail, setShowCartDetail] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     loadProducts();
@@ -362,7 +363,10 @@ export default function OrderPage() {
                 return (
                     <div key={product.id} className="bg-white rounded-lg p-3 flex gap-3">
                       {/* 产品图片 */}
-                      <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                      <div
+                          className={`w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden ${product.image ? 'cursor-pointer active:scale-95 transition-transform' : ''}`}
+                          onClick={() => product.image && setPreviewImage(product.image)}
+                      >
                         {product.image ? (
                             <img src={product.image} alt={product.name} className="w-full h-full object-cover"/>
                         ) : (
@@ -453,6 +457,34 @@ export default function OrderPage() {
             </div>
           </main>
         </div>
+
+        {/* 图片预览弹窗 */}
+        {previewImage && (
+          <div
+            className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setPreviewImage(null)}
+          >
+            {/* 关闭按钮 */}
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 active:scale-90 transition-all"
+              aria-label="关闭预览"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* 提示文字 */}
+            <span className="absolute top-5 left-5 text-white/50 text-xs z-10">点击空白处关闭</span>
+
+            {/* 大图 */}
+            <img
+              src={previewImage}
+              alt="产品图片预览"
+              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
 
         {/* 底部结算栏 */}
         {selectedItems.length > 0 && (
