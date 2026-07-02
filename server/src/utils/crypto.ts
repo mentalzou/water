@@ -181,7 +181,7 @@ function processKeyLength(key: string): string {
  */
 export function generateMd5Sign(data: string, key: string): string {
   const signData = `${data}&${key}`;
-  return CryptoJS.MD5(signData).toString();
+  return CryptoJS.MD5(signData).toString().toUpperCase();
 }
 
 /**
@@ -189,7 +189,7 @@ export function generateMd5Sign(data: string, key: string): string {
  */
 export function verifyMd5Sign(data: string, key: string, receivedSign: string): boolean {
   const expectedSign = generateMd5Sign(data, key);
-  return expectedSign === receivedSign;
+  return expectedSign.toUpperCase() === (receivedSign || '').toUpperCase();
 }
 
 /**

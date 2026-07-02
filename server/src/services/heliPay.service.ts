@@ -195,15 +195,47 @@ async function initPayment(): Promise<void> {
   // 2. 尝试从数据库加载持久化的终端配置
   const cached = loadTerminalConfig();
   if (cached && cached.terminal?.snNo && cached.keys?.secretKey && cached.keys?.signKey) {
-    console.log('[InitPayment] 使用数据库缓存的终端配置, snNo:', cached.terminal.snNo);
-    setMerchantKeys(cached.keys);
-    return;
+    // 检查缓存时效：超过24小时视为过期，需要重新获取
+    if (cached.keys.updatedAt && Date.now() - cached.keys.updatedAt <= 24 * 60 * 60 * 1000) {
+      console.log('[InitPayment] 使用数据库缓存的终端配置, snNo:', cached.terminal.snNo);
+      setMerchantKeys(cached.keys);
+      return;
+    }
+    console.log('[InitPayment] 数据库缓存的终端配置已过期（超过24小时），将重新获取');
   }
 
-  // 3. 数据库无缓存或缓存无效，重新获取终端和密钥
+  // 3. 数据库无缓存或缓存无效/过期，重新获取终端和密钥
   console.log('[InitPayment] 无有效终端配置，开始重新获取...');
   const terminal = await generateTerminal();
   await requestKeys(terminal);
+}
+
+/**
+ * 发送加密支付请求到合利宝（内部辅助，用于创建支付 + 重试）
+ */
+async function sendPaymentRequest(
+    params: Record<string, any>,
+    keys: { secretKey: string; signKey: string; snNo: string }
+): Promise<any> {
+  // 构建加密请求
+  const requestBody = buildEncryptedRequest(params, keys.secretKey, keys.signKey, keys.snNo);
+  console.log('加密请求体:', JSON.stringify(requestBody));
+
+  // 发送请求
+  const fullUrl = `${helipayConfig.baseUrl.replace(/\/+$/, '')}${API_ENDPOINTS.orderJsapi}`;
+  const response = await sendPostRequest(
+      fullUrl,
+      JSON.stringify(requestBody),
+      helipayConfig.authCode
+  );
+
+  console.log('支付原始响应:', JSON.stringify(response));
+
+  // 处理加密响应
+  const processedResponse = processEncryptedResponse(response, keys.secretKey, keys.signKey);
+  console.log('支付解密响应:', JSON.stringify(processedResponse));
+
+  return processedResponse;
 }
 
 /**
@@ -241,24 +273,29 @@ export async function createJsApiOrder(
 
     console.log('支付请求参数:', JSON.stringify(params));
 
-    // 构建加密请求
-    const requestBody = buildEncryptedRequest(params, keys.secretKey, keys.signKey, keys.snNo);
-    console.log('加密请求体:', JSON.stringify(requestBody));
+    // 发送加密支付请求（含签名错误自动重试）
+    let processedResponse = await sendPaymentRequest(params, keys);
 
-    // 发送请求（JSAPI原生支付）
-    const fullUrl = `${helipayConfig.baseUrl.replace(/\/+$/, '')}${API_ENDPOINTS.orderJsapi}`;
-    const response = await sendPostRequest(
-        fullUrl,
-        JSON.stringify(requestBody),
-        helipayConfig.authCode
-    );
+    // 签名错误时清除缓存并重试一次
+    if (processedResponse.responseCode !== '0000') {
+      const errMsg = (processedResponse.responseMessage || '').toUpperCase();
+      if (errMsg.includes('SIGN') || processedResponse.responseCode === '9999') {
+        console.log('[支付] 检测到签名/通信错误，清除终端缓存并重试...');
+        clearTerminalConfig();
+        await initPayment();
 
-    console.log('支付原始响应:', JSON.stringify(response));
+        const retryKeys = getMerchantKeys();
+        if (!retryKeys) {
+          throw new Error(`支付请求失败: ${processedResponse.responseMessage}`);
+        }
 
-    // 处理加密响应
-    const processedResponse = processEncryptedResponse(response, keys.secretKey, keys.signKey);
+        // 更新 snNo（重新生成的终端 snNo 可能不同）
+        params.snNo = retryKeys.snNo;
+        console.log('[支付] 重试 - 新终端 snNo:', retryKeys.snNo);
 
-    console.log('支付解密响应:', JSON.stringify(processedResponse));
+        processedResponse = await sendPaymentRequest(params, retryKeys);
+      }
+    }
 
     if (processedResponse.responseCode !== '0000') {
       throw new Error(`支付请求失败: ${processedResponse.responseMessage}`);
