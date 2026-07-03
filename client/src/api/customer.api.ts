@@ -37,6 +37,8 @@ export const customerApi = {
       api.get(`/customers/recharge/my-recharges?page=${page}&pageSize=${pageSize}`),
   getActiveRecharge: () => api.get('/customers/recharge/active'),
   getUserBalance: () => api.get('/customers/recharge/balance'),
+  getMyBalanceTransactions: (params?: { page?: number; pageSize?: number; tx_type?: string; start_date?: string; end_date?: string }) =>
+      api.get('/customers/recharge/transactions', { params }),
 
   // 商品和分类
   getProducts: () => api.get('/products'),

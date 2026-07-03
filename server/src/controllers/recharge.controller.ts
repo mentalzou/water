@@ -220,8 +220,42 @@ export function getUserBalance(req: Request, res: Response): void {
   const balance = userRechargeModel.getTotalBalanceByUserId(userId);
   const activeRecharges = userRechargeModel.findAllActiveByUserId(userId);
 
+  // 累计充值总额
+  const db = require('../utils/db').getDb();
+  const totalRecharged = (db.prepare(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM user_recharges WHERE user_id = ? AND status != 'pending'"
+  ).get(userId) as { total: number }).total;
+
+  // 累计消费总额
+  const totalConsumed = (db.prepare(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM balance_transactions WHERE user_id = ? AND tx_type IN ('consume_principal', 'consume_bonus')"
+  ).get(userId) as { total: number }).total;
+
   success(res, {
     ...balance,
+    totalRecharged,
+    totalConsumed,
     active_recharges: activeRecharges,
   });
+}
+
+/** 获取用户账户余额变动明细（带筛选） */
+export function getMyBalanceTransactions(req: Request, res: Response): void {
+  const userId = (req as any).user?.userId;
+
+  if (!userId) {
+    error(res, '请先登录', 401);
+    return;
+  }
+
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.pageSize as string) || 20;
+  const txType = req.query.tx_type as string || '';
+  const startDate = req.query.start_date as string || '';
+  const endDate = req.query.end_date as string || '';
+
+  const { data, total } = balanceTransactionModel.findByUserId(
+    userId, page, pageSize, txType, startDate, endDate
+  );
+  paginated(res, data, page, pageSize, total);
 }

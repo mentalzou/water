@@ -8,6 +8,7 @@ import {
     getActiveRecharge,
     getUserBalance,
     payForRecharge,
+    getMyBalanceTransactions,
 } from '../controllers/recharge.controller';
 import * as paymentController from '../controllers/payment.controller';
 import { getActiveBanners } from '../controllers/adBanner.controller';
@@ -64,6 +65,7 @@ router.post('/customers/recharge/:id/pay', payForRecharge);
 router.get('/customers/recharge/my-recharges', getMyRecharges);
 router.get('/customers/recharge/active', getActiveRecharge);
 router.get('/customers/recharge/balance', getUserBalance);
+router.get('/customers/recharge/transactions', getMyBalanceTransactions);
 
 // Address management
 router.get('/addresses', customerController.getAddresses);

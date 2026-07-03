@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  User, Package, Lock, MapPin, LogOut, ChevronRight, Gift, CreditCard
+  User, Package, Lock, MapPin, LogOut, ChevronRight, Gift, CreditCard, Wallet
 } from 'lucide-react';
 import BottomNav from '../../components/BottomNav';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
 const MENU_ITEMS = [
   { key: 'orders', label: '我的订单', icon: Package, path: '/profile/orders', desc: '查看全部订单状态' },
+  { key: 'balance', label: '账户余额', icon: Wallet, path: '/profile/balance', desc: '查看余额及变动明细' },
   { key: 'recharge', label: '充值中心', icon: CreditCard, path: '/profile/recharge', desc: '充值享受优惠折扣' },
   { key: 'points', label: '我的积分', icon: Gift, path: '/profile/points', desc: '查看积分和记录' },
   { key: 'password', label: '修改密码', icon: Lock, path: '/profile/password', desc: '更改登录密码' },

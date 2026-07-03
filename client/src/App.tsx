@@ -12,6 +12,7 @@ const CustomerPasswordPage = lazy(() => import('./pages/customer/PasswordPage'))
 const CustomerAddressPage = lazy(() => import('./pages/customer/AddressPage'))
 const CustomerPointsPage = lazy(() => import('./pages/customer/PointsPage'))
 const CustomerRechargePage = lazy(() => import('./pages/customer/RechargePage'))
+const CustomerBalancePage = lazy(() => import('./pages/customer/BalancePage'))
 const CustomerFreeTrialPage = lazy(() => import('./pages/customer/FreeTrialPage'))
 const CustomerQualityReportPage = lazy(() => import('./pages/customer/QualityReportPage'))
 const CustomerPurchaseNoticePage = lazy(() => import('./pages/customer/PurchaseNoticePage'))
@@ -84,6 +85,7 @@ function AppContent() {
             <Route path="/profile/orders" element={<CustomerOrdersPage />} />
             <Route path="/profile/points" element={<CustomerPointsPage />} />
             <Route path="/profile/recharge" element={<CustomerRechargePage />} />
+            <Route path="/profile/balance" element={<CustomerBalancePage />} />
             <Route path="/profile/password" element={<CustomerPasswordPage />} />
             <Route path="/profile/address" element={<CustomerAddressPage />} />
             <Route path="/free-trial" element={<CustomerFreeTrialPage />} />
