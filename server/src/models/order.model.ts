@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+﻿import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../utils/db';
 import type { Order } from '../types';
 
@@ -39,8 +39,8 @@ export const orderModel = {
     
     // 创建订单主表记录（不含商品信息）
     db.prepare(
-      `INSERT INTO orders (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, distributor_commission, pay_method, from_balance, from_bonus, delivery_date, delivery_time)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO orders (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, distributor_commission, pay_method, from_balance, from_bonus, delivery_date, delivery_time, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))`
     ).run(
       id, order_no,
       data.customer_phone, data.customer_name, data.address,
@@ -247,15 +247,15 @@ export const orderModel = {
     };
     const timeCol = timeField[status as keyof typeof timeField];
     if (timeCol) {
-      db.prepare(`UPDATE orders SET status = ?, ${timeCol} = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(status, id);
+      db.prepare(`UPDATE orders SET status = ?, ${timeCol} = datetime('now', 'localtime'), updated_at = datetime('now', 'localtime') WHERE id = ?`).run(status, id);
     } else {
-      db.prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
+      db.prepare("UPDATE orders SET status = ?, updated_at = datetime('now', 'localtime') WHERE id = ?").run(status, id);
     }
     return this.findById(id);
   },
 
   assignDeliveryman(orderId: string, deliverymanId: string): Order | undefined {
-    const info = db.prepare("UPDATE orders SET deliveryman_id = ?, status = 'assigned', assigned_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+    const info = db.prepare("UPDATE orders SET deliveryman_id = ?, status = 'assigned', assigned_at = datetime('now', 'localtime'), updated_at = datetime('now', 'localtime') WHERE id = ?")
       .run(deliverymanId, orderId);
     console.log(`[派单] 订单 ${orderId} 派单结果: changes=${info.changes}, deliveryman=${deliverymanId}`);
     if (info.changes === 0) {
@@ -269,33 +269,33 @@ export const orderModel = {
   },
 
   markPaid(id: string, transactionId: string): Order | undefined {
-    db.prepare("UPDATE orders SET pay_status = 'paid', status = 'paid', transaction_id = ?, paid_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+    db.prepare("UPDATE orders SET pay_status = 'paid', status = 'paid', transaction_id = ?, paid_at = datetime('now', 'localtime'), updated_at = datetime('now', 'localtime') WHERE id = ?")
       .run(transactionId, id);
     return this.findById(id);
   },
 
   /** 支付成功后的"待派送"状态（等待系统匹配派送员） */
   markPendingDelivery(id: string, transactionId: string): Order | undefined {
-    db.prepare("UPDATE orders SET pay_status = 'paid', status = 'pending_delivery', transaction_id = ?, paid_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+    db.prepare("UPDATE orders SET pay_status = 'paid', status = 'pending_delivery', transaction_id = ?, paid_at = datetime('now', 'localtime'), updated_at = datetime('now', 'localtime') WHERE id = ?")
       .run(transactionId, id);
     return this.findById(id);
   },
 
   markRefunding(id: string, refundOrderNo: string): Order | undefined {
-    db.prepare("UPDATE orders SET status = 'refunding', remark = '退款订单号:' || ? || CASE WHEN remark IS NOT NULL AND remark != '' THEN ';' || remark ELSE '' END, updated_at = datetime('now') WHERE id = ?")
+    db.prepare("UPDATE orders SET status = 'refunding', remark = '退款订单号:' || ? || CASE WHEN remark IS NOT NULL AND remark != '' THEN ';' || remark ELSE '' END, updated_at = datetime('now', 'localtime') WHERE id = ?")
       .run(refundOrderNo, id);
     return this.findById(id);
   },
 
   markRefunded(id: string): Order | undefined {
-    db.prepare("UPDATE orders SET status = 'refunded', pay_status = 'refunded', updated_at = datetime('now') WHERE id = ?")
+    db.prepare("UPDATE orders SET status = 'refunded', pay_status = 'refunded', updated_at = datetime('now', 'localtime') WHERE id = ?")
       .run(id);
     return this.findById(id);
   },
 
   /** 取消订单（关闭订单） */
   cancelOrder(id: string): Order | undefined {
-    db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?")
+    db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now', 'localtime') WHERE id = ?")
       .run(id);
     return this.findById(id);
   },
@@ -303,7 +303,7 @@ export const orderModel = {
   /** 查找超过指定小时数仍未支付的待支付订单 */
   findPendingOlderThan(hours: number): Array<{ id: string; order_no: string }> {
     return db.prepare(
-      `SELECT id, order_no FROM orders WHERE status = 'pending' AND created_at < datetime('now', ?)`
+      `SELECT id, order_no FROM orders WHERE status = 'pending' AND created_at < datetime('now', 'localtime', ?)`
     ).all(`-${hours} hours`) as Array<{ id: string; order_no: string }>;
   },
 };

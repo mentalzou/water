@@ -107,7 +107,7 @@ export default function OrderManage() {
       // 从 Content-Disposition 头取文件名，兼容后端动态命名
       const disposition = res.headers.get('Content-Disposition');
       const match = disposition?.match(/filename="?([^";]+)"?/);
-      a.download = match?.[1] || `order_export_${new Date().toISOString().slice(0,10)}.csv`;
+      const n = new Date(); a.download = match?.[1] || `order_export_${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

@@ -41,7 +41,7 @@ export default function AdminDashboard() {
     const result: Record<string, { day: string; orders: number; revenue: number }> = {};
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now); d.setDate(d.getDate() - i);
-      const key = d.toISOString().split('T')[0];
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       result[key] = { day: days[d.getDay()], orders: 0, revenue: 0 };
     }
     // 用今日已支付订单填充（后端 recentOrders 包含 created_at）

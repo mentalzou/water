@@ -16,7 +16,7 @@ export const deliverymanModel = {
       if (!existingUser) {
         const newUserId = uuidv4();
         const passwordHash = data.password ? hashPassword(data.password) : '';
-        db.prepare('INSERT INTO users (id, phone, name, role, status, password_hash) VALUES (?, ?, ?, ?, ?, ?)').run(
+        db.prepare('INSERT INTO users (id, phone, name, role, status, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))').run(
           newUserId, data.phone, data.name || '', 'deliveryman', data.status || 'active', passwordHash,
         );
         userIdToUse = newUserId;
@@ -26,7 +26,7 @@ export const deliverymanModel = {
     }
 
     db.prepare(
-      'INSERT INTO deliverymen (id, user_id, name, phone, area_ids, province, city, districts, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO deliverymen (id, user_id, name, phone, area_ids, province, city, districts, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(
       id,
       userIdToUse,

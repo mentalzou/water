@@ -8,7 +8,7 @@ export const brandModel = {
   create(data: { name: string; description?: string; logo?: string; category_id?: string; status?: string; sort_order?: number }): Brand {
     const id = `brand-${Date.now()}`;
     db.prepare(
-      'INSERT INTO brands (id, name, logo, description, category_id, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO brands (id, name, logo, description, category_id, status, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(
       id,
       data.name || '',

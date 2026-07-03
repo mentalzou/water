@@ -8,7 +8,7 @@ export const roleModel = {
   create(data: Partial<Role>): Role {
     const id = uuidv4();
     db.prepare(
-      'INSERT INTO roles (id, name, code, description, permissions) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO roles (id, name, code, description, permissions, created_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(id, data.name || '', data.code || '', data.description || '', data.permissions || '[]');
     return this.findById(id)!;
   },

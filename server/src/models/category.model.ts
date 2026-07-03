@@ -9,7 +9,7 @@ export const categoryModel = {
   create(data: { name: string; code: string; description?: string; icon?: string; sort_order?: number }): ProductCategory {
     const id = `cat-${Date.now()}`;
     db.prepare(
-        'INSERT INTO product_categories (id, name, code, description, icon, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO product_categories (id, name, code, description, icon, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(
         id,
         data.name || '',

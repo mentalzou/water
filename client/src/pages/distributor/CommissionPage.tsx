@@ -31,7 +31,7 @@ export default function CommissionPage() {
     // 直接通过浏览器下载 CSV
     const a = document.createElement('a');
     a.href = distributorApi.exportCommissionsUrl(distributorId);
-    a.download = `commission_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    const n = new Date(); a.download = `commission_export_${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}.csv`;
     a.click();
   }
 

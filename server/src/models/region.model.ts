@@ -30,7 +30,7 @@ export const regionModel = {
     ).get(data.parent_id ?? null) as { next: number }).next;
 
     db.prepare(
-      'INSERT INTO regions (id, name, parent_id, level, sort_order, status) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO regions (id, name, parent_id, level, sort_order, status, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(id, data.name, data.parent_id || null, level, maxSort, 'active');
 
     return this.findById(id)!;

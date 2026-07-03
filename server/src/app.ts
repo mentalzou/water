@@ -41,7 +41,7 @@ app.use('/uploads', express.static(config.upload.baseDir));
 
 // Public routes - no authentication required
 app.get('/api/health', (_req, res) => {
-  res.json({ code: 200, message: '服务运行正常', data: { time: new Date().toUTCString() } });
+  res.json({ code: 200, message: '服务运行正常', data: { time: new Date().toLocaleString() } });
 });
 
 // 临时文件上传接口（用于上传资质证书图片）

@@ -230,7 +230,8 @@ export function exportCommissions(req: Request, res: Response): void {
   });
 
   const csvContent = BOM + lines.join('\n');
-  const filename = `commission_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  const now = new Date();
+  const filename = `commission_export_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.csv`;
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

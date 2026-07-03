@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+﻿import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../utils/db';
 
 export interface Address {
@@ -36,7 +36,7 @@ const addressModel = {
     }
 
     db.prepare(
-      'INSERT INTO addresses (id, user_id, contact_name, contact_phone, province, city, district, detail, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO addresses (id, user_id, contact_name, contact_phone, province, city, district, detail, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))'
     ).run(id, data.user_id, data.contact_name, data.contact_phone, data.province || '', data.city || '', data.district || '', data.detail, isDefault);
 
     return addressModel.findById(id)!;
@@ -67,7 +67,7 @@ const addressModel = {
       values.push(value);
     }
     values.push(id);
-    db.prepare(`UPDATE addresses SET ${fields.join(', ')}, updated_at = datetime('now') WHERE id = ?`).run(...values);
+    db.prepare(`UPDATE addresses SET ${fields.join(', ')}, updated_at = datetime('now', 'localtime') WHERE id = ?`).run(...values);
 
     return addressModel.findById(id);
   },

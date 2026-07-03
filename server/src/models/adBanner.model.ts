@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+﻿import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../utils/db';
 import type { AdBanner } from '../types';
 
@@ -34,8 +34,8 @@ export const adBannerModel = {
   }): AdBanner {
     const id = uuidv4();
     db.prepare(
-        `INSERT INTO ad_banners (id, title, subtitle, type, src, link_url, bg_color, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO ad_banners (id, title, subtitle, type, src, link_url, bg_color, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))`
     ).run(
         id, data.title, data.subtitle || '', data.type, data.src,
         data.link_url || '', data.bg_color || '', data.sort_order || 0
@@ -62,7 +62,7 @@ export const adBannerModel = {
       }
     }
     if (fields.length === 0) return this.findById(id);
-    fields.push("updated_at = datetime('now')");
+    fields.push("updated_at = datetime('now', 'localtime')");
     values.push(id);
     db.prepare(`UPDATE ad_banners SET ${fields.join(', ')} WHERE id = ?`).run(...values);
     return this.findById(id);

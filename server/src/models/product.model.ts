@@ -9,7 +9,7 @@ export const productModel = {
   create(data: Partial<Product>): Product {
     const id = `prod-${Date.now()}`;
     db.prepare(
-      'INSERT INTO products (id, name, description, price, unit, image, stock, frozen_stock, min_order_quantity, brand_id, category_id, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO products (id, name, description, price, unit, image, stock, frozen_stock, min_order_quantity, brand_id, category_id, status, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(
       id,
       data.name || '',

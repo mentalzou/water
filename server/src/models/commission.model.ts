@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+﻿import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../utils/db';
 import type { CommissionRecord, CommissionSummary, PayoutRecord } from '../types';
 
@@ -15,7 +15,7 @@ export const commissionModel = {
   }): CommissionRecord {
     const id = uuidv4();
     db.prepare(
-      'INSERT INTO commissions (id, order_id, distributor_id, order_amount, commission_rate, commission_type, commission_amount) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO commissions (id, order_id, distributor_id, order_amount, commission_rate, commission_type, commission_amount, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(id, data.order_id, data.distributor_id, data.order_amount, data.commission_rate, data.commission_type, data.commission_amount);
     
     // Update distributor totals
@@ -275,7 +275,7 @@ export const commissionModel = {
 
       // 创建打款批次
       db.prepare(
-        'INSERT INTO payout_batches (id, batch_no, payout_date, total_amount, distributor_count) VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO payout_batches (id, batch_no, payout_date, total_amount, distributor_count, created_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
       ).run(batchId, batch_no, payout_date, result.total, result.dist_count);
 
       // 更新佣金记录
@@ -284,7 +284,7 @@ export const commissionModel = {
         if (!record || record.status !== 'pending') continue;
 
         db.prepare(
-          "UPDATE commissions SET status = 'settled', settled_at = datetime('now'), payout_batch_no = ?, payout_date = ? WHERE id = ? AND status = 'pending'"
+          "UPDATE commissions SET status = 'settled', settled_at = datetime('now', 'localtime'), payout_batch_no = ?, payout_date = ? WHERE id = ? AND status = 'pending'"
         ).run(batch_no, payout_date, cid);
 
         // 更新分销商资金：可用 → 冻结
@@ -302,7 +302,7 @@ export const commissionModel = {
   },
 
   settle(id: string): CommissionRecord | undefined {
-    db.prepare("UPDATE commissions SET status = 'settled', settled_at = datetime('now') WHERE id = ?").run(id);
+    db.prepare("UPDATE commissions SET status = 'settled', settled_at = datetime('now', 'localtime') WHERE id = ?").run(id);
     const record = this.findById(id);
     if (record && record.status === 'settled') {
       db.prepare('UPDATE distributors SET available_commission = available_commission - ?, frozen_commission = frozen_commission + ? WHERE id = ?')

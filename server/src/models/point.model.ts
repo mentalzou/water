@@ -8,7 +8,7 @@ export const pointsRecordModel = {
   create(data: Omit<PointsRecord, 'id' | 'created_at'>): PointsRecord {
     const id = uuidv4();
     db.prepare(
-        'INSERT INTO points_records (id, user_id, order_id, change_type, change_amount, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO points_records (id, user_id, order_id, change_type, change_amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(
         id,
         data.user_id,

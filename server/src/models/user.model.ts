@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+﻿import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../utils/db';
 import type { User } from '../types';
 
@@ -8,7 +8,7 @@ export const userModel = {
   create(data: Partial<User> & { phone: string }): User {
     const id = uuidv4();
     db.prepare(
-      'INSERT INTO users (id, phone, name, role, password_hash, avatar, status, referrer_distributor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (id, phone, name, role, password_hash, avatar, status, referrer_distributor_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))'
     ).run(
       id,
       data.phone,
@@ -86,7 +86,7 @@ export const userModel = {
       }
     }
     if (fields.length > 0) {
-      fields.push("updated_at = datetime('now')");
+      fields.push("updated_at = datetime('now', 'localtime')");
       values.push(id);
       db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...values);
     }

@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+﻿import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../utils/db';
 import type { UserRecharge } from '../types';
 
@@ -19,7 +19,7 @@ export const userRechargeModel = {
   }): UserRecharge {
     const id = uuidv4();
     db.prepare(
-        'INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, status, transaction_id, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, status, transaction_id, remark, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(
         id,
         data.user_id,
@@ -106,7 +106,7 @@ export const userRechargeModel = {
 
   markPaid(id: string, transactionId: string): UserRecharge | undefined {
     db.prepare(
-        "UPDATE user_recharges SET status = 'active', transaction_id = ?, paid_at = datetime('now') WHERE id = ?"
+        "UPDATE user_recharges SET status = 'active', transaction_id = ?, paid_at = datetime('now', 'localtime') WHERE id = ?"
     ).run(transactionId, id);
     return this.findById(id);
   },

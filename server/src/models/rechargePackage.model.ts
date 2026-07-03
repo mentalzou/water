@@ -25,7 +25,7 @@ export const rechargePackageModel = {
   }): RechargePackage {
     const id = uuidv4();
     db.prepare(
-        'INSERT INTO recharge_packages (id, name, amount, discount_rate, bonus_amount, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO recharge_packages (id, name, amount, discount_rate, bonus_amount, description, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(id, data.name, data.amount, data.discount_rate, data.bonus_amount || 0, data.description || '', data.sort_order || 0);
 
     return this.findById(id)!;

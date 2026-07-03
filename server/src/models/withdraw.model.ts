@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+﻿import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../utils/db';
 import type { WithdrawRequest } from '../types';
 
@@ -14,8 +14,8 @@ export const withdrawModel = {
   }): WithdrawRequest {
     const id = uuidv4();
     db.prepare(
-      `INSERT INTO withdraw_requests (id, distributor_id, amount, bank_name, bank_account, account_name)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO withdraw_requests (id, distributor_id, amount, bank_name, bank_account, account_name, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))`
     ).run(id, data.distributor_id, data.amount, data.bank_name || '', data.bank_account || '', data.account_name || '');
 
     // 冻结可用佣金
@@ -77,7 +77,7 @@ export const withdrawModel = {
     }
 
     db.prepare(
-      `UPDATE withdraw_requests SET status = ?, reviewed_by = ?, remark = ?, reviewed_at = datetime('now') WHERE id = ?`
+      `UPDATE withdraw_requests SET status = ?, reviewed_by = ?, remark = ?, reviewed_at = datetime('now', 'localtime') WHERE id = ?`
     ).run(status, reviewedBy || '', remark || '', id);
 
     return this.findById(id);

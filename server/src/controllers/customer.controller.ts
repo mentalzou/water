@@ -278,7 +278,7 @@ export function createOrder(req: Request, res: Response): void {
   if (delivery_date === '明天') {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    delivery_date = d.toISOString().slice(0, 10);
+    delivery_date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
   
   // 验证必填字段

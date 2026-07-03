@@ -1,4 +1,4 @@
-import { getDb } from '../utils/db';
+﻿import { getDb } from '../utils/db';
 import { userModel } from '../models/user.model';
 import type { PointsRecord } from '../types';
 
@@ -70,8 +70,13 @@ export function changePoints(params: PointsChangeParams): { newBalance: number; 
 
   switch (params.changeType) {
     case 'earn':
+      newPoints = currentPoints + params.amount;
+      break;
     case 'adjust':
       newPoints = currentPoints + params.amount;
+      if (newPoints < 0) {
+        throw new Error('调整后的积分不能为负数，当前积分：' + currentPoints);
+      }
       break;
     case 'spend':
     case 'refund':
@@ -90,7 +95,7 @@ export function changePoints(params: PointsChangeParams): { newBalance: number; 
   const description = params.description || getDefaultDescription(params.changeType, params.amount, params.orderId);
 
   db.prepare(
-      'INSERT INTO points_records (id, user_id, order_id, change_type, change_amount, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO points_records (id, user_id, order_id, change_type, change_amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
   ).run(
       recordId,
       params.userId,
@@ -102,7 +107,7 @@ export function changePoints(params: PointsChangeParams): { newBalance: number; 
   );
 
   // 更新用户积分 - 直接使用 SQL 而不是 userModel.update
-  const updateResult = db.prepare('UPDATE users SET points = ?, updated_at = datetime(\'now\') WHERE id = ?').run(newPoints, params.userId);
+  const updateResult = db.prepare('UPDATE users SET points = ?, updated_at = datetime(\'now\', \'localtime\') WHERE id = ?').run(newPoints, params.userId);
 
   if (updateResult.changes === 0) {
     console.error('[Points] Failed to update user points for user:', params.userId);
@@ -137,13 +142,44 @@ function getDefaultDescription(changeType: string, amount: number, orderId?: str
 }
 
 /**
- * 获取用户积分记录
+ * 获取用户积分记录，支持按日期和积分范围筛选
  */
-export function getUserPointsRecords(userId: string, page = 1, pageSize = 20): { data: PointsRecord[]; total: number } {
-  const total = (db.prepare('SELECT COUNT(*) as count FROM points_records WHERE user_id = ?').get(userId) as { count: number }).count;
+export function getUserPointsRecords(
+    userId: string,
+    page = 1,
+    pageSize = 20,
+    startDate?: string,
+    endDate?: string,
+    minAmount?: number,
+    maxAmount?: number
+): { data: PointsRecord[]; total: number } {
+  let whereClauses: string[] = ['user_id = ?'];
+  let params: any[] = [userId];
+
+  if (startDate) {
+    whereClauses.push("date(created_at) >= ?");
+    params.push(startDate);
+  }
+  if (endDate) {
+    whereClauses.push("date(created_at) <= ?");
+    params.push(endDate);
+  }
+  if (minAmount !== undefined) {
+    whereClauses.push('change_amount >= ?');
+    params.push(minAmount);
+  }
+  if (maxAmount !== undefined) {
+    whereClauses.push('change_amount <= ?');
+    params.push(maxAmount);
+  }
+
+  const whereSQL = whereClauses.join(' AND ');
+  const total = (db.prepare(`SELECT COUNT(*) as count FROM points_records WHERE ${whereSQL}`).get(...params) as { count: number }).count;
+
+  const dataParams = [...params, pageSize, (page - 1) * pageSize];
   const data = db.prepare(
-      'SELECT * FROM points_records WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-  ).all(userId, pageSize, (page - 1) * pageSize) as PointsRecord[];
+      `SELECT * FROM points_records WHERE ${whereSQL} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+  ).all(...dataParams) as PointsRecord[];
 
   return { data, total };
 }

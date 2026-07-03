@@ -99,7 +99,7 @@ export default function AdminCommissionManage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `commission_detail_${new Date().toISOString().slice(0, 10)}.csv`;
+      const dn1 = new Date(); a.download = `commission_detail_${dn1.getFullYear()}-${String(dn1.getMonth()+1).padStart(2,'0')}-${String(dn1.getDate()).padStart(2,'0')}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e: any) {
@@ -124,7 +124,7 @@ export default function AdminCommissionManage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `payout_record_${new Date().toISOString().slice(0, 10)}.csv`;
+      const dn2 = new Date(); a.download = `payout_record_${dn2.getFullYear()}-${String(dn2.getMonth()+1).padStart(2,'0')}-${String(dn2.getDate()).padStart(2,'0')}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e: any) {

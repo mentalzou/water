@@ -18,12 +18,12 @@ export const distributorModel = {
     if (!existingUser) {
       const newUserId = uuidv4();
       const passwordHash = data.password ? hashPassword(data.password) : '';
-      db.prepare('INSERT INTO users (id, phone, name, role, password_hash) VALUES (?, ?, ?, ?, ?)').run(newUserId, data.phone, data.name, 'distributor', passwordHash);
+      db.prepare('INSERT INTO users (id, phone, name, role, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))').run(newUserId, data.phone, data.name, 'distributor', passwordHash);
       userIdToUse = newUserId;
     }
 
     db.prepare(
-      'INSERT INTO distributors (id, user_id, code, commission_type, commission_rate) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO distributors (id, user_id, code, commission_type, commission_rate, created_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(id, userIdToUse, code, commissionType, commissionRate);
     
     return this.findByIdWithUser(id)!;

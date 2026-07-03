@@ -122,7 +122,7 @@ function resolveDeliveryDate(raw: string): string {
   if (raw === '明天') {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
   return raw;
 }

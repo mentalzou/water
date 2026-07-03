@@ -8,7 +8,7 @@ export const areaModel = {
   create(data: Partial<Area>): Area {
     const id = uuidv4();
     db.prepare(
-      'INSERT INTO areas (id, name, description, deliveryman_ids) VALUES (?, ?, ?, ?)'
+      'INSERT INTO areas (id, name, description, deliveryman_ids, created_at) VALUES (?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(id, data.name || '', data.description || '', JSON.stringify(data.deliveryman_ids || []));
     return this.findById(id)!;
   },

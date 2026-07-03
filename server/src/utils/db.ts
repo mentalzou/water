@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+﻿import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
@@ -35,8 +35,8 @@ export function initTables(database: Database.Database): void {
        avatar TEXT DEFAULT '',
        points INTEGER DEFAULT 0,
        status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive','locked')),
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT DEFAULT (datetime('now', 'localtime'))
       );
 
     CREATE TABLE IF NOT EXISTS roles (
@@ -45,7 +45,7 @@ export function initTables(database: Database.Database): void {
        code TEXT NOT NULL UNIQUE,
        description TEXT DEFAULT '',
        permissions TEXT DEFAULT '[]',
-       created_at TEXT DEFAULT (datetime('now'))
+       created_at TEXT DEFAULT (datetime('now', 'localtime'))
   );
 
     CREATE TABLE IF NOT EXISTS distributors (
@@ -57,7 +57,7 @@ export function initTables(database: Database.Database): void {
       available_commission REAL DEFAULT 0,
       frozen_commission REAL DEFAULT 0,
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive','frozen')),
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS deliverymen (
@@ -73,7 +73,7 @@ export function initTables(database: Database.Database): void {
       total_orders INTEGER DEFAULT 0,
       completed_orders INTEGER DEFAULT 0,
       rating REAL DEFAULT 5.0,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS areas (
@@ -81,7 +81,7 @@ export function initTables(database: Database.Database): void {
       name TEXT NOT NULL UNIQUE,
       description TEXT DEFAULT '',
       deliveryman_ids TEXT DEFAULT '[]',
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS brands (
@@ -92,7 +92,7 @@ export function initTables(database: Database.Database): void {
       category_id TEXT DEFAULT '' REFERENCES product_categories(id),
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
       sort_order INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
       );
 
     CREATE TABLE IF NOT EXISTS product_categories (
@@ -103,7 +103,7 @@ export function initTables(database: Database.Database): void {
       icon TEXT DEFAULT '',
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
       sort_order INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS products (
@@ -120,7 +120,7 @@ export function initTables(database: Database.Database): void {
       category_id TEXT DEFAULT '' REFERENCES product_categories(id),
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
       sort_order INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS orders (
@@ -142,8 +142,8 @@ export function initTables(database: Database.Database): void {
       delivery_time TEXT DEFAULT '',
       transaction_id TEXT DEFAULT '',
       remark TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT DEFAULT (datetime('now', 'localtime')),
       paid_at TEXT DEFAULT '',
       assigned_at TEXT DEFAULT '',
       delivered_at TEXT DEFAULT ''
@@ -158,7 +158,7 @@ export function initTables(database: Database.Database): void {
       unit_price REAL NOT NULL,
       subtotal REAL NOT NULL,
       unit TEXT DEFAULT '瓶',
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS commissions (
@@ -173,7 +173,7 @@ export function initTables(database: Database.Database): void {
       settled_at TEXT DEFAULT '',
       payout_batch_no TEXT DEFAULT '',
       payout_date TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS system_config (
@@ -194,8 +194,8 @@ export function initTables(database: Database.Database): void {
       district TEXT DEFAULT '',
       detail TEXT NOT NULL,
       is_default INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT DEFAULT (datetime('now', 'localtime'))
       );
 
     CREATE TABLE IF NOT EXISTS points_records (
@@ -206,7 +206,7 @@ export function initTables(database: Database.Database): void {
       change_amount INTEGER NOT NULL,
       balance_after INTEGER NOT NULL,
       description TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
       );
 
     CREATE TABLE IF NOT EXISTS recharge_packages (
@@ -218,7 +218,7 @@ export function initTables(database: Database.Database): void {
       description TEXT DEFAULT '',
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
       sort_order INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
       );
 
     CREATE TABLE IF NOT EXISTS user_recharges (
@@ -234,7 +234,7 @@ export function initTables(database: Database.Database): void {
       status TEXT DEFAULT 'active' CHECK(status IN ('active','expired','refunded')),
       transaction_id TEXT DEFAULT '',
       remark TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
       paid_at TEXT DEFAULT ''
     );
 
@@ -249,7 +249,7 @@ export function initTables(database: Database.Database): void {
       bonus_after REAL DEFAULT 0,
       description TEXT DEFAULT '',
       operator_ip TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
     CREATE TABLE IF NOT EXISTS ad_banners (
@@ -262,14 +262,14 @@ export function initTables(database: Database.Database): void {
       bg_color TEXT DEFAULT '',
       sort_order INTEGER DEFAULT 0,
       status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT DEFAULT (datetime('now', 'localtime'))
       );
 
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY,
       description TEXT DEFAULT '',
-      applied_at TEXT DEFAULT (datetime('now'))
+      applied_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
 
   `);
@@ -316,7 +316,7 @@ function applyMigrations(db: Database.Database): void {
         id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, logo TEXT DEFAULT '',
         description TEXT DEFAULT '', category_id TEXT DEFAULT '' REFERENCES product_categories(id),
         status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 1, 'brands 表');
     });
@@ -330,7 +330,7 @@ function applyMigrations(db: Database.Database): void {
         id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, code TEXT NOT NULL UNIQUE,
         description TEXT DEFAULT '', icon TEXT DEFAULT '',
         status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       // 幂等加列
       const cols = db.prepare('PRAGMA table_info(products)').all() as any[];
@@ -358,7 +358,7 @@ function applyMigrations(db: Database.Database): void {
         discount_rate REAL NOT NULL, bonus_amount REAL DEFAULT 0,
         description TEXT DEFAULT '',
         status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+        sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 3, 'recharge_packages 表');
     });
@@ -379,7 +379,7 @@ function applyMigrations(db: Database.Database): void {
           remaining_balance REAL NOT NULL, bonus_balance REAL DEFAULT 0,
           status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
           transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
-          created_at TEXT DEFAULT (datetime('now')), paid_at TEXT DEFAULT ''
+          created_at TEXT DEFAULT (datetime('now', 'localtime')), paid_at TEXT DEFAULT ''
         )`);
       } else {
         // 老表存在：先加缺失列
@@ -398,7 +398,7 @@ function applyMigrations(db: Database.Database): void {
             remaining_balance REAL NOT NULL, bonus_balance REAL DEFAULT 0,
             status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
             transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now')), paid_at TEXT DEFAULT ''
+            created_at TEXT DEFAULT (datetime('now', 'localtime')), paid_at TEXT DEFAULT ''
           )`);
           db.exec(`INSERT INTO user_recharges_new
             SELECT id,user_id,package_id,amount,discount_rate,
@@ -423,7 +423,7 @@ function applyMigrations(db: Database.Database): void {
         product_id TEXT NOT NULL REFERENCES products(id),
         product_name TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 1,
         unit_price REAL NOT NULL, subtotal REAL NOT NULL, unit TEXT DEFAULT '瓶',
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
 
       // 迁移 orders 旧数据到 order_items
@@ -443,7 +443,7 @@ function applyMigrations(db: Database.Database): void {
           status TEXT DEFAULT 'pending',
           pay_status TEXT DEFAULT 'unpaid',
           transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
-          created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+          created_at TEXT DEFAULT (datetime('now', 'localtime')), updated_at TEXT DEFAULT (datetime('now', 'localtime')),
           paid_at TEXT DEFAULT '', assigned_at TEXT DEFAULT '', delivered_at TEXT DEFAULT ''
         )`);
         db.exec(`INSERT INTO orders_new_schema_v2
@@ -470,7 +470,7 @@ function applyMigrations(db: Database.Database): void {
         contact_name TEXT NOT NULL, contact_phone TEXT NOT NULL,
         province TEXT DEFAULT '', city TEXT DEFAULT '', district TEXT DEFAULT '',
         detail TEXT NOT NULL, is_default INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now', 'localtime')), updated_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 6, 'addresses 表');
     });
@@ -489,7 +489,7 @@ function applyMigrations(db: Database.Database): void {
         order_id TEXT REFERENCES orders(id),
         change_type TEXT NOT NULL CHECK(change_type IN ('earn','spend','refund','adjust','expire')),
         change_amount INTEGER NOT NULL, balance_after INTEGER NOT NULL,
-        description TEXT DEFAULT '', created_at TEXT DEFAULT (datetime('now'))
+        description TEXT DEFAULT '', created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 7, 'users.points + points_records 表');
     });
@@ -525,7 +525,7 @@ function applyMigrations(db: Database.Database): void {
         src TEXT DEFAULT '', link_url TEXT DEFAULT '', bg_color TEXT DEFAULT '',
         sort_order INTEGER DEFAULT 0,
         status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now', 'localtime')), updated_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 9, 'ad_banners 表');
     });
@@ -554,7 +554,7 @@ function applyMigrations(db: Database.Database): void {
         tx_type TEXT NOT NULL CHECK(tx_type IN ('recharge_principal','recharge_bonus','consume_bonus','consume_principal','refund','adjust','expire')),
         amount REAL NOT NULL, principal_after REAL DEFAULT 0, bonus_after REAL DEFAULT 0,
         description TEXT DEFAULT '', operator_ip TEXT DEFAULT '',
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 11, 'balance_transactions 表');
     });
@@ -597,7 +597,7 @@ function applyMigrations(db: Database.Database): void {
           pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
           from_balance REAL DEFAULT 0, from_bonus REAL DEFAULT 0,
           transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
-          created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+          created_at TEXT DEFAULT (datetime('now', 'localtime')), updated_at TEXT DEFAULT (datetime('now', 'localtime')),
           paid_at TEXT DEFAULT '', assigned_at TEXT DEFAULT '', delivered_at TEXT DEFAULT ''
         )`);
         db.exec(`INSERT INTO orders_new SELECT
@@ -633,7 +633,7 @@ function applyMigrations(db: Database.Database): void {
           pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
           from_balance REAL DEFAULT 0, from_bonus REAL DEFAULT 0,
           transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
-          created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+          created_at TEXT DEFAULT (datetime('now', 'localtime')), updated_at TEXT DEFAULT (datetime('now', 'localtime')),
           paid_at TEXT DEFAULT '', assigned_at TEXT DEFAULT '', delivered_at TEXT DEFAULT ''
         )`);
         db.exec(`INSERT INTO orders_new SELECT
@@ -669,7 +669,7 @@ function applyMigrations(db: Database.Database): void {
           pay_method TEXT DEFAULT 'online' CHECK(pay_method IN ('online','balance','mixed')),
           from_balance REAL DEFAULT 0, from_bonus REAL DEFAULT 0,
           transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
-          created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+          created_at TEXT DEFAULT (datetime('now', 'localtime')), updated_at TEXT DEFAULT (datetime('now', 'localtime')),
           paid_at TEXT DEFAULT '', assigned_at TEXT DEFAULT '', delivered_at TEXT DEFAULT ''
         )`);
         db.exec(`INSERT INTO orders_new SELECT
@@ -766,7 +766,7 @@ function applyMigrations(db: Database.Database): void {
         remark TEXT DEFAULT '',
         reviewed_by TEXT DEFAULT '',
         reviewed_at TEXT DEFAULT '',
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 20, 'withdraw_requests 提现申请表');
     });
@@ -792,7 +792,7 @@ function applyMigrations(db: Database.Database): void {
           total_amount REAL NOT NULL DEFAULT 0,
           distributor_count INTEGER NOT NULL DEFAULT 0,
           status TEXT DEFAULT 'pending' CHECK(status IN ('pending','completed','cancelled')),
-          created_at TEXT DEFAULT (datetime('now'))
+          created_at TEXT DEFAULT (datetime('now', 'localtime'))
         )
       `);
       recordMigration(db, 21, 'commissions 新增 payout_batch_no / payout_date + payout_batches 打款批次表');
@@ -810,7 +810,7 @@ function applyMigrations(db: Database.Database): void {
         level INTEGER NOT NULL DEFAULT 1,
         sort_order INTEGER DEFAULT 0,
         status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 22, 'regions 省市区管理表');
     });
@@ -827,7 +827,7 @@ function applyMigrations(db: Database.Database): void {
         level INTEGER NOT NULL DEFAULT 1,
         sort_order INTEGER DEFAULT 0,
         status TEXT DEFAULT 'active' CHECK(status IN ('active','inactive')),
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
       )`);
       recordMigration(db, 23, 'regions 省市区管理表（兜底创建）');
     });

@@ -37,7 +37,7 @@ export function getDashboard(_req: Request, res: Response): void {
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const todayStr = todayStart.toISOString().split('T')[0];
+  const todayStr = `${todayStart.getFullYear()}-${String(todayStart.getMonth() + 1).padStart(2, '0')}-${String(todayStart.getDate()).padStart(2, '0')}`;
 
   const todayOrders = (db.prepare(
       "SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM orders WHERE pay_status = 'paid' AND date(created_at) = ?"
@@ -219,7 +219,7 @@ export function resetDeliverymanPassword(req: Request, res: Response): void {
       userId = existingUser.id;
     } else {
       userId = uuidv4();
-      db.prepare('INSERT INTO users (id, phone, name, role, status, password_hash) VALUES (?, ?, ?, ?, ?, ?)').run(
+      db.prepare('INSERT INTO users (id, phone, name, role, status, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))').run(
           userId, dm.phone, dm.name, 'deliveryman', dm.status || 'active', hashPassword(newPassword),
       );
     }
@@ -522,7 +522,8 @@ export function exportOrders(req: Request, res: Response): void {
 
   const csv = BOM + [headers.join(','), ...rows].join('\n');
 
-  const timestamp = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const filename = `order_export_${timestamp}.csv`;
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -1118,7 +1119,7 @@ export function adjustUserPoints(req: Request, res: Response): void {
     const result = changePoints({
       userId: id,
       changeType: 'adjust',
-      amount: Math.abs(amount), // 取绝对值，正负由changeType决定
+      amount: amount, // 保留原始正负值，正数增加积分，负数减少积分
       description: description || `管理员调整积分`,
     });
 
@@ -1133,12 +1134,16 @@ export function adjustUserPoints(req: Request, res: Response): void {
 }
 
 /**
- * 获取用户积分记录
+ * 获取用户积分记录（支持日期和积分筛选）
  */
 export function getUserPointsHistory(req: Request, res: Response): void {
   const id = str(req.params.id);
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.pageSize as string) || 20;
+  const startDate = str(req.query.startDate);
+  const endDate = str(req.query.endDate);
+  const minAmount = req.query.minAmount !== undefined ? parseInt(req.query.minAmount as string) : undefined;
+  const maxAmount = req.query.maxAmount !== undefined ? parseInt(req.query.maxAmount as string) : undefined;
 
   const user = userModel.findById(id);
   if (!user) {
@@ -1146,7 +1151,7 @@ export function getUserPointsHistory(req: Request, res: Response): void {
     return;
   }
 
-  const { data, total } = getUserPointsRecords(id, page, pageSize);
+  const { data, total } = getUserPointsRecords(id, page, pageSize, startDate, endDate, minAmount, maxAmount);
 
   success(res, {
     userId: id,
@@ -1183,7 +1188,7 @@ export function createRechargePackage(req: Request, res: Response): void {
     const id = uuidv4();
     const db = getDb();
     db.prepare(
-        'INSERT INTO recharge_packages (id, name, amount, discount_rate, bonus_amount, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO recharge_packages (id, name, amount, discount_rate, bonus_amount, description, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(id, name, parseFloat(amount), 0, parseFloat(bonus_amount) || 0, description || '', parseInt(sort_order) || 0);
 
     const pkg = db.prepare('SELECT * FROM recharge_packages WHERE id = ?').get(id);
@@ -1399,7 +1404,8 @@ export function exportCommissions(req: Request, res: Response): void {
   ].map(csvEscape).join(','));
 
   const csv = BOM + [headers.join(','), ...rows].join('\n');
-  const timestamp = new Date().toISOString().slice(0, 10);
+  const now2 = new Date();
+  const timestamp = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-${String(now2.getDate()).padStart(2, '0')}`;
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="commission_export_${timestamp}.csv"`);
   res.send(csv);
@@ -1450,7 +1456,8 @@ export function exportPayoutRecord(req: Request, res: Response): void {
   ].map(csvEscape).join(','));
 
   const csv = BOM + [headers.join(','), ...rows].join('\n');
-  const timestamp = new Date().toISOString().slice(0, 10);
+  const now3 = new Date();
+  const timestamp = `${now3.getFullYear()}-${String(now3.getMonth() + 1).padStart(2, '0')}-${String(now3.getDate()).padStart(2, '0')}`;
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="payout_record_${batchNo}.csv"`);
   res.send(csv);

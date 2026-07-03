@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Edit3, Trash2, Search, Key, Save, X, UserCheck, UserX, Lock, Gift } from 'lucide-react';
+import { Users, Plus, Edit3, Trash2, Search, Key, Save, X, UserCheck, UserX, Lock, Gift, FileText } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -42,6 +42,24 @@ interface UserInfo {
   points?: number;
 }
 
+interface PointsRecord {
+  id: string;
+  user_id: string;
+  change_type: 'earn' | 'spend' | 'refund' | 'adjust' | 'expire';
+  change_amount: number;
+  balance_after: number;
+  description: string;
+  created_at: string;
+}
+
+const POINTS_TYPE_MAP: Record<string, { label: string; cls: string }> = {
+  earn: { label: '获得积分', cls: 'text-emerald-600' },
+  spend: { label: '消费积分', cls: 'text-rose-600' },
+  refund: { label: '退款返还', cls: 'text-blue-600' },
+  adjust: { label: '管理员调整', cls: 'text-amber-600' },
+  expire: { label: '积分过期', cls: 'text-gray-500' },
+};
+
 export default function UserManage() {
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [total, setTotal] = useState(0);
@@ -58,6 +76,18 @@ export default function UserManage() {
   const [adjustPointsFor, setAdjustPointsFor] = useState<UserInfo | null>(null);
   const [adjustPointsAmount, setAdjustPointsAmount] = useState('');
   const [adjustPointsDesc, setAdjustPointsDesc] = useState('');
+
+  // 积分明细
+  const [pointsHistoryUser, setPointsHistoryUser] = useState<UserInfo | null>(null);
+  const [pointsRecords, setPointsRecords] = useState<PointsRecord[]>([]);
+  const [pointsRecordsLoading, setPointsRecordsLoading] = useState(false);
+  const [pointsRecordsPage, setPointsRecordsPage] = useState(1);
+  const [pointsRecordsTotal, setPointsRecordsTotal] = useState(0);
+  const [pointsRecordsPageSize] = useState(10);
+  const [pointsDateFrom, setPointsDateFrom] = useState('');
+  const [pointsDateTo, setPointsDateTo] = useState('');
+  const [pointsAmountMin, setPointsAmountMin] = useState('');
+  const [pointsAmountMax, setPointsAmountMax] = useState('');
 
   // 角色列表（从后端API动态获取）
   const [roles, setRoles] = useState<RoleItem[]>([]);
@@ -210,6 +240,54 @@ export default function UserManage() {
     }
   }
 
+  async function fetchPointsRecords(userId: string, pg: number, overrideFilters?: { startDate?: string; endDate?: string; minAmount?: string; maxAmount?: string }) {
+    setPointsRecordsLoading(true);
+    try {
+      const startDate = overrideFilters?.startDate ?? pointsDateFrom;
+      const endDate = overrideFilters?.endDate ?? pointsDateTo;
+      const minAmount = overrideFilters?.minAmount ?? pointsAmountMin;
+      const maxAmount = overrideFilters?.maxAmount ?? pointsAmountMax;
+      const params = new URLSearchParams({ page: String(pg), pageSize: String(pointsRecordsPageSize) });
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      if (minAmount) params.set('minAmount', minAmount);
+      if (maxAmount) params.set('maxAmount', maxAmount);
+      const res = await fetch(`${API_BASE}/admin/users/${userId}/points/records?${params}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        const body = data.data;
+        setPointsRecords(body.records || []);
+        setPointsRecordsTotal(body.pagination?.total || 0);
+      }
+    } catch (e) {
+      console.error('获取积分记录失败', e);
+    }
+    setPointsRecordsLoading(false);
+  }
+
+  function openPointsHistory(u: UserInfo) {
+    setPointsHistoryUser(u);
+    setPointsRecordsPage(1);
+    setPointsDateFrom('');
+    setPointsDateTo('');
+    setPointsAmountMin('');
+    setPointsAmountMax('');
+    fetchPointsRecords(u.id, 1, { startDate: '', endDate: '', minAmount: '', maxAmount: '' });
+  }
+
+  function applyPointsFilter() {
+    if (!pointsHistoryUser) return;
+    setPointsRecordsPage(1);
+    fetchPointsRecords(pointsHistoryUser.id, 1);
+  }
+
+  function closePointsHistory() {
+    setPointsHistoryUser(null);
+    setPointsRecords([]);
+  }
+
   const totalPages = Math.ceil(total / pageSize);
 
   return (
@@ -301,6 +379,7 @@ export default function UserManage() {
                           <button onClick={() => openEdit(u)} title="编辑" className="p-2 text-gray-400 hover:text-cyan-500 hover:bg-cyan-50 rounded-lg transition-colors"><Edit3 className="w-4 h-4" /></button>
                           <button onClick={() => { setResetPwdFor(u); setNewPassword(''); }} title="重置密码" className="p-2 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"><Key className="w-4 h-4" /></button>
                           <button onClick={() => { setAdjustPointsFor(u); setAdjustPointsAmount(''); setAdjustPointsDesc(''); }} title="调整积分" className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"><Gift className="w-4 h-4" /></button>
+                          <button onClick={() => openPointsHistory(u)} title="积分明细" className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"><FileText className="w-4 h-4" /></button>
                           {u.role === 'admin' ? (
                               <span className="p-2 text-gray-300 cursor-not-allowed" title="不可删除管理员"><Trash2 className="w-4 h-4" /></span>
                           ) : (
@@ -484,6 +563,112 @@ export default function UserManage() {
                 </div>
               </div>
             </div>
+        )}
+
+        {/* Points History Modal */}
+        {pointsHistoryUser && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closePointsHistory}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"><FileText className="w-5 h-5 text-blue-600" /></div>
+                    <div>
+                      <h3 className="font-bold text-gray-800">积分明细</h3>
+                      <p className="text-sm text-gray-500">
+                        {pointsHistoryUser.name} ({pointsHistoryUser.phone})
+                        <span className="ml-3 text-xs text-gray-400">
+                          当前积分: <span className="font-semibold text-orange-600">{pointsHistoryUser.points || 0}</span>
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={closePointsHistory} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
+                </div>
+                {/* Filter row */}
+                <div className="px-6 py-3 border-b border-gray-100 shrink-0 bg-gray-50/50">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs text-gray-500 whitespace-nowrap">日期</label>
+                      <input type="date" value={pointsDateFrom} onChange={e => setPointsDateFrom(e.target.value)}
+                             className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                      <span className="text-xs text-gray-400">至</span>
+                      <input type="date" value={pointsDateTo} onChange={e => setPointsDateTo(e.target.value)}
+                             className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs text-gray-500 whitespace-nowrap">积分</label>
+                      <input type="number" value={pointsAmountMin} onChange={e => setPointsAmountMin(e.target.value)}
+                             placeholder="最低" className="w-18 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                      <span className="text-xs text-gray-400">-</span>
+                      <input type="number" value={pointsAmountMax} onChange={e => setPointsAmountMax(e.target.value)}
+                             placeholder="最高" className="w-18 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    </div>
+                    <button onClick={applyPointsFilter}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                      <Search className="w-3.5 h-3.5" /> 查询
+                    </button>
+                    <button onClick={() => { setPointsDateFrom(''); setPointsDateTo(''); setPointsAmountMin(''); setPointsAmountMax(''); if (pointsHistoryUser) fetchPointsRecords(pointsHistoryUser.id, 1, { startDate: '', endDate: '', minAmount: '', maxAmount: '' }); }}
+                            className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                      重置
+                    </button>
+                  </div>
+                </div>
+                <div className="overflow-auto flex-1 p-6">
+                  {pointsRecordsLoading ? (
+                      <div className="text-center py-12 text-gray-400">加载中...</div>
+                  ) : pointsRecords.length === 0 ? (
+                      <div className="text-center py-12 text-gray-400">暂无积分记录</div>
+                  ) : (
+                      <table className="w-full text-sm">
+                        <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left py-2.5 px-2 text-xs font-semibold text-gray-500 uppercase">变更类型</th>
+                          <th className="text-right py-2.5 px-2 text-xs font-semibold text-gray-500 uppercase">变更数量</th>
+                          <th className="text-right py-2.5 px-2 text-xs font-semibold text-gray-500 uppercase">变更后余额</th>
+                          <th className="text-left py-2.5 px-2 text-xs font-semibold text-gray-500 uppercase">说明</th>
+                          <th className="text-right py-2.5 px-2 text-xs font-semibold text-gray-500 uppercase">时间</th>
+                        </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                        {pointsRecords.map((rec) => (
+                            <tr key={rec.id} className="hover:bg-gray-50/50">
+                              <td className="py-2.5 px-2">
+                                <span className={`text-xs font-medium ${POINTS_TYPE_MAP[rec.change_type]?.cls || 'text-gray-600'}`}>
+                                  {POINTS_TYPE_MAP[rec.change_type]?.label || rec.change_type}
+                                </span>
+                              </td>
+                              <td className={`py-2.5 px-2 text-right font-mono text-xs font-medium ${rec.change_amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {rec.change_amount >= 0 ? '+' : ''}{rec.change_amount}
+                              </td>
+                              <td className="py-2.5 px-2 text-right font-mono text-xs text-gray-700">{rec.balance_after}</td>
+                              <td className="py-2.5 px-2 text-xs text-gray-500 max-w-[180px] truncate" title={rec.description}>{rec.description}</td>
+                              <td className="py-2.5 px-2 text-right text-xs text-gray-400 whitespace-nowrap">{rec.created_at?.slice(0, 19)}</td>
+                            </tr>
+                        ))}
+                        </tbody>
+                      </table>
+                  )}
+                </div>
+                {/* Points history pagination - always visible */}
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 shrink-0">
+                  <span className="text-xs text-gray-400">
+                    共 {pointsRecordsTotal} 条{pointsRecordsTotal > pointsRecordsPageSize ? `，第 ${pointsRecordsPage}/${Math.ceil(pointsRecordsTotal / pointsRecordsPageSize)} 页` : ''}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => { const p = pointsRecordsPage - 1; setPointsRecordsPage(p); if (pointsHistoryUser) fetchPointsRecords(pointsHistoryUser.id, p); }}
+                        disabled={pointsRecordsPage <= 1}
+                        className="px-3 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+                    >上一页</button>
+                    <button
+                        onClick={() => { const p = pointsRecordsPage + 1; setPointsRecordsPage(p); if (pointsHistoryUser) fetchPointsRecords(pointsHistoryUser.id, p); }}
+                        disabled={pointsRecordsPage >= Math.ceil(Math.max(pointsRecordsTotal, 1) / pointsRecordsPageSize)}
+                        className="px-3 py-1 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+                    >下一页</button>
+                  </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
   );
