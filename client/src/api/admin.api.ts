@@ -125,12 +125,25 @@ export const deleteRechargePackage = (id: string) =>
     adminApi.delete(`/recharge/packages/${id}`);
 
 // Recharge Orders & Reports
-export const getRechargeOrders = (params?: { page?: number; pageSize?: number; status?: string }) =>
+export const getRechargeOrders = (params?: {
+  page?: number; pageSize?: number; status?: string;
+  keyword?: string; package_id?: string; start_date?: string; end_date?: string;
+}) =>
     adminApi.get('/recharge/orders', { params });
+export const queryRechargePayment = (id: string) =>
+    adminApi.post(`/recharge/orders/${id}/query-payment`);
+export const refundRecharge = (id: string) =>
+    adminApi.post(`/recharge/orders/${id}/refund`);
+export const queryRechargeRefund = (id: string) =>
+    adminApi.post(`/recharge/orders/${id}/query-refund`);
 export const getRechargeStats = (params?: { start_date?: string; end_date?: string }) =>
     adminApi.get('/recharge/stats', { params });
-export const getBalanceTransactions = (params: { user_id: string; page?: number; pageSize?: number }) =>
+export const getBalanceTransactions = (params: { user_id: string; page?: number; pageSize?: number; tx_type?: string; start_date?: string; end_date?: string }) =>
     adminApi.get('/recharge/transactions', { params });
+
+// User Recharge Balance
+export const getUserRechargeBalance = (userId: string) =>
+    adminApi.get(`/users/${userId}/recharge-balance`);
 
 // Commission Management
 export const getCommissions = (params: {

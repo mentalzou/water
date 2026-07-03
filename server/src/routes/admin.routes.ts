@@ -108,8 +108,14 @@ router.put('/recharge/packages/:id', adminController.updateRechargePackage);
 router.put('/recharge/packages/:id/status', adminController.updateRechargePackageStatus);
 router.delete('/recharge/packages/:id', adminController.deleteRechargePackage);
 
+// User Recharge Balance
+router.get('/users/:id/recharge-balance', adminController.getUserRechargeBalance);
+
 // Recharge Orders & Reports
 router.get('/recharge/orders', adminController.listRechargeOrders);
+router.post('/recharge/orders/:id/query-payment', adminController.queryRechargePayment);
+router.post('/recharge/orders/:id/refund', adminController.refundRecharge);
+router.post('/recharge/orders/:id/query-refund', adminController.queryRechargeRefund);
 router.get('/recharge/stats', adminController.getRechargeStats);
 router.get('/recharge/transactions', adminController.listBalanceTransactions);
 

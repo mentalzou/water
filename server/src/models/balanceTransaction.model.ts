@@ -36,15 +36,31 @@ export const balanceTransactionModel = {
     return db.prepare('SELECT * FROM balance_transactions WHERE id = ?').get(id) as BalanceTransaction;
   },
 
-  /** 查询用户流水（分页） */
-  findByUserId(userId: string, page = 1, pageSize = 20): { data: BalanceTransaction[]; total: number } {
+  /** 查询用户流水（分页，支持筛选） */
+  findByUserId(userId: string, page = 1, pageSize = 20, txType?: string, startDate?: string, endDate?: string): { data: BalanceTransaction[]; total: number } {
+    let where = 'WHERE user_id = ?';
+    const params: any[] = [userId];
+
+    if (txType) {
+      where += ' AND tx_type = ?';
+      params.push(txType);
+    }
+    if (startDate) {
+      where += ' AND created_at >= ?';
+      params.push(startDate);
+    }
+    if (endDate) {
+      where += ' AND created_at <= ?';
+      params.push(endDate + ' 23:59:59');
+    }
+
     const total = (db.prepare(
-      'SELECT COUNT(*) as count FROM balance_transactions WHERE user_id = ?'
-    ).get(userId) as { count: number }).count;
+      `SELECT COUNT(*) as count FROM balance_transactions ${where}`
+    ).get(...params) as { count: number }).count;
 
     const rows = db.prepare(
-      'SELECT * FROM balance_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).all(userId, pageSize, (page - 1) * pageSize) as BalanceTransaction[];
+      `SELECT * FROM balance_transactions ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).all(...params, pageSize, (page - 1) * pageSize) as BalanceTransaction[];
 
     return { data: rows, total };
   },

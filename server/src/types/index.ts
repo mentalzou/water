@@ -237,7 +237,7 @@ export interface UserRecharge {
   paid_amount: number;
   remaining_balance: number;
   bonus_balance: number;
-  status: 'active' | 'expired' | 'refunded';
+  status: 'pending' | 'active' | 'expired' | 'refunding' | 'refunded';
   transaction_id?: string;
   remark?: string;
   created_at?: string;

@@ -47,6 +47,17 @@ export const userRechargeModel = {
     return { ...recharge, package: pkg };
   },
 
+  /** 根据 transaction_id 查找充值记录 */
+  findByTransactionId(transactionId: string): (UserRecharge & { package?: any }) | undefined {
+    if (!transactionId) return undefined;
+    const recharge = db.prepare('SELECT * FROM user_recharges WHERE transaction_id = ?').get(transactionId) as UserRecharge | undefined;
+    if (!recharge) return undefined;
+
+    const pkg = db.prepare('SELECT * FROM recharge_packages WHERE id = ?').get(recharge.package_id) as any;
+
+    return { ...recharge, package: pkg };
+  },
+
   findByUserId(userId: string, page = 1, pageSize = 20): { data: (UserRecharge & { package?: any })[]; total: number } {
     const total = (db.prepare('SELECT COUNT(*) as count FROM user_recharges WHERE user_id = ?').get(userId) as { count: number }).count;
     const recharges = db.prepare(
@@ -128,6 +139,20 @@ export const userRechargeModel = {
   expireRecharge(id: string): UserRecharge | undefined {
     db.prepare(
         "UPDATE user_recharges SET status = 'expired' WHERE id = ?"
+    ).run(id);
+    return this.findById(id);
+  },
+
+  markRefunding(id: string, refundOrderNo: string): UserRecharge | undefined {
+    db.prepare(
+        "UPDATE user_recharges SET status = 'refunding', remark = ? WHERE id = ?"
+    ).run(`退款订单号:${refundOrderNo}`, id);
+    return this.findById(id);
+  },
+
+  markRefunded(id: string): UserRecharge | undefined {
+    db.prepare(
+        "UPDATE user_recharges SET status = 'refunded' WHERE id = ?"
     ).run(id);
     return this.findById(id);
   },

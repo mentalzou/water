@@ -15,7 +15,7 @@ import { brandModel } from '../models/brand.model';
 import { categoryModel } from '../models/category.model';
 import { userRechargeModel } from '../models/userRecharge.model';
 import { balanceTransactionModel } from '../models/balanceTransaction.model';
-import { queryOrderStatus } from '../services/heliPay.service';
+import { queryOrderStatus, requestRefund, queryRefundStatus } from '../services/heliPay.service';
 import { getDb } from '../utils/db';
 import config from '../config';
 import multer from 'multer';
@@ -1291,6 +1291,10 @@ export function listRechargeOrders(req: Request, res: Response): void {
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.pageSize as string) || 20;
   const status = req.query.status as string || '';
+  const keyword = req.query.keyword as string || '';
+  const packageId = req.query.package_id as string || '';
+  const startDate = req.query.start_date as string || '';
+  const endDate = req.query.end_date as string || '';
 
   const db = getDb();
   let sql = 'SELECT ur.*, u.name as user_name, u.phone as user_phone, rp.name as package_name FROM user_recharges ur LEFT JOIN users u ON ur.user_id = u.id LEFT JOIN recharge_packages rp ON ur.package_id = rp.id WHERE 1=1';
@@ -1299,6 +1303,27 @@ export function listRechargeOrders(req: Request, res: Response): void {
   if (status) {
     sql += ' AND ur.status = ?';
     params.push(status);
+  }
+
+  if (keyword) {
+    sql += ' AND (u.name LIKE ? OR u.phone LIKE ?)';
+    const kw = `%${keyword}%`;
+    params.push(kw, kw);
+  }
+
+  if (packageId) {
+    sql += ' AND ur.package_id = ?';
+    params.push(packageId);
+  }
+
+  if (startDate) {
+    sql += ' AND ur.created_at >= ?';
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    sql += ' AND ur.created_at <= ?';
+    params.push(endDate + ' 23:59:59');
   }
 
   const countSql = sql.replace('SELECT ur.*, u.name as user_name, u.phone as user_phone, rp.name as package_name', 'SELECT COUNT(*) as count');
@@ -1319,19 +1344,223 @@ export function getRechargeStats(req: Request, res: Response): void {
   success(res, stats);
 }
 
+// ============ 用户充值账户余额汇总 ============
+export function getUserRechargeBalance(req: Request, res: Response): void {
+  const userId = str(req.params.id);
+
+  const user = userModel.findById(userId);
+  if (!user) {
+    error(res, '用户不存在', 404);
+    return;
+  }
+
+  const balance = userRechargeModel.getTotalBalanceByUserId(userId);
+
+  // 查询充值总累计（所有status的历史充值）
+  const db = getDb();
+  const totalRecharged = (db.prepare(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM user_recharges WHERE user_id = ? AND status != 'pending'"
+  ).get(userId) as { total: number }).total;
+
+  // 查询累计消费（从流水表）
+  const totalConsumed = (db.prepare(
+    "SELECT COALESCE(SUM(amount), 0) as total FROM balance_transactions WHERE user_id = ? AND tx_type IN ('consume_principal', 'consume_bonus')"
+  ).get(userId) as { total: number }).total;
+
+  success(res, {
+    userId: user.id,
+    userName: user.name,
+    userPhone: user.phone,
+    ...balance,
+    totalRecharged,
+    totalConsumed,
+  });
+}
+
 // ============ 账户变动流水查询 ============
 export function listBalanceTransactions(req: Request, res: Response): void {
   const userId = req.query.user_id as string || '';
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.pageSize as string) || 20;
+  const txType = req.query.tx_type as string || '';
+  const startDate = req.query.start_date as string || '';
+  const endDate = req.query.end_date as string || '';
 
   if (!userId) {
     error(res, '请提供用户ID');
     return;
   }
 
-  const { data, total } = balanceTransactionModel.findByUserId(userId, page, pageSize);
+  const { data, total } = balanceTransactionModel.findByUserId(userId, page, pageSize, txType, startDate, endDate);
   paginated(res, data, page, pageSize, total);
+}
+
+// ============ 充值订单交易查询（向合利宝查询支付状态） ============
+export async function queryRechargePayment(req: Request, res: Response): Promise<void> {
+  const id = str(req.params.id);
+
+  const recharge = userRechargeModel.findById(id);
+  if (!recharge) {
+    notFound(res);
+    return;
+  }
+
+  if (recharge.status !== 'pending') {
+    error(res, '仅待支付状态的充值订单支持交易查询');
+    return;
+  }
+
+  if (!recharge.transaction_id) {
+    error(res, '充值订单缺少交易号');
+    return;
+  }
+
+  try {
+    const result = await queryOrderStatus(recharge.transaction_id);
+
+    console.log(`[充值交易查询] 充值 ${recharge.transaction_id} 合利宝状态: ${result.status}`);
+
+    if (result.status === 'SUCCESS') {
+      userRechargeModel.markPaid(recharge.id, result.orderNo || '');
+
+      // 记录流水
+      balanceTransactionModel.create({
+        user_id: recharge.user_id,
+        recharge_id: recharge.id,
+        tx_type: 'recharge_principal',
+        amount: recharge.amount,
+        principal_after: recharge.remaining_balance,
+        bonus_after: recharge.bonus_balance,
+        description: `充值本金到账 - ¥${recharge.amount.toFixed(2)}`,
+        operator_ip: req.ip || '',
+      });
+
+      if (recharge.bonus_amount > 0) {
+        balanceTransactionModel.create({
+          user_id: recharge.user_id,
+          recharge_id: recharge.id,
+          tx_type: 'recharge_bonus',
+          amount: recharge.bonus_amount,
+          principal_after: recharge.remaining_balance,
+          bonus_after: recharge.bonus_balance,
+          description: `充值赠送金到账 - ¥${recharge.bonus_amount.toFixed(2)}`,
+          operator_ip: req.ip || '',
+        });
+      }
+
+      console.log(`[充值交易查询] 充值 ${recharge.transaction_id} 已自动标记为已支付`);
+      success(res, {
+        orderNo: result.orderNo,
+        helipayStatus: result.status,
+        localStatus: 'active',
+        message: '交易查询成功，充值已自动更新为已支付',
+      });
+    } else {
+      success(res, {
+        orderNo: result.orderNo,
+        helipayStatus: result.status,
+        localStatus: recharge.status,
+        message: `交易查询完成，当前合利宝状态: ${result.status}`,
+      });
+    }
+  } catch (err: any) {
+    error(res, err.message || '交易查询失败');
+  }
+}
+
+// ============ 充值订单退款（向合利宝发起退款） ============
+export async function refundRecharge(req: Request, res: Response): Promise<void> {
+  const id = str(req.params.id);
+
+  const recharge = userRechargeModel.findById(id);
+  if (!recharge) {
+    notFound(res);
+    return;
+  }
+
+  if (recharge.status !== 'active') {
+    error(res, '仅已支付状态的充值订单支持退款');
+    return;
+  }
+
+  if (!recharge.transaction_id) {
+    error(res, '充值订单缺少交易号');
+    return;
+  }
+
+  if (!recharge.amount || recharge.amount <= 0) {
+    error(res, '充值金额无效');
+    return;
+  }
+
+  try {
+    const result = await requestRefund(recharge.transaction_id, recharge.amount);
+
+    console.log(`[充值退款] 充值 ${recharge.transaction_id} 退款请求已受理, 退款订单号: ${result.refundOrderNo}`);
+
+    userRechargeModel.markRefunding(recharge.id, result.refundOrderNo);
+
+    success(res, {
+      orderNo: result.orderNo,
+      refundOrderNo: result.refundOrderNo,
+      orderStatus: result.orderStatus,
+      message: `退款请求已受理，退款订单号: ${result.refundOrderNo}，合利宝状态: ${result.orderStatus}`,
+    });
+  } catch (err: any) {
+    error(res, err.message || '退款请求失败');
+  }
+}
+
+// ============ 充值退款查询（向合利宝查询退款状态） ============
+export async function queryRechargeRefund(req: Request, res: Response): Promise<void> {
+  const id = str(req.params.id);
+
+  const recharge = userRechargeModel.findById(id);
+  if (!recharge) {
+    notFound(res);
+    return;
+  }
+
+  if (recharge.status !== 'refunding') {
+    error(res, '仅退款中状态的充值订单支持退款查询');
+    return;
+  }
+
+  const remark = recharge.remark || '';
+  const match = remark.match(/退款订单号:(\d+)/);
+  if (!match || !match[1]) {
+    error(res, '充值记录备注中缺少退款订单号，无法查询');
+    return;
+  }
+  const refundOrderNo = match[1];
+
+  try {
+    const result = await queryRefundStatus(refundOrderNo);
+
+    console.log(`[充值退款查询] 退款订单号 ${refundOrderNo}, 合利宝状态: ${result.orderStatus}`);
+
+    if (result.orderStatus === 'SUCCESS') {
+      userRechargeModel.markRefunded(recharge.id);
+      console.log(`[充值退款查询] 充值 ${recharge.transaction_id} 已自动标记为已退款`);
+      success(res, {
+        orderNo: result.orderNo,
+        refundOrderNo: result.refundOrderNo,
+        helipayStatus: result.orderStatus,
+        localStatus: 'refunded',
+        message: '退款查询成功，退款已完成，充值已更新为已退款',
+      });
+    } else {
+      success(res, {
+        orderNo: result.orderNo,
+        refundOrderNo: result.refundOrderNo,
+        helipayStatus: result.orderStatus,
+        localStatus: recharge.status,
+        message: `退款查询完成，当前合利宝状态: ${result.orderStatus}`,
+      });
+    }
+  } catch (err: any) {
+    error(res, err.message || '退款查询失败');
+  }
 }
 
 // ============ Commission Management ============

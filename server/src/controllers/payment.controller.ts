@@ -202,37 +202,109 @@ export async function paymentNotify(req: Request, res: Response): Promise<void> 
 
     // ========== 收单通知（正向交易） ==========
     if (orderType === 'FORWARD') {
+      // 先尝试从 orders 表查找（商品订单）
       const order = orderModel.findByOrderNo(orderNo);
 
-      if (!order) {
-        console.warn(`[合利宝通知] FORWARD: 未找到订单 orderNo=${orderNo}，忽略`);
-        res.send('success');
-        return;
-      }
+      if (order) {
+        if (orderStatus === 'SUCCESS') {
+          // 幂等：已经是 paid/refunding/refunded 状态则不再重复处理
+          if (order.status === 'paid' || order.status === 'refunding' || order.status === 'refunded') {
+            console.log(`[合利宝通知] FORWARD SUCCESS: 订单 ${orderNo} 已是 ${order.status} 状态，跳过`);
+            res.send('success');
+            return;
+          }
 
-      if (orderStatus === 'SUCCESS') {
-        // 幂等：已经是 paid/refunding/refunded 状态则不再重复处理
-        if (order.status === 'paid' || order.status === 'refunding' || order.status === 'refunded') {
-          console.log(`[合利宝通知] FORWARD SUCCESS: 订单 ${orderNo} 已是 ${order.status} 状态，跳过`);
+          const txnId = channelOrderId || `HLB_${Date.now()}`;
+          processPaymentSuccess(order.id, txnId);
+          console.log(`[合利宝通知] ✅ 订单 ${orderNo} 已标记为已支付, channelOrderId: ${txnId}`);
           res.send('success');
           return;
         }
 
-        const txnId = channelOrderId || `HLB_${Date.now()}`;
-        processPaymentSuccess(order.id, txnId);
-        console.log(`[合利宝通知] ✅ 订单 ${orderNo} 已标记为已支付, channelOrderId: ${txnId}`);
+        if (orderStatus === 'FAILED' || orderStatus === 'CLOSE' || orderStatus === 'CANCELLED') {
+          console.log(`[合利宝通知] FORWARD ${orderStatus}: 订单 ${orderNo} 交易未成功，不改状态`);
+          res.send('success');
+          return;
+        }
+
+        // INIT / DOING 等中间状态，不处理
+        console.log(`[合利宝通知] FORWARD ${orderStatus}: 中间状态，等待后续通知`);
         res.send('success');
         return;
       }
 
-      if (orderStatus === 'FAILED' || orderStatus === 'CLOSE' || orderStatus === 'CANCELLED') {
-        console.log(`[合利宝通知] FORWARD ${orderStatus}: 订单 ${orderNo} 交易未成功，不改状态`);
+      // 商品订单未找到，尝试从 user_recharges 表查找（充值订单）
+      const recharge = userRechargeModel.findByTransactionId(orderNo);
+
+      if (recharge) {
+        if (orderStatus === 'SUCCESS') {
+          // 幂等：已经是 active 状态则不再重复处理
+          if (recharge.status === 'active') {
+            console.log(`[合利宝通知] FORWARD SUCCESS: 充值 ${orderNo} 已是 active 状态，跳过`);
+            res.send('success');
+            return;
+          }
+
+          // 幂等性检查：防止重复入账
+          if (balanceTransactionModel.hasRechargeTransaction(recharge.id)) {
+            console.log(`[合利宝通知] FORWARD SUCCESS: 充值 ${orderNo} 已入账，跳过`);
+            res.send('success');
+            return;
+          }
+
+          const txnId = channelOrderId || `HLB_${Date.now()}`;
+          const updated = userRechargeModel.markPaid(recharge.id, txnId);
+          if (!updated) {
+            console.error(`[合利宝通知] ❌ 充值 ${orderNo} 标记已支付失败`);
+            res.send('success');
+            return;
+          }
+
+          // 记录流水：本金充值
+          balanceTransactionModel.create({
+            user_id: recharge.user_id,
+            recharge_id: recharge.id,
+            tx_type: 'recharge_principal',
+            amount: recharge.amount,
+            principal_after: recharge.remaining_balance,
+            bonus_after: recharge.bonus_balance,
+            description: `充值本金到账 - ¥${recharge.amount.toFixed(2)}`,
+            operator_ip: getClientIp(req),
+          });
+
+          // 记录流水：赠送金充值
+          if (recharge.bonus_amount > 0) {
+            balanceTransactionModel.create({
+              user_id: recharge.user_id,
+              recharge_id: recharge.id,
+              tx_type: 'recharge_bonus',
+              amount: recharge.bonus_amount,
+              principal_after: recharge.remaining_balance,
+              bonus_after: recharge.bonus_balance,
+              description: `充值赠送金到账 - ¥${recharge.bonus_amount.toFixed(2)}`,
+              operator_ip: getClientIp(req),
+            });
+          }
+
+          console.log(`[合利宝通知] ✅ 充值 ${orderNo} 已标记为已支付, channelOrderId: ${txnId}`);
+          res.send('success');
+          return;
+        }
+
+        if (orderStatus === 'FAILED' || orderStatus === 'CLOSE' || orderStatus === 'CANCELLED') {
+          console.log(`[合利宝通知] FORWARD ${orderStatus}: 充值 ${orderNo} 交易未成功，不改状态`);
+          res.send('success');
+          return;
+        }
+
+        // INIT / DOING 等中间状态，不处理
+        console.log(`[合利宝通知] FORWARD ${orderStatus}: 充值中间状态，等待后续通知`);
         res.send('success');
         return;
       }
 
-      // INIT / DOING 等中间状态，不处理
-      console.log(`[合利宝通知] FORWARD ${orderStatus}: 中间状态，等待后续通知`);
+      // 既不是商品订单也不是充值订单
+      console.warn(`[合利宝通知] FORWARD: 未找到订单或充值记录 orderNo=${orderNo}，忽略`);
       res.send('success');
       return;
     }

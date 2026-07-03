@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, AlertCircle, Package, FileText, BarChart3 } from 'lucide-react';
+import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, AlertCircle, Package, FileText, BarChart3, Search, RefreshCw, Undo2, SearchCheck } from 'lucide-react';
 import {
   getRechargeOrders,
   getRechargeStats,
@@ -8,6 +8,9 @@ import {
   updateRechargePackage,
   updateRechargePackageStatus,
   deleteRechargePackage,
+  queryRechargePayment,
+  refundRecharge,
+  queryRechargeRefund,
 } from '../../api/admin.api';
 
 interface RechargePackage {
@@ -30,6 +33,8 @@ interface RechargeOrder {
   bonus_amount: number;
   paid_amount: number;
   status: string;
+  transaction_id: string;
+  remark: string;
   created_at: string;
   paid_at: string;
 }
@@ -66,9 +71,21 @@ export default function RechargePackageManage() {
     sort_order: '0',
   });
 
+  // 充值订单筛选
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterKeyword, setFilterKeyword] = useState('');
+  const [filterPackageId, setFilterPackageId] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+
+  // 操作 loading 状态
+  const [queryingOrders, setQueryingOrders] = useState<Set<string>>(new Set());
+  const [refundingOrders, setRefundingOrders] = useState<Set<string>>(new Set());
+  const [refundQueryingOrders, setRefundQueryingOrders] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (activeTab === 'packages') loadPackages();
-    if (activeTab === 'orders') loadRechargeOrders();
+    if (activeTab === 'orders') { loadRechargeOrders(); loadPackages(); }
     if (activeTab === 'stats') loadRechargeStats();
   }, [activeTab]);
 
@@ -89,7 +106,14 @@ export default function RechargePackageManage() {
   async function loadRechargeOrders(page = 1) {
     setLoading(true);
     try {
-      const res: any = await getRechargeOrders({ page, pageSize: 20 });
+      const params: any = { page, pageSize: 20 };
+      if (filterStatus) params.status = filterStatus;
+      if (filterKeyword) params.keyword = filterKeyword;
+      if (filterPackageId) params.package_id = filterPackageId;
+      if (filterStartDate) params.start_date = filterStartDate;
+      if (filterEndDate) params.end_date = filterEndDate;
+
+      const res: any = await getRechargeOrders(params);
       if (res.code === 200) {
         setRechargeOrders(res.data?.data || res.data || []);
         setOrdersTotal(res.pagination?.total || 0);
@@ -197,20 +221,98 @@ export default function RechargePackageManage() {
   const statusLabel = (s: string) => {
     switch (s) {
       case 'active': return '已支付';
+      case 'pending': return '待支付';
       case 'expired': return '已过期';
+      case 'refunding': return '退款中';
       case 'refunded': return '已退款';
-      default: return '待支付';
+      default: return s || '待支付';
     }
   };
 
   const statusColor = (s: string) => {
     switch (s) {
       case 'active': return 'bg-green-100 text-green-700';
+      case 'pending': return 'bg-yellow-100 text-yellow-700';
       case 'expired': return 'bg-gray-100 text-gray-500';
+      case 'refunding': return 'bg-blue-100 text-blue-700';
       case 'refunded': return 'bg-red-100 text-red-600';
       default: return 'bg-yellow-100 text-yellow-700';
     }
   };
+
+  /** 向合利宝查询充值支付状态 */
+  async function handleQueryPayment(order: RechargeOrder) {
+    setQueryingOrders(prev => new Set(prev).add(order.id));
+    try {
+      const res: any = await queryRechargePayment(order.id);
+      if (res && res.code === 200) {
+        alert(res.data?.message || res.message || '查询完成');
+        if (res.data?.localStatus === 'active') {
+          loadRechargeOrders(ordersPage);
+        }
+      } else {
+        alert(res?.message || '查询失败');
+      }
+    } catch (e: any) {
+      alert('查询失败: ' + (e.message || '网络错误'));
+    } finally {
+      setQueryingOrders(prev => { const next = new Set(prev); next.delete(order.id); return next; });
+    }
+  }
+
+  /** 向合利宝发起充值退款 */
+  async function handleRefund(order: RechargeOrder) {
+    if (!confirm(`确定要对该充值订单发起退款吗？\n\n用户：${order.user_name || '--'}\n套餐：${order.package_name}\n金额：¥${(order.amount || 0).toFixed(2)}\n\n退款请求提交后将不可撤销。`)) return;
+
+    setRefundingOrders(prev => new Set(prev).add(order.id));
+    try {
+      const res: any = await refundRecharge(order.id);
+      if (res && res.code === 200) {
+        alert(res.data?.message || res.message || '退款请求已提交');
+        loadRechargeOrders(ordersPage);
+      } else {
+        alert(res?.message || '退款请求失败');
+      }
+    } catch (e: any) {
+      alert('退款请求失败: ' + (e.message || '网络错误'));
+    } finally {
+      setRefundingOrders(prev => { const next = new Set(prev); next.delete(order.id); return next; });
+    }
+  }
+
+  /** 向合利宝查询充值退款状态 */
+  async function handleQueryRefund(order: RechargeOrder) {
+    setRefundQueryingOrders(prev => new Set(prev).add(order.id));
+    try {
+      const res: any = await queryRechargeRefund(order.id);
+      if (res && res.code === 200) {
+        alert(res.data?.message || res.message || '查询完成');
+        if (res.data?.localStatus === 'refunded') {
+          loadRechargeOrders(ordersPage);
+        }
+      } else {
+        alert(res?.message || '退款查询失败');
+      }
+    } catch (e: any) {
+      alert('退款查询失败: ' + (e.message || '网络错误'));
+    } finally {
+      setRefundQueryingOrders(prev => { const next = new Set(prev); next.delete(order.id); return next; });
+    }
+  }
+
+  function handleSearch() {
+    setOrdersPage(1);
+    loadRechargeOrders(1);
+  }
+
+  function handleResetFilter() {
+    setFilterStatus('');
+    setFilterKeyword('');
+    setFilterPackageId('');
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setOrdersPage(1);
+  }
 
   return (
       <div className="space-y-4">
@@ -342,6 +444,89 @@ export default function RechargePackageManage() {
         {/* Tab: 充值订单 */}
         {activeTab === 'orders' && (
           <>
+            {/* 筛选栏 */}
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1 min-w-[120px]">
+                  <label className="text-xs text-gray-500">状态</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-water/30 focus:border-water outline-none"
+                  >
+                    <option value="">全部状态</option>
+                    <option value="pending">待支付</option>
+                    <option value="active">已支付</option>
+                    <option value="refunding">退款中</option>
+                    <option value="refunded">已退款</option>
+                    <option value="expired">已过期</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1 min-w-[120px]">
+                  <label className="text-xs text-gray-500">充值套餐</label>
+                  <select
+                    value={filterPackageId}
+                    onChange={(e) => setFilterPackageId(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-water/30 focus:border-water outline-none"
+                  >
+                    <option value="">全部套餐</option>
+                    {packages.map(pkg => (
+                      <option key={pkg.id} value={pkg.id}>{pkg.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1 min-w-[180px]">
+                  <label className="text-xs text-gray-500">关键词</label>
+                  <input
+                    type="text"
+                    value={filterKeyword}
+                    onChange={(e) => setFilterKeyword(e.target.value)}
+                    placeholder="用户姓名/手机号"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-water/30 focus:border-water outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1 min-w-[140px]">
+                  <label className="text-xs text-gray-500">开始日期</label>
+                  <input
+                    type="date"
+                    value={filterStartDate}
+                    onChange={(e) => setFilterStartDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-water/30 focus:border-water outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1 min-w-[140px]">
+                  <label className="text-xs text-gray-500">结束日期</label>
+                  <input
+                    type="date"
+                    value={filterEndDate}
+                    onChange={(e) => setFilterEndDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-water/30 focus:border-water outline-none"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSearch}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-water text-white rounded-lg hover:bg-water/90 transition-colors text-sm"
+                  >
+                    <Search className="w-4 h-4" />
+                    查询
+                  </button>
+                  <button
+                    onClick={() => { handleResetFilter(); loadRechargeOrders(1); }}
+                    className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  >
+                    重置
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {loading ? (
               <div className="flex justify-center py-12">
                 <div className="w-8 h-8 border-3 border-water-light/30 border-t-water rounded-full animate-spin"/>
@@ -361,6 +546,7 @@ export default function RechargePackageManage() {
                       <th className="text-right px-4 py-3 text-gray-500 font-medium">赠送金额</th>
                       <th className="text-center px-4 py-3 text-gray-500 font-medium">状态</th>
                       <th className="text-right px-4 py-3 text-gray-500 font-medium">时间</th>
+                      <th className="text-center px-4 py-3 text-gray-500 font-medium">操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -378,8 +564,57 @@ export default function RechargePackageManage() {
                             {statusLabel(order.status)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-500">
-                          {order.created_at ? new Date(order.created_at).toLocaleDateString() : '--'}
+                        <td className="px-4 py-3 text-right text-gray-500 whitespace-nowrap">
+                          {order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '--'}
+                        </td>
+                        <td className="px-2 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {order.status === 'pending' && (
+                              <button
+                                onClick={() => handleQueryPayment(order)}
+                                disabled={queryingOrders.has(order.id)}
+                                className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-50"
+                                title="向合利宝查询支付状态"
+                              >
+                                {queryingOrders.has(order.id) ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <SearchCheck className="w-3 h-3" />
+                                )}
+                                查支付
+                              </button>
+                            )}
+                            {order.status === 'active' && (
+                              <button
+                                onClick={() => handleRefund(order)}
+                                disabled={refundingOrders.has(order.id)}
+                                className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 bg-red-50 rounded hover:bg-red-100 disabled:opacity-50"
+                                title="发起退款"
+                              >
+                                {refundingOrders.has(order.id) ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Undo2 className="w-3 h-3" />
+                                )}
+                                退款
+                              </button>
+                            )}
+                            {order.status === 'refunding' && (
+                              <button
+                                onClick={() => handleQueryRefund(order)}
+                                disabled={refundQueryingOrders.has(order.id)}
+                                className="flex items-center gap-1 px-2 py-1 text-xs text-purple-600 bg-purple-50 rounded hover:bg-purple-100 disabled:opacity-50"
+                                title="查询退款状态"
+                              >
+                                {refundQueryingOrders.has(order.id) ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <SearchCheck className="w-3 h-3" />
+                                )}
+                                查退款
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
