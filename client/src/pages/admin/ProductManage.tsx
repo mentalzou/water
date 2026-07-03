@@ -328,10 +328,10 @@ export default function ProductManage() {
               {/* 库存 + 起送量 */}
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-xs text-gray-500">
-                  库存: {p.stock != null ? (p.stock - (p.frozen_stock ?? 0)) : '∞'}
+                  库存: {p.stock != null ? p.stock : '∞'}
                 </span>
                 {(p.frozen_stock ?? 0) > 0 && (
-                  <span className="text-xs text-orange-500">(冻结{p.frozen_stock})</span>
+                  <span className="text-xs text-orange-500">(已冻结{p.frozen_stock}，可用{p.stock != null ? p.stock - p.frozen_stock : '∞'})</span>
                 )}
                 {(p.min_order_quantity ?? 1) > 1 && (
                   <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-[10px] font-medium">{p.min_order_quantity}件起送</span>
