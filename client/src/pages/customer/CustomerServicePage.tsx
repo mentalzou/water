@@ -36,7 +36,7 @@ export default function CustomerServicePage() {
 
           {/* 订水热线 */}
           <div
-            onClick={() => handleCall('955888')}
+            onClick={() => handleCall('18005016582')}
             className="flex items-center justify-between p-4 bg-water/5 rounded-xl cursor-pointer active:bg-water/10 transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -45,7 +45,7 @@ export default function CustomerServicePage() {
               </div>
               <div>
                 <p className="text-xs text-gray-400">订水热线</p>
-                <p className="text-lg font-bold text-gray-800">955888</p>
+                <p className="text-lg font-bold text-gray-800">18005016582</p>
               </div>
             </div>
             <div className="w-9 h-9 bg-water text-white rounded-full flex items-center justify-center">
@@ -54,23 +54,23 @@ export default function CustomerServicePage() {
           </div>
 
           {/* 服务热线 */}
-          <div
-            onClick={() => handleCall('059088889999')}
-            className="flex items-center justify-between p-4 bg-orange-50 rounded-xl cursor-pointer active:bg-orange-100 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-200 rounded-full flex items-center justify-center">
-                <Phone className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">服务热线</p>
-                <p className="text-lg font-bold text-gray-800">0590-88889999</p>
-              </div>
-            </div>
-            <div className="w-9 h-9 bg-orange-500 text-white rounded-full flex items-center justify-center">
-              <Phone className="w-4 h-4" />
-            </div>
-          </div>
+          {/*<div*/}
+          {/*  onClick={() => handleCall('059088889999')}*/}
+          {/*  className="flex items-center justify-between p-4 bg-orange-50 rounded-xl cursor-pointer active:bg-orange-100 transition-colors"*/}
+          {/*>*/}
+          {/*  <div className="flex items-center gap-3">*/}
+          {/*    <div className="w-10 h-10 bg-orange-200 rounded-full flex items-center justify-center">*/}
+          {/*      <Phone className="w-5 h-5 text-orange-600" />*/}
+          {/*    </div>*/}
+          {/*    <div>*/}
+          {/*      <p className="text-xs text-gray-400">服务热线</p>*/}
+          {/*      <p className="text-lg font-bold text-gray-800">0590-88889999</p>*/}
+          {/*    </div>*/}
+          {/*  </div>*/}
+          {/*  <div className="w-9 h-9 bg-orange-500 text-white rounded-full flex items-center justify-center">*/}
+          {/*    <Phone className="w-4 h-4" />*/}
+          {/*  </div>*/}
+          {/*</div>*/}
 
           <div className="border-t border-gray-100 pt-4">
             <p className="text-center text-xs text-gray-400">
