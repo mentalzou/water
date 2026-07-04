@@ -128,8 +128,12 @@ function resolveDeliveryDate(raw: string): string {
 }
 
 async function handleSubmit() {
-    if (!selectedAddress && !contactPhone) {
-      alert('请选择收货地址或填写联系电话');
+    if (!selectedAddress) {
+      alert('请先选择收货地址');
+      return;
+    }
+    if (!contactPhone) {
+      alert('请填写送水联系电话');
       return;
     }
 
@@ -153,9 +157,7 @@ async function handleSubmit() {
     setSubmitting(true);
     try {
       const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
-      const addressText = selectedAddress
-          ? `${selectedAddress.province}${selectedAddress.city}${selectedAddress.district}${selectedAddress.detail}`
-          : '自提';
+      const addressText = `${selectedAddress!.province}${selectedAddress!.city}${selectedAddress!.district}${selectedAddress!.detail}`;
 
       const orderItems = orderData.items.map(item => ({
         product_id: item.product.id,
