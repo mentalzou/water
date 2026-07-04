@@ -108,13 +108,16 @@ export function createCustomerOrder(data: {
         fromBonus += deduct;
         remainingToPay = Math.round((remainingToPay - deduct) * 100) / 100;
 
+        // 获取本次扣减后的用户累计余额
+        const cumulative = userRechargeModel.getTotalBalanceByUserId(data.user_id);
+
         balanceTransactionModel.create({
           user_id: data.user_id,
           recharge_id: recharge.id,
           tx_type: 'consume_bonus',
           amount: deduct,
-          principal_after: recharge.remaining_balance,
-          bonus_after: recharge.bonus_balance - deduct,
+          principal_after: cumulative.total_principal,
+          bonus_after: cumulative.total_bonus,
           description: `消费抵扣 - 赠送金 - ¥${deduct.toFixed(2)}`,
         });
       }
@@ -129,13 +132,16 @@ export function createCustomerOrder(data: {
         fromBalance += deduct;
         remainingToPay = Math.round((remainingToPay - deduct) * 100) / 100;
 
+        // 获取本次扣减后的用户累计余额
+        const cumulative = userRechargeModel.getTotalBalanceByUserId(data.user_id);
+
         balanceTransactionModel.create({
           user_id: data.user_id,
           recharge_id: recharge.id,
           tx_type: 'consume_principal',
           amount: deduct,
-          principal_after: recharge.remaining_balance - deduct,
-          bonus_after: recharge.bonus_balance,
+          principal_after: cumulative.total_principal,
+          bonus_after: cumulative.total_bonus,
           description: `消费抵扣 - 本金 - ¥${deduct.toFixed(2)}`,
         });
       }
@@ -148,13 +154,16 @@ export function createCustomerOrder(data: {
         const remainingTotal = (refetched.remaining_balance || 0) + (refetched.bonus_balance || 0);
         if (remainingTotal <= 0) {
           userRechargeModel.expireRecharge(recharge.id);
+
+          const cumulative = userRechargeModel.getTotalBalanceByUserId(data.user_id);
+
           balanceTransactionModel.create({
             user_id: data.user_id,
             recharge_id: recharge.id,
             tx_type: 'expire',
             amount: 0,
-            principal_after: 0,
-            bonus_after: 0,
+            principal_after: cumulative.total_principal,
+            bonus_after: cumulative.total_bonus,
             description: '余额用尽，充值套餐自动过期',
           });
         }

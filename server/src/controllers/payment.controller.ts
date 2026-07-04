@@ -260,27 +260,29 @@ export async function paymentNotify(req: Request, res: Response): Promise<void> 
             return;
           }
 
-          // 记录流水：本金充值
+          // 记录流水：本金充值（使用用户累计余额）
+          const cumulative1 = userRechargeModel.getTotalBalanceByUserId(recharge.user_id);
           balanceTransactionModel.create({
             user_id: recharge.user_id,
             recharge_id: recharge.id,
             tx_type: 'recharge_principal',
             amount: recharge.amount,
-            principal_after: recharge.remaining_balance,
-            bonus_after: recharge.bonus_balance,
+            principal_after: cumulative1.total_principal,
+            bonus_after: cumulative1.total_bonus,
             description: `充值本金到账 - ¥${recharge.amount.toFixed(2)}`,
             operator_ip: getClientIp(req),
           });
 
-          // 记录流水：赠送金充值
+          // 记录流水：赠送金充值（使用用户累计余额）
           if (recharge.bonus_amount > 0) {
+            const cumulative2 = userRechargeModel.getTotalBalanceByUserId(recharge.user_id);
             balanceTransactionModel.create({
               user_id: recharge.user_id,
               recharge_id: recharge.id,
               tx_type: 'recharge_bonus',
               amount: recharge.bonus_amount,
-              principal_after: recharge.remaining_balance,
-              bonus_after: recharge.bonus_balance,
+              principal_after: cumulative2.total_principal,
+              bonus_after: cumulative2.total_bonus,
               description: `充值赠送金到账 - ¥${recharge.bonus_amount.toFixed(2)}`,
               operator_ip: getClientIp(req),
             });

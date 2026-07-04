@@ -1423,26 +1423,28 @@ export async function queryRechargePayment(req: Request, res: Response): Promise
     if (result.status === 'SUCCESS') {
       userRechargeModel.markPaid(recharge.id, result.orderNo || '');
 
-      // 记录流水
+      // 记录流水：本金充值（使用用户累计余额）
+      const cumulative1 = userRechargeModel.getTotalBalanceByUserId(recharge.user_id);
       balanceTransactionModel.create({
         user_id: recharge.user_id,
         recharge_id: recharge.id,
         tx_type: 'recharge_principal',
         amount: recharge.amount,
-        principal_after: recharge.remaining_balance,
-        bonus_after: recharge.bonus_balance,
+        principal_after: cumulative1.total_principal,
+        bonus_after: cumulative1.total_bonus,
         description: `充值本金到账 - ¥${recharge.amount.toFixed(2)}`,
         operator_ip: req.ip || '',
       });
 
       if (recharge.bonus_amount > 0) {
+        const cumulative2 = userRechargeModel.getTotalBalanceByUserId(recharge.user_id);
         balanceTransactionModel.create({
           user_id: recharge.user_id,
           recharge_id: recharge.id,
           tx_type: 'recharge_bonus',
           amount: recharge.bonus_amount,
-          principal_after: recharge.remaining_balance,
-          bonus_after: recharge.bonus_balance,
+          principal_after: cumulative2.total_principal,
+          bonus_after: cumulative2.total_bonus,
           description: `充值赠送金到账 - ¥${recharge.bonus_amount.toFixed(2)}`,
           operator_ip: req.ip || '',
         });
