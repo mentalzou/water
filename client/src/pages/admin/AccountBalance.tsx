@@ -255,7 +255,17 @@ export default function AccountBalance() {
           {summaryLoading ? (
             <div className="text-center py-12 text-gray-400">加载余额信息中...</div>
           ) : balanceSummary ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-5 lg:col-span-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center">
+                    <Wallet className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-sm text-gray-500">账户总余额</span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-600">¥{(balanceSummary.total_balance ?? 0).toFixed(2)}</p>
+                <p className="text-xs text-gray-400 mt-1">&nbsp;</p>
+              </div>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -263,7 +273,7 @@ export default function AccountBalance() {
                   </div>
                   <span className="text-sm text-gray-500">本金余额</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-800">¥{balanceSummary.total_principal.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-800">¥{(balanceSummary.total_principal ?? 0).toFixed(2)}</p>
                 <p className="text-xs text-gray-400 mt-1">{balanceSummary.recharge_count} 笔充值</p>
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -273,7 +283,7 @@ export default function AccountBalance() {
                   </div>
                   <span className="text-sm text-gray-500">赠送金余额</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-800">¥{balanceSummary.total_bonus.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-800">¥{(balanceSummary.total_bonus ?? 0).toFixed(2)}</p>
                 <p className="text-xs text-gray-400 mt-1">&nbsp;</p>
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -283,7 +293,7 @@ export default function AccountBalance() {
                   </div>
                   <span className="text-sm text-gray-500">累计充值</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-800">¥{balanceSummary.totalRecharged.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-800">¥{(balanceSummary.totalRecharged ?? 0).toFixed(2)}</p>
                 <p className="text-xs text-gray-400 mt-1">&nbsp;</p>
               </div>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -293,7 +303,7 @@ export default function AccountBalance() {
                   </div>
                   <span className="text-sm text-gray-500">累计消费</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-800">¥{balanceSummary.totalConsumed.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-800">¥{(balanceSummary.totalConsumed ?? 0).toFixed(2)}</p>
                 <p className="text-xs text-gray-400 mt-1">&nbsp;</p>
               </div>
             </div>
@@ -363,6 +373,12 @@ export default function AccountBalance() {
                     {transactions.map((rec) => {
                       const typeInfo = TX_TYPE_MAP[rec.tx_type] || { label: rec.tx_type, cls: 'bg-gray-100 text-gray-700' };
                       const dir = AMOUNT_DIRECTION[rec.tx_type] || 'in';
+                      const principalAfter = rec.principal_after ?? 0;
+                      const bonusAfter = rec.bonus_after ?? 0;
+                      const localTime = rec.created_at ? new Date(rec.created_at) : null;
+                      const timeStr = localTime && !isNaN(localTime.getTime())
+                        ? `${localTime.getFullYear()}-${String(localTime.getMonth() + 1).padStart(2, '0')}-${String(localTime.getDate()).padStart(2, '0')} ${String(localTime.getHours()).padStart(2, '0')}:${String(localTime.getMinutes()).padStart(2, '0')}:${String(localTime.getSeconds()).padStart(2, '0')}`
+                        : '';
                       return (
                         <tr key={rec.id} className="hover:bg-gray-50/60 transition-colors">
                           <td className="px-6 py-3.5">
@@ -371,12 +387,12 @@ export default function AccountBalance() {
                             </span>
                           </td>
                           <td className={`px-6 py-3.5 text-right font-mono text-sm font-medium ${dir === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {dir === 'in' ? '+' : '-'}¥{rec.amount.toFixed(2)}
+                            {dir === 'in' ? '+' : '-'}¥{(rec.amount ?? 0).toFixed(2)}
                           </td>
-                          <td className="px-6 py-3.5 text-right font-mono text-sm text-gray-700">¥{rec.principal_after.toFixed(2)}</td>
-                          <td className="px-6 py-3.5 text-right font-mono text-sm text-gray-700">¥{rec.bonus_after.toFixed(2)}</td>
+                          <td className="px-6 py-3.5 text-right font-mono text-sm text-gray-700">¥{principalAfter.toFixed(2)}</td>
+                          <td className="px-6 py-3.5 text-right font-mono text-sm text-gray-700">¥{bonusAfter.toFixed(2)}</td>
                           <td className="px-6 py-3.5 text-sm text-gray-500 max-w-[220px] truncate" title={rec.description}>{rec.description}</td>
-                          <td className="px-6 py-3.5 text-right text-sm text-gray-400 whitespace-nowrap">{rec.created_at?.slice(0, 19)}</td>
+                          <td className="px-6 py-3.5 text-right text-sm text-gray-400 whitespace-nowrap">{timeStr}</td>
                         </tr>
                       );
                     })}

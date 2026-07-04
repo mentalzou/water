@@ -79,8 +79,8 @@ export default function BalancePage() {
       if (endDate) params.end_date = endDate;
 
       const res = await customerApi.getMyBalanceTransactions(params);
-      const newData = res.data.data || [];
-      const total = res.data.total || 0;
+      const newData = res.data || [];
+      const total = res.pagination?.total || 0;
 
       if (reset) {
         setTransactions(newData);
