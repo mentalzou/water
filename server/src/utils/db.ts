@@ -233,6 +233,7 @@ export function initTables(database: Database.Database): void {
       bonus_balance REAL DEFAULT 0,
       status TEXT DEFAULT 'active' CHECK(status IN ('active','expired','refunded')),
       transaction_id TEXT DEFAULT '',
+      channel_transaction_id TEXT DEFAULT '',
       remark TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now', 'localtime')),
       paid_at TEXT DEFAULT ''
@@ -302,7 +303,7 @@ function recordMigration(db: Database.Database, version: number, description: st
  */
 function applyMigrations(db: Database.Database): void {
   const currentVersion = getCurrentVersion(db);
-  const LATEST_VERSION = 26;
+  const LATEST_VERSION = 27;
 
   // 已达最新版本，无需迁移，静默返回（避免每次启动都刷日志）
   if (currentVersion >= LATEST_VERSION) return;
@@ -377,14 +378,15 @@ function applyMigrations(db: Database.Database): void {
           amount REAL NOT NULL, discount_rate REAL NOT NULL,
           bonus_amount REAL DEFAULT 0, paid_amount REAL NOT NULL,
           remaining_balance REAL NOT NULL, bonus_balance REAL DEFAULT 0,
-          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
-          transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunding','refunded')),
+          transaction_id TEXT DEFAULT '', channel_transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
           created_at TEXT DEFAULT (datetime('now', 'localtime')), paid_at TEXT DEFAULT ''
         )`);
       } else {
         // 老表存在：先加缺失列
         try { db.exec("ALTER TABLE user_recharges ADD COLUMN bonus_amount REAL DEFAULT 0"); } catch (_) { /* 已存在 */ }
         try { db.exec("ALTER TABLE user_recharges ADD COLUMN bonus_balance REAL DEFAULT 0"); } catch (_) { /* 已存在 */ }
+        try { db.exec("ALTER TABLE user_recharges ADD COLUMN channel_transaction_id TEXT DEFAULT ''"); } catch (_) { /* 已存在 */ }
         // 修正 CHECK 约束（加 pending）
         const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_recharges'").get() as { sql: string } | undefined;
         if (tableInfo && !tableInfo.sql.includes('pending')) {
@@ -396,14 +398,14 @@ function applyMigrations(db: Database.Database): void {
             amount REAL NOT NULL, discount_rate REAL NOT NULL,
             bonus_amount REAL DEFAULT 0, paid_amount REAL NOT NULL,
             remaining_balance REAL NOT NULL, bonus_balance REAL DEFAULT 0,
-            status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunded')),
-            transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending' CHECK(status IN ('pending','active','expired','refunding','refunded')),
+            transaction_id TEXT DEFAULT '', channel_transaction_id TEXT DEFAULT '', remark TEXT DEFAULT '',
             created_at TEXT DEFAULT (datetime('now', 'localtime')), paid_at TEXT DEFAULT ''
           )`);
           db.exec(`INSERT INTO user_recharges_new
             SELECT id,user_id,package_id,amount,discount_rate,
               COALESCE(bonus_amount,0),paid_amount,remaining_balance,
-              COALESCE(bonus_balance,0),status,transaction_id,remark,created_at,paid_at
+              COALESCE(bonus_balance,0),status,transaction_id,COALESCE(channel_transaction_id,''),remark,created_at,paid_at
             FROM user_recharges`);
           db.exec('DROP TABLE user_recharges');
           db.exec('ALTER TABLE user_recharges_new RENAME TO user_recharges');
@@ -510,6 +512,9 @@ function applyMigrations(db: Database.Database): void {
       }
       if (!urCols.some((c: any) => c.name === 'bonus_balance')) {
         db.exec('ALTER TABLE user_recharges ADD COLUMN bonus_balance REAL DEFAULT 0');
+      }
+      if (!urCols.some((c: any) => c.name === 'channel_transaction_id')) {
+        db.exec("ALTER TABLE user_recharges ADD COLUMN channel_transaction_id TEXT DEFAULT ''");
       }
       recordMigration(db, 8, 'bonus_amount/bonus_balance 字段');
     });
@@ -875,6 +880,37 @@ function applyMigrations(db: Database.Database): void {
         db.exec('ALTER TABLE products ADD COLUMN min_order_quantity INTEGER DEFAULT 1');
       }
       recordMigration(db, 26, 'products 新增 frozen_stock / min_order_quantity（库存冻结 + 起送量）');
+    });
+    txn();
+  }
+
+  // === v27: user_recharges 新增 channel_transaction_id（支付渠道交易号） ===
+  if (currentVersion < 27) {
+    const txn = db.transaction(() => {
+      const urCols = db.prepare('PRAGMA table_info(user_recharges)').all() as any[];
+      if (!urCols.some((c: any) => c.name === 'channel_transaction_id')) {
+        db.exec("ALTER TABLE user_recharges ADD COLUMN channel_transaction_id TEXT DEFAULT ''");
+      }
+      recordMigration(db, 27, 'user_recharges 新增 channel_transaction_id（支付渠道交易号）');
+    });
+    txn();
+  }
+
+  // === v28: 修复负数 frozen_stock — 根据待处理订单重新计算冻结库存 ===
+  if (currentVersion < 28) {
+    const txn = db.transaction(() => {
+      const result = db.prepare(`
+        UPDATE products 
+        SET frozen_stock = (
+          SELECT COALESCE(SUM(oi.quantity), 0)
+          FROM order_items oi
+          JOIN orders o ON oi.order_id = o.id
+          WHERE oi.product_id = products.id 
+            AND o.status IN ('pending', 'pending_delivery', 'delivering')
+        )
+        WHERE frozen_stock < 0
+      `).run();
+      recordMigration(db, 28, `修复负数 frozen_stock（共修复 ${result.changes} 个产品）`);
     });
     txn();
   }

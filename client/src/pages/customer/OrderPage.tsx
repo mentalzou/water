@@ -386,7 +386,13 @@ export default function OrderPage() {
                           {product.sales_count && (
                               <p className="text-xs text-gray-400">30天销量 {product.sales_count}</p>
                           )}
-                          {/* 库存 & 起送量提示 */}
+                          {/* 有效库存 */}
+                          {/*{product.stock != null && (*/}
+                          {/*  <p className="text-xs text-gray-500 mt-0.5">*/}
+                          {/*    库存: {Math.max(0, product.stock - (product.frozen_stock ?? 0))} 件*/}
+                          {/*  </p>*/}
+                          {/*)}*/}
+                          {/* 起送量提示 */}
                           {(product.min_order_quantity ?? 1) > 1 && (
                             <span className="inline-block mt-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-[10px] font-medium">
                               {product.min_order_quantity}件起送

@@ -19,7 +19,7 @@ export const userRechargeModel = {
   }): UserRecharge {
     const id = uuidv4();
     db.prepare(
-        'INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, status, transaction_id, remark, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
+        'INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, status, transaction_id, channel_transaction_id, remark, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'))'
     ).run(
         id,
         data.user_id,
@@ -32,6 +32,7 @@ export const userRechargeModel = {
         data.bonus_balance,
         'pending',
         data.transaction_id || '',
+        '',
         data.remark || ''
     );
 
@@ -117,8 +118,14 @@ export const userRechargeModel = {
 
   markPaid(id: string, transactionId: string): UserRecharge | undefined {
     db.prepare(
-        "UPDATE user_recharges SET status = 'active', transaction_id = ?, paid_at = datetime('now', 'localtime') WHERE id = ?"
-    ).run(transactionId, id);
+        "UPDATE user_recharges SET status = 'active', paid_at = datetime('now', 'localtime') WHERE id = ?"
+    ).run(id);
+    // 如果传入了支付渠道交易号（如微信支付 channelOrderId），存入 channel_transaction_id
+    if (transactionId && transactionId !== (this.findById(id)?.transaction_id)) {
+      try {
+        db.prepare("UPDATE user_recharges SET channel_transaction_id = ? WHERE id = ?").run(transactionId, id);
+      } catch (_) { /* channel_transaction_id 列可能尚不存在 */ }
+    }
     return this.findById(id);
   },
 
