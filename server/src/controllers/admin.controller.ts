@@ -460,7 +460,21 @@ export function listProducts(req: Request, res: Response): void {
 
 export function updateProduct(req: Request, res: Response): void {
   const id = str(req.params.id);
-  const result = productModel.update(id, req.body as any);
+  const data = req.body as any;
+
+  // 校验：更新 stock 时不能小于当前 frozen_stock
+  if (data.stock !== undefined) {
+    const product = productModel.findById(id);
+    if (!product) return notFound(res);
+    const frozenStock = product.frozen_stock ?? 0;
+    const newStock = Number(data.stock);
+    if (newStock < frozenStock) {
+      error(res, `库存数量（${newStock}）不能小于已冻结数量（${frozenStock}），请先处理冻结中的订单`);
+      return;
+    }
+  }
+
+  const result = productModel.update(id, data);
   if (!result) return notFound(res);
   success(res, result, '更新成功');
 }
