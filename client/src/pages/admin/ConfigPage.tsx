@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, CheckCircle2, Server, Trash2, RefreshCw } from 'lucide-react';
+import { Settings, Save, CheckCircle2, Server, Trash2, RefreshCw, Plus, Edit2, X } from 'lucide-react';
+import { getDeliveryFeeRules, createDeliveryFeeRule, updateDeliveryFeeRule, deleteDeliveryFeeRule } from '../../api/admin.api';
 
 function SettingsIcon(props: any) {
   return (
@@ -21,6 +22,11 @@ export default function ConfigPage() {
   const [terminalInfo, setTerminalInfo] = useState<any>(null);
   const [terminalLoading, setTerminalLoading] = useState(false);
   const [terminalDeleting, setTerminalDeleting] = useState(false);
+
+  // 配送费规则
+  const [feeRules, setFeeRules] = useState<any[]>([]);
+  const [editingRule, setEditingRule] = useState<any>(null);
+  const [ruleForm, setRuleForm] = useState({ building_type: 'stairs', floor_from: 1, floor_to: 1, fee: 0 });
 
   const isPercentage = configs.commission_type === 'percentage';
   const exampleAmount = 100;
@@ -97,9 +103,64 @@ export default function ConfigPage() {
     }
   }
 
+  async function fetchFeeRules() {
+    try {
+      const res: any = await getDeliveryFeeRules();
+      if (res.code === 200) setFeeRules(res.data || []);
+    } catch (e) { console.error('获取配送费规则失败', e); }
+  }
+
+  async function handleCreateRule() {
+    try {
+      const res: any = await createDeliveryFeeRule(ruleForm);
+      if (res.code === 200) {
+        setEditingRule(null);
+        setRuleForm({ building_type: 'stairs', floor_from: 1, floor_to: 1, fee: 0 });
+        fetchFeeRules();
+      } else { alert(res.message || '创建失败'); }
+    } catch (e: any) { alert('创建失败: ' + (e.message || '网络错误')); }
+  }
+
+  async function handleUpdateRule() {
+    if (!editingRule?.id) return;
+    try {
+      const res: any = await updateDeliveryFeeRule(editingRule.id, ruleForm);
+      if (res.code === 200) {
+        setEditingRule(null);
+        setRuleForm({ building_type: 'stairs', floor_from: 1, floor_to: 1, fee: 0 });
+        fetchFeeRules();
+      } else { alert(res.message || '更新失败'); }
+    } catch (e: any) { alert('更新失败: ' + (e.message || '网络错误')); }
+  }
+
+  async function handleDeleteRule(id: string) {
+    if (!confirm('确定删除该规则？')) return;
+    try {
+      const res: any = await deleteDeliveryFeeRule(id);
+      if (res.code === 200) fetchFeeRules();
+      else alert(res.message || '删除失败');
+    } catch (e: any) { alert('删除失败: ' + (e.message || '网络错误')); }
+  }
+
+  function startEditRule(rule: any) {
+    setEditingRule(rule);
+    setRuleForm({
+      building_type: rule.building_type || 'stairs',
+      floor_from: rule.floor_from ?? 1,
+      floor_to: rule.floor_to ?? 1,
+      fee: rule.fee ?? 0,
+    });
+  }
+
+  function cancelEditRule() {
+    setEditingRule(null);
+    setRuleForm({ building_type: 'stairs', floor_from: 1, floor_to: 1, fee: 0 });
+  }
+
   useEffect(() => {
     fetchConfigs();
     fetchTerminalInfo();
+    fetchFeeRules();
   }, []);
 
   async function handleSave() {
@@ -300,6 +361,101 @@ export default function ConfigPage() {
           <div className="p-6 space-y-4">
             <div><label className="block text-sm font-medium text-gray-700 mb-1.5">站点名称</label>
               <input value={configs.site_name} onChange={e=>setConfigs({...configs,site_name:e.target.value})} className="w-full max-w-md px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm"/></div>
+          </div>
+        </div>
+
+        {/* Delivery Fee Rules */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-green-50/80 to-emerald-50/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-gray-800 flex items-center gap-2">🚚 配送费规则配置</h2>
+                <p className="text-xs text-gray-400 mt-1">按楼房类型和楼层范围设置配送费，未配置的楼层配送费为 0</p>
+              </div>
+              {!editingRule && (
+                <button onClick={() => startEditRule({})}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-water text-white hover:bg-water-dark transition-colors">
+                  <Plus className="w-3.5 h-3.5" />新增规则
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6">
+            {/* Rules List */}
+            {feeRules.length === 0 && !editingRule ? (
+              <div className="text-center py-8 text-gray-400 text-sm">暂无配送费规则，点击"新增规则"添加</div>
+            ) : (
+              <div className="space-y-2 mb-4">
+                {['stairs', 'elevator'].map(type => {
+                  const typeRules = feeRules.filter((r: any) => r.building_type === type);
+                  if (typeRules.length === 0) return null;
+                  return (
+                    <div key={type} className="border border-gray-100 rounded-xl overflow-hidden">
+                      <div className="px-4 py-2 bg-gray-50 text-sm font-medium text-gray-700">
+                        {type === 'stairs' ? '🏢 楼梯房' : '🛗 电梯房'}
+                      </div>
+                      <div className="divide-y divide-gray-50">
+                        {typeRules.map((rule: any) => (
+                          <div key={rule.id} className="px-4 py-2.5 flex items-center justify-between text-sm">
+                            <span className="text-gray-600">
+                              {rule.floor_from === rule.floor_to ? `${rule.floor_from}层` : `${rule.floor_from}-${rule.floor_to}层`}
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="font-semibold text-gray-800">{rule.fee > 0 ? `¥${Number(rule.fee).toFixed(2)}` : '免费'}</span>
+                              <button onClick={() => startEditRule(rule)} className="text-blue-500 hover:text-blue-700"><Edit2 className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => handleDeleteRule(rule.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add / Edit Form */}
+            {editingRule && (
+              <div className="border border-water/30 rounded-xl p-4 bg-water/5">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">{editingRule.id ? '编辑规则' : '新增规则'}</h3>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">楼房类型 *</label>
+                    <select value={ruleForm.building_type} onChange={e => setRuleForm({...ruleForm, building_type: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 ring-water/30">
+                      <option value="stairs">楼梯房</option>
+                      <option value="elevator">电梯房</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">配送费 (元)</label>
+                    <input type="number" value={ruleForm.fee} onChange={e => setRuleForm({...ruleForm, fee: parseFloat(e.target.value) || 0})}
+                      min="0" step="0.01" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 ring-water/30" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">起始楼层</label>
+                    <input type="number" value={ruleForm.floor_from} onChange={e => setRuleForm({...ruleForm, floor_from: parseInt(e.target.value) || 1})}
+                      min="1" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 ring-water/30" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">结束楼层</label>
+                    <input type="number" value={ruleForm.floor_to} onChange={e => setRuleForm({...ruleForm, floor_to: parseInt(e.target.value) || 1})}
+                      min="1" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 ring-water/30" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={editingRule.id ? handleUpdateRule : handleCreateRule}
+                    className="px-4 py-2 bg-water text-white rounded-lg text-sm font-medium hover:bg-water-dark transition-colors">
+                    {editingRule.id ? '更新' : '创建'}
+                  </button>
+                  <button onClick={cancelEditRule}
+                    className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

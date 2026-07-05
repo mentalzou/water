@@ -10,6 +10,7 @@ import { createCustomerOrder, processPaymentSuccess } from '../services/order.se
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { getUserPointsRecords, getPointsConfig, changePoints } from '../services/points.service';
+import deliveryFeeRuleModel from '../models/delivery_fee_rule.model';
 import { getDb } from '../utils/db';
 
 /** 安全提取 req.body 中的字符串值 */
@@ -273,6 +274,8 @@ export function getProducts(_req: Request, res: Response): void {
 // ============ Orders ============
 export function createOrder(req: Request, res: Response): void {
   let { customer_phone, customer_name, address, items, distributor_code, pay_method, delivery_date, delivery_time } = req.body;
+  const building_type = str(req.body.building_type);
+  const floor = parseInt(req.body.floor, 10) || 1;
 
   // 将"明天"转为系统日期 +1 天，避免存储文字
   if (delivery_date === '明天') {
@@ -315,7 +318,7 @@ export function createOrder(req: Request, res: Response): void {
     return;
   }
 
-  // 创建订单（支持多商品 + 支付方式 + 预约时间）
+  // 创建订单（支持多商品 + 支付方式 + 预约时间 + 配送费）
   const result = createCustomerOrder({
     customer_phone,
     customer_name: customer_name || '',
@@ -326,6 +329,8 @@ export function createOrder(req: Request, res: Response): void {
     pay_method: payMethod,
     delivery_date: delivery_date || '',
     delivery_time: delivery_time || '',
+    building_type: building_type || undefined,
+    floor: floor || undefined,
   });
 
 
@@ -452,6 +457,8 @@ export function addAddress(req: Request, res: Response): void {
   const city = str(req.body.city);
   const district = str(req.body.district);
   const detail = str(req.body.detail);
+  const building_type = str(req.body.building_type);
+  const floor = parseInt(req.body.floor, 10) || 1;
 
   if (!contact_name || !contact_phone || !detail) {
     error(res, '请填写完整地址信息（联系人、手机号、详细地址）');
@@ -463,6 +470,11 @@ export function addAddress(req: Request, res: Response): void {
     return;
   }
 
+  if (!building_type) {
+    error(res, '请选择楼房类型');
+    return;
+  }
+
   const address = addressModel.create({
     user_id: userId,
     contact_name,
@@ -471,6 +483,8 @@ export function addAddress(req: Request, res: Response): void {
     city,
     district,
     detail,
+    building_type,
+    floor,
     is_default: req.body.is_default ? 1 : 0,
   });
 
@@ -495,6 +509,8 @@ export function updateAddress(req: Request, res: Response): void {
   if (req.body.city !== undefined) data.city = str(req.body.city);
   if (req.body.district !== undefined) data.district = str(req.body.district);
   if (req.body.detail) data.detail = str(req.body.detail);
+  if (req.body.building_type) data.building_type = str(req.body.building_type);
+  if (req.body.floor !== undefined) data.floor = parseInt(req.body.floor, 10) || 1;
   if (req.body.is_default !== undefined) data.is_default = req.body.is_default ? 1 : 0;
 
   const updated = addressModel.update(id, data);
@@ -511,6 +527,26 @@ export function deleteAddress(req: Request, res: Response): void {
   } else {
     error(res, '地址不存在或无权删除', 404);
   }
+}
+
+// ============ 计算配送费 ============
+export function calculateDeliveryFee(req: Request, res: Response): void {
+  const building_type = str(req.query.building_type);
+  const floor = parseInt(str(req.query.floor), 10) || 1;
+
+  if (!building_type || !['stairs', 'elevator'].includes(building_type)) {
+    error(res, '请提供楼房类型（stairs/elevator）');
+    return;
+  }
+
+  const fee = deliveryFeeRuleModel.calculateFee(building_type, floor);
+  const rules = deliveryFeeRuleModel.findByBuildingType(building_type as 'stairs' | 'elevator');
+  success(res, {
+    building_type,
+    floor,
+    delivery_fee: fee,
+    rules: rules.map(r => ({ floor_from: r.floor_from, floor_to: r.floor_to, fee: r.fee })),
+  });
 }
 
 // ============ Region Tree（公开，省市区级联选择） ============

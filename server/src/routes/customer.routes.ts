@@ -73,6 +73,9 @@ router.post('/addresses', customerController.addAddress);
 router.put('/addresses/:id', customerController.updateAddress);
 router.delete('/addresses/:id', customerController.deleteAddress);
 
+// Delivery fee calculation
+router.get('/delivery-fee/calculate', customerController.calculateDeliveryFee);
+
 // Points management
 router.get('/customers/points', customerController.getMyPoints);
 router.get('/customers/points/records', customerController.getMyPointsRecords);

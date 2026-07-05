@@ -13,12 +13,16 @@ export const customerApi = {
 
   // 个人中心 - 收货地址
   getAddresses: () => api.get('/addresses'),
-  addAddress: (data: { contact_name: string; contact_phone: string; province?: string; city?: string; district?: string; detail: string; is_default?: number }) =>
+  addAddress: (data: { contact_name: string; contact_phone: string; province?: string; city?: string; district?: string; detail: string; building_type?: string; floor?: number; is_default?: number }) =>
     api.post('/addresses', data),
   updateAddress: (id: string, data: any) =>
     api.put(`/addresses/${id}`, data),
   deleteAddress: (id: string) =>
     api.delete(`/addresses/${id}`),
+
+  // 配送费计算
+  calculateDeliveryFee: (buildingType: string, floor: number) =>
+    api.get('/delivery-fee/calculate', { params: { building_type: buildingType, floor } }),
 
   // 个人中心 - 积分管理
   getMyPoints: () => api.get('/customers/points'),
@@ -56,6 +60,8 @@ export const customerApi = {
     pay_method?: 'online' | 'balance';
     delivery_date?: string;
     delivery_time?: string;
+    building_type?: string;
+    floor?: number;
   }) => api.post('/orders', data),
 
   getOrderById: (id: string) => api.get(`/orders/${id}`),

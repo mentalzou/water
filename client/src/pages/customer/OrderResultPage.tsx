@@ -81,8 +81,14 @@ export default function OrderResultPage() {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">支付金额</span>
-              <span className="text-water font-bold text-lg">¥{order?.total_amount}</span>
+              <span className="text-water font-bold text-lg">¥{Number(order?.total_amount || 0).toFixed(2)}</span>
             </div>
+            {order?.delivery_fee > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">含配送费</span>
+                <span className="text-gray-500">¥{Number(order.delivery_fee).toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">订单状态</span>
               <span className={isPaid ? 'text-green-500' : 'text-orange-500'}>

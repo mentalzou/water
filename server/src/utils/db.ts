@@ -303,7 +303,7 @@ function recordMigration(db: Database.Database, version: number, description: st
  */
 function applyMigrations(db: Database.Database): void {
   const currentVersion = getCurrentVersion(db);
-  const LATEST_VERSION = 29;
+  const LATEST_VERSION = 30;
 
   // 已达最新版本，无需迁移，静默返回（避免每次启动都刷日志）
   if (currentVersion >= LATEST_VERSION) return;
@@ -921,6 +921,31 @@ function applyMigrations(db: Database.Database): void {
       const brandFix = db.prepare("UPDATE products SET brand_id = NULL WHERE brand_id = ''").run();
       const catFix = db.prepare("UPDATE products SET category_id = NULL WHERE category_id = ''").run();
       recordMigration(db, 29, `修复 products 外键空值（brand: ${brandFix.changes}, category: ${catFix.changes}）`);
+    });
+    txn();
+  }
+
+  // === v30: 配送费规则表 + 地址表楼房类型/楼层 + 订单表配送费字段 ===
+  if (currentVersion < 30) {
+    const txn = db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS delivery_fee_rules (
+        id TEXT PRIMARY KEY,
+        building_type TEXT NOT NULL CHECK(building_type IN ('stairs','elevator')),
+        floor_from INTEGER NOT NULL,
+        floor_to INTEGER NOT NULL,
+        fee REAL NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )`);
+
+      // addresses 增加楼房类型和楼层字段
+      try { db.exec(`ALTER TABLE addresses ADD COLUMN building_type TEXT DEFAULT 'stairs'`); } catch (_) { /* ignore */ }
+      try { db.exec(`ALTER TABLE addresses ADD COLUMN floor INTEGER DEFAULT 1`); } catch (_) { /* ignore */ }
+
+      // orders 增加配送费字段
+      try { db.exec(`ALTER TABLE orders ADD COLUMN delivery_fee REAL DEFAULT 0`); } catch (_) { /* ignore */ }
+
+      recordMigration(db, 30, '新增配送费规则表 + 地址楼房类型/楼层 + 订单配送费字段');
     });
     txn();
   }

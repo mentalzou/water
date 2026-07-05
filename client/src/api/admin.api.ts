@@ -113,6 +113,15 @@ export const getConfigs = () => adminApi.get('/configs');
 export const updateConfig = (key: string, value: string) =>
   adminApi.put('/configs', { key, value });
 
+// Delivery Fee Rules
+export const getDeliveryFeeRules = () => adminApi.get('/delivery-fee-rules');
+export const createDeliveryFeeRule = (data: { building_type: string; floor_from: number; floor_to: number; fee: number }) =>
+  adminApi.post('/delivery-fee-rules', data);
+export const updateDeliveryFeeRule = (id: string, data: any) =>
+  adminApi.put(`/delivery-fee-rules/${id}`, data);
+export const deleteDeliveryFeeRule = (id: string) =>
+  adminApi.delete(`/delivery-fee-rules/${id}`);
+
 // Recharge Packages
 export const getRechargePackages = () => adminApi.get('/recharge/packages');
 export const createRechargePackage = (data: any) =>

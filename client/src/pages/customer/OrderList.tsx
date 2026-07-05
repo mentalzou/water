@@ -94,7 +94,12 @@ export default function OrderList() {
                           <span className="text-gray-700 max-w-[200px] truncate text-right">{order.address}</span>
                         </div>
                         <div className="flex justify-between items-end pt-2">
-                          <span className="text-xs text-gray-400">合计</span>
+                          <div>
+                            <span className="text-xs text-gray-400">合计</span>
+                            {order.delivery_fee > 0 && (
+                              <span className="text-xs text-gray-400 ml-2">(含配送费¥{Number(order.delivery_fee).toFixed(2)})</span>
+                            )}
+                          </div>
                           <span className="text-lg font-bold text-water">¥{order.total_amount.toFixed(2)}</span>
                         </div>
                       </div>

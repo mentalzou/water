@@ -102,7 +102,12 @@ export default function OrdersPage() {
                         </div>
 
                         <div className="border-t border-dashed border-gray-100 pt-2 flex justify-between items-center">
-                          <span className="text-xs text-gray-400">合计</span>
+                          <div>
+                            <span className="text-xs text-gray-400">合计</span>
+                            {order.delivery_fee > 0 && (
+                              <span className="text-xs text-gray-400 ml-2">(含配送费¥{Number(order.delivery_fee).toFixed(2)})</span>
+                            )}
+                          </div>
                           <span className="font-bold text-water">¥{Number(order.total_amount).toFixed(2)}</span>
                         </div>
                       </div>

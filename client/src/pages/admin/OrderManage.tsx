@@ -497,6 +497,7 @@ export default function OrderManage() {
                   ['收货地址', selectedOrder.address],
                   ['预约时间', [selectedOrder.delivery_date, selectedOrder.delivery_time].filter(Boolean).join(' ') || '-'],
                   ['订单金额', `¥${Number(selectedOrder.total_amount || selectedOrder.amount || 0).toFixed(2)}`],
+                  ['配送费', `¥${Number(selectedOrder.delivery_fee || 0).toFixed(2)}`],
                   ['支付方式', payMethodMap[selectedOrder.pay_method] || selectedOrder.pay_method || '-'],
                   ['分销商', selectedOrder.distributor_name || selectedOrder.distributor?.name || '无'],
                   ['派送员', selectedOrder.deliveryman_name || selectedOrder.deliveryman?.name || '未分配'],

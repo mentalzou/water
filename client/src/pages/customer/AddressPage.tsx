@@ -20,8 +20,9 @@ export default function AddressPage() {
   const [addresses, setAddresses] = useState<any[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState({
-    contact_name: '', contact_phone: '', province: '', city: '', district: '', detail: '', is_default: false
+    contact_name: '', contact_phone: '', province: '', city: '', district: '', detail: '', building_type: 'stairs', floor: 1, is_default: false
   });
+  const [deliveryFee, setDeliveryFee] = useState(0);
   const [loading, setLoading] = useState(false);
 
   // 省市区树数据
@@ -67,6 +68,16 @@ export default function AddressPage() {
 
   useEffect(() => { loadAddresses(); }, []);
 
+  // 楼房类型或楼层变化时计算配送费
+  async function calcFee() {
+    if (!form.building_type || !form.floor) { setDeliveryFee(0); return; }
+    try {
+      const res: any = await customerApi.calculateDeliveryFee(form.building_type, form.floor);
+      if (res.code === 200) setDeliveryFee(res.data?.delivery_fee ?? 0);
+    } catch { setDeliveryFee(0); }
+  }
+  useEffect(() => { calcFee(); }, [form.building_type, form.floor]);
+
   // 当省份变化时，更新城市列表
   function handleProvinceChange(provinceName: string) {
     const province = regionTree.find(p => p.name === provinceName);
@@ -111,6 +122,8 @@ export default function AddressPage() {
         city: c,
         district: d,
         detail: addr.detail,
+        building_type: addr.building_type || 'stairs',
+        floor: addr.floor || 1,
         is_default: !!addr.is_default,
       });
       // 根据已保存的省/市加载子级列表
@@ -122,7 +135,7 @@ export default function AddressPage() {
       }
     } else {
       setEditing('new');
-      setForm({ contact_name: '', contact_phone: '', province: '', city: '', district: '', detail: '', is_default: false });
+      setForm({ contact_name: '', contact_phone: '', province: '', city: '', district: '', detail: '', building_type: 'stairs', floor: 1, is_default: false });
       setCities([]);
       setDistricts([]);
     }
@@ -134,6 +147,14 @@ export default function AddressPage() {
     e.preventDefault();
     if (!form.contact_name || !form.contact_phone || !form.province || !form.city || !form.district || !form.detail) {
       alert('请填写完整信息（联系人、手机号、省/市/区、详细地址）');
+      return;
+    }
+    if (!form.building_type) {
+      alert('请选择楼房类型');
+      return;
+    }
+    if (!form.floor || form.floor < 1) {
+      alert('请选择楼层');
       return;
     }
     setLoading(true);
@@ -219,6 +240,27 @@ export default function AddressPage() {
 
                 <textarea value={form.detail} onChange={e => setForm(f => ({ ...f, detail: e.target.value }))} placeholder="详细地址（街道、门牌号等）" rows={2} required
                           className="w-full px-4 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20 resize-none" />
+
+                {/* 楼房类型 + 楼层 */}
+                <div className="flex gap-2">
+                  <select value={form.building_type} onChange={e => setForm(f => ({ ...f, building_type: e.target.value }))} required
+                          className="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20">
+                    <option value="stairs">楼梯房</option>
+                    <option value="elevator">电梯房</option>
+                  </select>
+                  <input type="number" value={form.floor} onChange={e => setForm(f => ({ ...f, floor: parseInt(e.target.value) || 1 }))}
+                         min="1" max="99" placeholder="楼层" required
+                         className="w-20 px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20" />
+                </div>
+
+                {/* 配送费预览 */}
+                {deliveryFee >= 0 && (
+                  <div className="px-3 py-2 bg-green-50 rounded-lg text-sm text-gray-700 flex items-center justify-between">
+                    <span>预估配送费</span>
+                    <span className="font-semibold text-green-600">{deliveryFee > 0 ? `¥${deliveryFee.toFixed(2)}` : '免费'}</span>
+                  </div>
+                )}
+
                 <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                   <input type="checkbox" checked={form.is_default} onChange={e => setForm(f => ({ ...f, is_default: e.target.checked }))} className="w-4 h-4 accent-water" />
                   设为默认地址
@@ -256,6 +298,9 @@ export default function AddressPage() {
                   )}
                   <p className="font-medium text-gray-800 text-sm">{addr.contact_name}<span className="ml-2 text-gray-400 font-normal">{addr.contact_phone}</span></p>
                   <p className="text-gray-500 text-xs mt-1 leading-relaxed whitespace-pre-wrap">{addr.province}{addr.city}{addr.district} {addr.detail}</p>
+                  <p className="text-gray-400 text-xs mt-0.5">
+                    {addr.building_type === 'elevator' ? '🛗 电梯房' : '🏢 楼梯房'} · {addr.floor || 1}层
+                  </p>
                   {fromPage !== 'confirm-order' && (
                       <div className="flex gap-3 mt-3">
                         <button onClick={() => handleSetDefault(addr.id)} className={`text-xs ${addr.is_default ? 'text-gray-300' : 'text-blue-500'}`}>设为默认</button>

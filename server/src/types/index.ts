@@ -125,6 +125,7 @@ export interface Order {
   remark?: string;
   delivery_date?: string;
   delivery_time?: string;
+  delivery_fee?: number;
   created_at: string;
   updated_at: string;
   paid_at?: string;

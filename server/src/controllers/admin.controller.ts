@@ -26,6 +26,7 @@ import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { updateOrderStatus } from '../services/order.service';
 import { changePoints, getUserPointsRecords } from '../services/points.service';
+import deliveryFeeRuleModel from '../models/delivery_fee_rule.model';
 
 /** 安全提取 req.body 中的字符串值 */
 function str(val: unknown): string {
@@ -839,6 +840,61 @@ export function updateConfig(req: Request, res: Response): void {
     db.prepare("INSERT INTO system_config (key, value) VALUES (?, ?)").run(key, value);
   }
   success(res, null, '配置已更新');
+}
+
+// ============ 配送费规则管理 ============
+export function listDeliveryFeeRules(_req: Request, res: Response): void {
+  const rules = deliveryFeeRuleModel.findAll();
+  success(res, rules);
+}
+
+export function createDeliveryFeeRule(req: Request, res: Response): void {
+  const building_type = str(req.body.building_type) as 'stairs' | 'elevator';
+  const floor_from = parseInt(req.body.floor_from, 10);
+  const floor_to = parseInt(req.body.floor_to, 10);
+  const fee = parseFloat(req.body.fee) || 0;
+
+  if (!building_type || !['stairs', 'elevator'].includes(building_type)) {
+    error(res, '请选择楼房类型（楼梯房/电梯房）');
+    return;
+  }
+  if (isNaN(floor_from) || isNaN(floor_to)) {
+    error(res, '请填写楼层范围');
+    return;
+  }
+  if (floor_from > floor_to) {
+    error(res, '起始楼层不能大于结束楼层');
+    return;
+  }
+
+  try {
+    const rule = deliveryFeeRuleModel.create({ building_type, floor_from, floor_to, fee });
+    success(res, rule, '配送费规则创建成功');
+  } catch (e: any) {
+    error(res, e.message || '创建失败');
+  }
+}
+
+export function updateDeliveryFeeRule(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  const data: any = {};
+  if (req.body.building_type) data.building_type = str(req.body.building_type);
+  if (req.body.floor_from !== undefined) data.floor_from = parseInt(req.body.floor_from, 10);
+  if (req.body.floor_to !== undefined) data.floor_to = parseInt(req.body.floor_to, 10);
+  if (req.body.fee !== undefined) data.fee = parseFloat(req.body.fee) || 0;
+
+  const rule = deliveryFeeRuleModel.update(id, data);
+  if (!rule) { error(res, '规则不存在', 404); return; }
+  success(res, rule, '配送费规则更新成功');
+}
+
+export function deleteDeliveryFeeRule(req: Request, res: Response): void {
+  const id = str(req.params.id);
+  if (deliveryFeeRuleModel.delete(id)) {
+    success(res, null, '规则已删除');
+  } else {
+    error(res, '规则不存在', 404);
+  }
 }
 
 // ============ 提现管理暂屏蔽 ============

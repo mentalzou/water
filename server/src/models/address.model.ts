@@ -10,6 +10,8 @@ export interface Address {
   city: string;
   district: string;
   detail: string;
+  building_type: string;
+  floor: number;
   is_default: number;
   created_at: string;
   updated_at: string;
@@ -24,6 +26,8 @@ const addressModel = {
     city?: string;
     district?: string;
     detail: string;
+    building_type?: string;
+    floor?: number;
     is_default?: number;
   }): Address {
     const db = getDb();
@@ -36,8 +40,8 @@ const addressModel = {
     }
 
     db.prepare(
-      'INSERT INTO addresses (id, user_id, contact_name, contact_phone, province, city, district, detail, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))'
-    ).run(id, data.user_id, data.contact_name, data.contact_phone, data.province || '', data.city || '', data.district || '', data.detail, isDefault);
+      'INSERT INTO addresses (id, user_id, contact_name, contact_phone, province, city, district, detail, building_type, floor, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))'
+    ).run(id, data.user_id, data.contact_name, data.contact_phone, data.province || '', data.city || '', data.district || '', data.detail, data.building_type || 'stairs', data.floor ?? 1, isDefault);
 
     return addressModel.findById(id)!;
   },

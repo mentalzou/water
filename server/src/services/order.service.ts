@@ -4,6 +4,7 @@ import { createCommissionRecord } from './commission.service';
 import { rewardPointsForOrder } from './points.service';
 import { userRechargeModel } from '../models/userRecharge.model';
 import { balanceTransactionModel } from '../models/balanceTransaction.model';
+import deliveryFeeRuleModel from '../models/delivery_fee_rule.model';
 import type { Order } from '../types';
 
 export interface OrderItemInput {
@@ -29,6 +30,8 @@ export function createCustomerOrder(data: {
   pay_method?: 'online' | 'balance';
   delivery_date?: string;
   delivery_time?: string;
+  building_type?: string;
+  floor?: number;
 }): CreateOrderResult | null {
   // 验证所有商品并计算总金额
   let totalAmount = 0;
@@ -71,8 +74,15 @@ export function createCustomerOrder(data: {
 
   totalAmount = Math.round(totalAmount * 100) / 100;
 
+  // 计算配送费
+  const deliveryFee = deliveryFeeRuleModel.calculateFee(
+    data.building_type || 'stairs',
+    data.floor ?? 1
+  );
+  const amountWithFee = Math.round((totalAmount + deliveryFee) * 100) / 100;
+
   const payMethod = data.pay_method || 'online';
-  let finalAmount = totalAmount;
+  let finalAmount = amountWithFee;
   let fromBalance = 0;
   let fromBonus = 0;
 
@@ -89,15 +99,15 @@ export function createCustomerOrder(data: {
       totalBalance += (r.remaining_balance || 0) + (r.bonus_balance || 0);
     }
 
-    if (totalBalance < totalAmount) {
+    if (totalBalance < amountWithFee) {
       return {
         order: null as any,
-        balanceError: `账户余额不足（余额 ¥${totalBalance.toFixed(2)}，订单 ¥${totalAmount.toFixed(2)}），请充值后重试`,
+        balanceError: `账户余额不足（余额 ¥${totalBalance.toFixed(2)}，订单 ¥${amountWithFee.toFixed(2)}），请充值后重试`,
       };
     }
 
     // 优先消费赠送金（逐条充值、按时间顺序），再消费本金
-    let remainingToPay = totalAmount;
+    let remainingToPay = amountWithFee;
 
     // 第一轮：优先从赠送金抵扣（按充值时间升序）
     for (const recharge of activeRecharges) {
@@ -185,7 +195,7 @@ export function createCustomerOrder(data: {
     customer_phone: data.customer_phone,
     customer_name: data.customer_name,
     address: data.address,
-    total_amount: totalAmount,
+    total_amount: amountWithFee,
     distributor_id: data.distributor_id,
     distributor_commission: distributorCommission,
     items: processedItems,
@@ -194,6 +204,7 @@ export function createCustomerOrder(data: {
     from_bonus: fromBonus,
     delivery_date: data.delivery_date || '',
     delivery_time: data.delivery_time || '',
+    delivery_fee: deliveryFee,
   });
 
   // 冻结库存

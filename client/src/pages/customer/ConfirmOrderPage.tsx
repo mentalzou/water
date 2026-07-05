@@ -25,6 +25,8 @@ interface Address {
   city?: string;
   district?: string;
   detail: string;
+  building_type?: string;
+  floor?: number;
   is_default: number;
 }
 
@@ -42,6 +44,7 @@ export default function ConfirmOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [payMethod, setPayMethod] = useState<'online' | 'balance'>('online');
   const [balanceInfo, setBalanceInfo] = useState<{ principal: number; bonus: number; total: number } | null>(null);
+  const [deliveryFee, setDeliveryFee] = useState(0);
 
   const orderData = location.state as {
     items: OrderItem[];
@@ -112,10 +115,21 @@ export default function ConfirmOrderPage() {
     }
   }
 
+  // 选择地址后计算配送费
+  useEffect(() => {
+    if (!selectedAddress) { setDeliveryFee(0); return; }
+    const bt = selectedAddress.building_type || 'stairs';
+    const fl = selectedAddress.floor || 1;
+    customerApi.calculateDeliveryFee(bt, fl).then((res: any) => {
+      if (res.code === 200) setDeliveryFee(res.data?.delivery_fee ?? 0);
+    }).catch(() => setDeliveryFee(0));
+  }, [selectedAddress]);
+
   // const totalAmount = orderData?.totalAmount || 0;
   // const couponAmount = useCoupon ? 0 : 0;
   // const finalAmount = totalAmount - couponAmount;
-  const finalAmount = orderData?.totalAmount || 0;
+  const productAmount = orderData?.totalAmount || 0;
+  const finalAmount = productAmount + deliveryFee;
 
   /** 将展示用的日期文本转为实际日期字符串 YYYY-MM-DD */
 function resolveDeliveryDate(raw: string): string {
@@ -144,10 +158,11 @@ async function handleSubmit() {
 
     // 余额支付前确认
     if (payMethod === 'balance') {
-      const confirmMsg = balanceInfo && balanceInfo.total < (orderData?.totalAmount || 0)
+      const totalWithFee = finalAmount;
+      const confirmMsg = balanceInfo && balanceInfo.total < totalWithFee
         ? '账户余额不足，请选择在线支付'
-        : `确认使用账户余额支付 ¥${(orderData?.totalAmount || 0).toFixed(2)}？`;
-      if (balanceInfo && balanceInfo.total < (orderData?.totalAmount || 0)) {
+        : `确认使用账户余额支付 ¥${totalWithFee.toFixed(2)}？`;
+      if (balanceInfo && balanceInfo.total < totalWithFee) {
         alert(confirmMsg);
         return;
       }
@@ -164,7 +179,7 @@ async function handleSubmit() {
         quantity: item.quantity,
       }));
 
-      // 1. 创建订单（传递支付方式）
+      // 1. 创建订单（传递支付方式 + 配送费信息）
       const orderRes: any = await customerApi.createOrder({
         customer_phone: user.phone || contactPhone,
         customer_name: selectedAddress?.contact_name || user.name || '',
@@ -174,7 +189,9 @@ async function handleSubmit() {
         pay_method: payMethod,
         delivery_date: resolveDeliveryDate(deliveryDate),
         delivery_time: deliveryTime,
-      });
+        building_type: selectedAddress?.building_type || 'stairs',
+        floor: selectedAddress?.floor || 1,
+      } as any);
 
       if (!orderRes.data?.id) {
         alert(orderRes.message || '下单失败');
@@ -320,6 +337,10 @@ async function handleSubmit() {
                       {selectedAddress.district}
                       {selectedAddress.detail}
                     </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {selectedAddress.building_type === 'elevator' ? '🛗 电梯房' : '🏢 楼梯房'} · {selectedAddress.floor || 1}层
+                      {deliveryFee > 0 ? <span className="text-orange-500 ml-1">(+¥{deliveryFee.toFixed(2)}配送费)</span> : <span className="text-green-500 ml-1">(免配送费)</span>}
+                    </p>
                   </div>
                   <ChevronLeft className="w-5 h-5 text-gray-400 rotate-180" />
                 </div>
@@ -402,6 +423,24 @@ async function handleSubmit() {
           {/*  </button>*/}
           {/*</div>*/}
 
+          {/* Price Summary */}
+          <div className="bg-white mt-2 p-4">
+            <div className="flex justify-between items-center text-sm mb-2">
+              <span className="text-gray-500">商品金额</span>
+              <span className="text-gray-800">¥{productAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm mb-2">
+              <span className="text-gray-500">配送费</span>
+              <span className={deliveryFee > 0 ? 'text-gray-800' : 'text-green-600 font-medium'}>
+                {deliveryFee > 0 ? `¥${deliveryFee.toFixed(2)}` : '免费'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-sm pt-2 border-t border-dashed border-gray-200">
+              <span className="text-gray-600 font-medium">合计</span>
+              <span className="text-green-600 font-bold text-lg">¥{finalAmount.toFixed(2)}</span>
+            </div>
+          </div>
+
           {/* Delivery Time */}
           <div className="bg-white mt-2 p-4">
             <div className="flex items-center gap-4 mb-3">
@@ -477,7 +516,7 @@ async function handleSubmit() {
                 </div>
               </button>
             </div>
-            {payMethod === 'balance' && balanceInfo && balanceInfo.total < (orderData?.totalAmount || 0) && (
+            {payMethod === 'balance' && balanceInfo && balanceInfo.total < finalAmount && (
               <p className="text-xs text-red-500 mt-2">
                 账户余额不足，请选择在线支付或<a href="/profile/recharge" className="text-water underline">前往充值</a>
               </p>

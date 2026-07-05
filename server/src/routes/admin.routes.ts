@@ -102,6 +102,12 @@ router.delete('/helipay/terminal', adminController.deleteHelipayTerminal);
 router.get('/configs', adminController.getConfigs);
 router.put('/configs', adminController.updateConfig);
 
+// Delivery Fee Rules
+router.get('/delivery-fee-rules', adminController.listDeliveryFeeRules);
+router.post('/delivery-fee-rules', adminController.createDeliveryFeeRule);
+router.put('/delivery-fee-rules/:id', adminController.updateDeliveryFeeRule);
+router.delete('/delivery-fee-rules/:id', adminController.deleteDeliveryFeeRule);
+
 // Recharge Packages Management
 router.get('/recharge/packages', adminController.listRechargePackages);
 router.post('/recharge/packages', adminController.createRechargePackage);
