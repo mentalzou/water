@@ -6,6 +6,7 @@ import { userModel } from '../models/user.model';
 import { getDb } from '../utils/db';
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
+import { updateOrderStatus } from '../services/order.service';
 
 /** 安全提取 req.body 字段 */
 function str(val: unknown): string {
@@ -132,7 +133,7 @@ export function completeTask(req: Request, res: Response): void {
     db.prepare('UPDATE deliverymen SET completed_orders = completed_orders + 1 WHERE id = ?').run(order.deliveryman_id);
   }
   
-  const updated = orderModel.updateStatus(orderId, 'completed');
+  const updated = updateOrderStatus(orderId, 'completed');
   if (!updated) { error(res, '操作失败', 400); return; }
   success(res, updated, '配送完成');
 }

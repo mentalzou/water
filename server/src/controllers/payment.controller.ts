@@ -5,7 +5,7 @@ import { userRechargeModel } from '../models/userRecharge.model';
 import { rechargePackageModel } from '../models/rechargePackage.model';
 import { balanceTransactionModel } from '../models/balanceTransaction.model';
 import { createJsApiOrder, parsePaymentNotify } from '../services/heliPay.service';
-import { processPaymentSuccess } from '../services/order.service';
+import { processPaymentSuccess, updateOrderStatus } from '../services/order.service';
 
 /**
  * 从请求中获取客户端真实IP
@@ -342,6 +342,8 @@ export async function paymentNotify(req: Request, res: Response): Promise<void> 
           return;
         }
 
+        updateOrderStatus(order.id, 'refunded');
+        // 补充更新 pay_status（updateOrderStatus 内部不处理 pay_status）
         orderModel.markRefunded(order.id);
         console.log(`[合利宝通知] ✅ 订单 ${order.order_no} 退款成功，已标记为已退款`);
         res.send('success');

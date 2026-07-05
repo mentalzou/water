@@ -49,24 +49,14 @@ export default function FreeTrialPage() {
                 <span className="text-water text-sm font-bold">2</span>
               </div>
               <div>
-                <h3 className="font-medium text-gray-800 text-sm">领取试喝券</h3>
-                <p className="text-gray-500 text-xs mt-1">在公众号菜单栏点击"免费试喝"，即可领取试喝券一张。</p>
+                <h3 className="font-medium text-gray-800 text-sm">免费试喝</h3>
+                <p className="text-gray-500 text-xs mt-1">可在销售点免费领取一瓶380ml的‘武夷屿都山水’矿泉水。</p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 bg-water/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
                 <span className="text-water text-sm font-bold">3</span>
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-800 text-sm">下单配送</h3>
-                <p className="text-gray-500 text-xs mt-1">使用试喝券在本平台下单，可免费领取一桶4.5L‘武夷屿都山水’矿泉水。</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-water/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-water text-sm font-bold">4</span>
               </div>
               <div>
                 <h3 className="font-medium text-gray-800 text-sm">分享好友</h3>

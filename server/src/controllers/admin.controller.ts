@@ -24,6 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
+import { updateOrderStatus } from '../services/order.service';
 import { changePoints, getUserPointsRecords } from '../services/points.service';
 
 /** 安全提取 req.body 中的字符串值 */
@@ -677,6 +678,8 @@ export async function queryRefundOrder(req: Request, res: Response): Promise<voi
 
     // 退款成功 → 订单状态变更为已退款
     if (result.orderStatus === 'SUCCESS') {
+      updateOrderStatus(order.id, 'refunded');
+      // 补充更新 pay_status（updateOrderStatus 内部不处理 pay_status）
       orderModel.markRefunded(order.id);
       console.log(`[退款查询] 订单 ${order.order_no} 已自动标记为已退款`);
       success(res, {
