@@ -50,7 +50,7 @@ export default function FreeTrialPage() {
               </div>
               <div>
                 <h3 className="font-medium text-gray-800 text-sm">免费试喝</h3>
-                <p className="text-gray-500 text-xs mt-1">可在销售点免费领取一瓶380ml的‘武夷屿都山水’矿泉水。</p>
+                <p className="text-gray-500 text-xs mt-1">关注公众号后，可在销售点免费领取一瓶380ml的‘武夷屿都山水’矿泉水（每人限一瓶）</p>
               </div>
             </div>
 
