@@ -313,7 +313,7 @@ export async function paymentNotify(req: Request, res: Response): Promise<void> 
 
     // ========== 退款通知（反向交易） ==========
     if (orderType === 'REVERSE') {
-      // 先尝试用 orderNo 查找原订单
+      // 先尝试用 orderNo 查找原商品订单
       let order = orderModel.findByOrderNo(orderNo);
 
       // 如果找不到，尝试通过 remark 中的退款订单号查找
@@ -328,36 +328,102 @@ export async function paymentNotify(req: Request, res: Response): Promise<void> 
         }
       }
 
-      if (!order) {
-        console.warn(`[合利宝通知] REVERSE: 未找到订单 orderNo=${orderNo}, refundOrderNo=${refundOrderNo}，忽略`);
-        res.send('success');
-        return;
-      }
+      // ============ 商品订单退款处理 ============
+      if (order) {
+        if (orderStatus === 'SUCCESS') {
+          // 幂等：已经是 refunded 则跳过
+          if (order.status === 'refunded') {
+            console.log(`[合利宝通知] REVERSE SUCCESS: 订单 ${order.order_no} 已是已退款状态，跳过`);
+            res.send('success');
+            return;
+          }
 
-      if (orderStatus === 'SUCCESS') {
-        // 幂等：已经是 refunded 则跳过
-        if (order.status === 'refunded') {
-          console.log(`[合利宝通知] REVERSE SUCCESS: 订单 ${order.order_no} 已是已退款状态，跳过`);
+          updateOrderStatus(order.id, 'refunded');
+          // 补充更新 pay_status（updateOrderStatus 内部不处理 pay_status）
+          orderModel.markRefunded(order.id);
+          console.log(`[合利宝通知] ✅ 订单 ${order.order_no} 退款成功，已标记为已退款`);
           res.send('success');
           return;
         }
 
-        updateOrderStatus(order.id, 'refunded');
-        // 补充更新 pay_status（updateOrderStatus 内部不处理 pay_status）
-        orderModel.markRefunded(order.id);
-        console.log(`[合利宝通知] ✅ 订单 ${order.order_no} 退款成功，已标记为已退款`);
+        if (orderStatus === 'FAILED') {
+          console.log(`[合利宝通知] REVERSE FAILED: 订单 ${order.order_no} 退款失败，请注意处理`);
+          res.send('success');
+          return;
+        }
+
+        // RECEIVE / DOING 等处理中状态
+        console.log(`[合利宝通知] REVERSE ${orderStatus}: 订单退款处理中，等待后续通知`);
         res.send('success');
         return;
       }
 
-      if (orderStatus === 'FAILED') {
-        console.log(`[合利宝通知] REVERSE FAILED: 订单 ${order.order_no} 退款失败，请注意处理`);
+      // ============ 充值退款处理 ============
+      // 尝试用 orderNo（即 transaction_id）查找充值记录
+      let rechargeRecord = userRechargeModel.findByTransactionId(orderNo);
+
+      // 如果找不到，尝试通过 remark 中的退款订单号查找
+      if (!rechargeRecord && refundOrderNo) {
+        const db2 = require('../utils/db').getDb();
+        const row2 = db2.prepare(
+          "SELECT * FROM user_recharges WHERE remark LIKE ? ORDER BY created_at DESC LIMIT 1"
+        ).get(`%退款订单号:${refundOrderNo}%`) as any;
+        if (row2) {
+          rechargeRecord = userRechargeModel.findById(row2.id);
+          console.log(`[合利宝通知] 通过退款订单号 ${refundOrderNo} 匹配到充值记录 ${row2.transaction_id}`);
+        }
+      }
+
+      if (rechargeRecord) {
+        if (orderStatus === 'SUCCESS') {
+          // 幂等：已经是 refunded 则跳过
+          if (rechargeRecord.status === 'refunded') {
+            console.log(`[合利宝通知] REVERSE SUCCESS: 充值 ${rechargeRecord.transaction_id} 已是已退款状态，跳过`);
+            res.send('success');
+            return;
+          }
+
+          // 先获取退款前的用户余额汇总（充值仍为 active/refunding 状态）
+          const cumulativeBefore = userRechargeModel.getTotalBalanceByUserId(rechargeRecord.user_id);
+
+          // 标记充值记录为已退款
+          userRechargeModel.markRefunded(rechargeRecord.id);
+
+          // 计算退款后的余额
+          const principalAfter = Math.max(0, cumulativeBefore.total_principal - rechargeRecord.remaining_balance);
+          const bonusAfter = Math.max(0, cumulativeBefore.total_bonus - rechargeRecord.bonus_balance);
+
+          // 记录退款流水
+          balanceTransactionModel.create({
+            user_id: rechargeRecord.user_id,
+            recharge_id: rechargeRecord.id,
+            tx_type: 'refund',
+            amount: rechargeRecord.paid_amount,
+            principal_after: principalAfter,
+            bonus_after: bonusAfter,
+            description: `充值退款 - ¥${rechargeRecord.paid_amount.toFixed(2)}`,
+            operator_ip: getClientIp(req),
+          });
+
+          console.log(`[合利宝通知] ✅ 充值 ${rechargeRecord.transaction_id} 退款成功，已标记为已退款`);
+          res.send('success');
+          return;
+        }
+
+        if (orderStatus === 'FAILED') {
+          console.log(`[合利宝通知] REVERSE FAILED: 充值 ${rechargeRecord.transaction_id} 退款失败，请注意处理`);
+          res.send('success');
+          return;
+        }
+
+        // RECEIVE / DOING 等处理中状态
+        console.log(`[合利宝通知] REVERSE ${orderStatus}: 充值退款处理中，等待后续通知`);
         res.send('success');
         return;
       }
 
-      // RECEIVE / DOING 等处理中状态
-      console.log(`[合利宝通知] REVERSE ${orderStatus}: 退款处理中，等待后续通知`);
+      // 既不是商品订单也不是充值记录
+      console.warn(`[合利宝通知] REVERSE: 未找到订单或充值记录 orderNo=${orderNo}, refundOrderNo=${refundOrderNo}，忽略`);
       res.send('success');
       return;
     }
