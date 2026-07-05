@@ -37,6 +37,7 @@ router.put('/roles/:id', adminController.updateRole);
 router.delete('/roles/:id', adminController.deleteRole);
 
 // Distributors CRUD
+router.post('/distributors/check-phone', adminController.checkDistributorPhone);
 router.get('/distributors', adminController.listDistributors);
 router.post('/distributors', adminController.createDistributor);
 router.put('/distributors/:id/reset-password', adminController.resetDistributorPassword);

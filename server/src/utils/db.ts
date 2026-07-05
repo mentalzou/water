@@ -303,7 +303,7 @@ function recordMigration(db: Database.Database, version: number, description: st
  */
 function applyMigrations(db: Database.Database): void {
   const currentVersion = getCurrentVersion(db);
-  const LATEST_VERSION = 27;
+  const LATEST_VERSION = 29;
 
   // 已达最新版本，无需迁移，静默返回（避免每次启动都刷日志）
   if (currentVersion >= LATEST_VERSION) return;
@@ -911,6 +911,16 @@ function applyMigrations(db: Database.Database): void {
         WHERE frozen_stock < 0
       `).run();
       recordMigration(db, 28, `修复负数 frozen_stock（共修复 ${result.changes} 个产品）`);
+    });
+    txn();
+  }
+
+  // === v29: 修复 products 外键空值 — brand_id / category_id 的 '' 改为 NULL ===
+  if (currentVersion < 29) {
+    const txn = db.transaction(() => {
+      const brandFix = db.prepare("UPDATE products SET brand_id = NULL WHERE brand_id = ''").run();
+      const catFix = db.prepare("UPDATE products SET category_id = NULL WHERE category_id = ''").run();
+      recordMigration(db, 29, `修复 products 外键空值（brand: ${brandFix.changes}, category: ${catFix.changes}）`);
     });
     txn();
   }

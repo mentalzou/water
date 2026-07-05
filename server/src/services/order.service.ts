@@ -224,11 +224,15 @@ export function updateOrderStatus(orderId: string, status: Order['status']): Ord
 
   if (!order) return undefined;
 
-  // 库存操作
-  if (status === 'completed') {
+  // 库存操作：仅从非终态进入终态时执行，防止重复操作导致 frozen_stock 为负
+  const fromStatus = orderBefore?.status;
+  const terminalStatuses: Order['status'][] = ['completed', 'cancelled', 'refunded'];
+  const isFromTerminal = fromStatus ? terminalStatuses.includes(fromStatus) : false;
+
+  if (status === 'completed' && !isFromTerminal) {
     // 派送完成 → 扣减库存
     stockOperationOnStatus(orderId, 'deduct');
-  } else if (status === 'cancelled' || status === 'refunded') {
+  } else if ((status === 'cancelled' || status === 'refunded') && !isFromTerminal) {
     // 取消/退款 → 释放冻结库存
     stockOperationOnStatus(orderId, 'release');
   }

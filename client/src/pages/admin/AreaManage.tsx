@@ -306,7 +306,6 @@ export default function AreaManage() {
       {showForm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowForm(false)}
         >
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-5">
@@ -362,7 +361,6 @@ export default function AreaManage() {
       {deleteTarget && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => setDeleteTarget(null)}
         >
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-gray-800 mb-2">确认删除</h2>

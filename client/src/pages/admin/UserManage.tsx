@@ -415,7 +415,7 @@ export default function UserManage() {
 
         {/* Create/Edit Modal */}
         {showForm && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-6 border-b border-gray-100">
                   <h2 className="text-lg font-bold text-gray-800">{editingUser ? '编辑用户' : '添加用户'}</h2>
@@ -494,7 +494,7 @@ export default function UserManage() {
 
         {/* Reset Password Modal */}
         {resetPwdFor && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setResetPwdFor(null)}>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
                 <div className="p-6">
                   <div className="flex items-center gap-3 mb-4">
@@ -521,7 +521,7 @@ export default function UserManage() {
 
         {/* Adjust Points Modal */}
         {adjustPointsFor && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setAdjustPointsFor(null)}>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
                 <div className="p-6">
                   <div className="flex items-center gap-3 mb-4">
@@ -567,7 +567,7 @@ export default function UserManage() {
 
         {/* Points History Modal */}
         {pointsHistoryUser && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closePointsHistory}>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-6 border-b border-gray-100 shrink-0">
                   <div className="flex items-center gap-3">

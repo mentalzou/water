@@ -483,7 +483,7 @@ export default function OrderManage() {
 
         {/* Detail Modal */}
         {selectedOrder && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center py-6 px-4 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={() => setSelectedOrder(null)}>
+          <div className="fixed inset-0 z-50 flex items-start justify-center py-6 px-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
             <div className="bg-white rounded-2xl w-full max-w-lg max-h-[95vh] overflow-y-auto p-6 shadow-2xl my-auto" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-start mb-5 sticky top-0 bg-white z-10 -mx-2 px-2 py-1">
                 <div><h2 className="font-bold text-lg text-gray-800">订单详情</h2><p className="text-xs text-gray-400 font-mono mt-0.5">{selectedOrder.order_no}</p></div>
@@ -547,7 +547,7 @@ export default function OrderManage() {
 
         {/* Assign Deliveryman Modal */}
         {assignModal && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center py-6 px-4 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={() => setAssignModal(null)}>
+          <div className="fixed inset-0 z-50 flex items-start justify-center py-6 px-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
             <div className="bg-white rounded-2xl w-full max-w-md max-h-[95vh] overflow-y-auto p-6 shadow-2xl my-auto" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-start mb-5 sticky top-0 bg-white z-10 -mx-2 px-2 py-1">
                 <div>

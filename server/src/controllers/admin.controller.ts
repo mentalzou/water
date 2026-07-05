@@ -88,8 +88,22 @@ export function createDistributor(req: Request, res: Response): void {
     error(res, '密码长度不能少于6位');
     return;
   }
-  const result = distributorModel.create('', { name, phone, password, commission_type, commission_rate });
-  success(res, result, '分销商创建成功');
+  try {
+    const result = distributorModel.create('', { name, phone, password, commission_type, commission_rate });
+    success(res, result, '分销商创建成功');
+  } catch (e: any) {
+    error(res, e.message || '创建分销商失败');
+  }
+}
+
+export function checkDistributorPhone(req: Request, res: Response): void {
+  const phone = str(req.body.phone);
+  if (!phone || phone.length !== 11) {
+    error(res, '请提供有效的手机号');
+    return;
+  }
+  const existing = distributorModel.findByPhone(phone);
+  success(res, { exists: !!existing }, existing ? '该手机号已存在分销商' : '');
 }
 
 export function listDistributors(req: Request, res: Response): void {
@@ -423,9 +437,10 @@ export function createProduct(req: Request, res: Response): void {
   const unit = str(req.body.unit);
   const description = str(req.body.description);
   const image = str(req.body.image);
-  const brandId = req.body.brand_id ? str(req.body.brand_id) : undefined;
+  const brandId = str(req.body.brand_id);
   const categoryId = req.body.category_id ? str(req.body.category_id) : undefined;
   if (!name || isNaN(price)) { error(res, '请提供产品名称和价格'); return; }
+  if (!brandId) { error(res, '请提供产品品牌'); return; }
   const result = productModel.create({ name, description, price, unit, image, brand_id: brandId, category_id: categoryId });
   success(res, result, '产品创建成功');
 }

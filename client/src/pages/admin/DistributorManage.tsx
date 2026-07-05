@@ -22,6 +22,7 @@ export default function DistributorManage() {
   const [showResetPwdVisible, setShowResetPwdVisible] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -49,6 +50,7 @@ export default function DistributorManage() {
 
   function handleAdd() {
     setForm({ name: '', phone: '', password: '', commission_type: 'percentage', commission_rate: '5' });
+    setPhoneError('');
     setEditId(null);
     setShowForm(true);
   }
@@ -87,7 +89,14 @@ export default function DistributorManage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ name: form.name, phone: form.phone, password: form.password, commission_type: form.commission_type, commission_rate: Number(form.commission_rate) }),
         }).then(r => r.json());
-        if (res.code === 200) loadData();
+        if (res.code === 200) {
+          setPhoneError('');
+          loadData();
+        } else {
+          alert(res?.message || '创建失败');
+          setSubmitting(false);
+          return;
+        }
       }
       setShowForm(false);
     } catch { /* silent */ }
@@ -264,7 +273,7 @@ export default function DistributorManage() {
 
         {/* Modal Form */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg font-bold text-gray-800">{editId ? '编辑分销商' : '添加分销商'}</h2>
@@ -272,7 +281,7 @@ export default function DistributorManage() {
               </div>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div><label className="block text-sm font-medium text-gray-700 mb-1.5">姓名</label><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30" placeholder="请输入分销商姓名" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">手机号</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} required type="tel" maxLength={11} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30" placeholder="请输入手机号" /></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">手机号</label><input value={form.phone} onChange={e => { setForm({...form, phone: e.target.value}); setPhoneError(''); }} required type="tel" maxLength={11} onBlur={async () => { if (!editId && form.phone.length === 11) { try { const token = getToken(); const checkRes: any = await fetch(`${API_BASE}/admin/distributors/check-phone`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ phone: form.phone }), }).then(r => r.json()); if (checkRes?.code === 200 && checkRes.data?.exists) { setPhoneError('该手机号已存在分销商'); } } catch { /* ignore */ } } }} className={`w-full px-4 py-2.5 border rounded-xl outline-none focus:ring-2 ring-water/30 ${phoneError ? 'border-red-300' : 'border-gray-200'}`} placeholder="请输入手机号" />{phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}</div>
                 {/* 返佣规则 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">返佣规则</label>
@@ -324,7 +333,7 @@ export default function DistributorManage() {
 
         {/* Reset Password Modal */}
         {showResetPwd && resetTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowResetPwd(false)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><KeyRound className="w-5 h-5 text-amber-500" /> 重置密码</h2>

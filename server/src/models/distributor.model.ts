@@ -7,19 +7,33 @@ const db = getDb();
 
 export const distributorModel = {
   create(userId: string, data: { name: string; phone: string; password?: string; commission_type?: string; commission_rate?: number }): Distributor & { user?: any } {
+    // 检查该手机号是否已有分销商（通过 users 表关联）
+    const existingDist = db.prepare(
+      'SELECT d.id FROM distributors d JOIN users u ON d.user_id = u.id WHERE u.phone = ?'
+    ).get(data.phone) as { id: string } | undefined;
+    if (existingDist) {
+      throw new Error('该手机号已存在分销商');
+    }
+
     const id = uuidv4();
     const code = `DM${Date.now().toString(36).toUpperCase()}`;
     const commissionType = data.commission_type || 'percentage';
     const commissionRate = data.commission_rate ?? 5;
     
     // Create user first
-    const existingUser = db.prepare('SELECT id FROM users WHERE phone = ?').get(data.phone);
-    let userIdToUse = userId;
+    const existingUser = db.prepare('SELECT id FROM users WHERE phone = ?').get(data.phone) as { id: string } | undefined;
+    let userIdToUse: string;
     if (!existingUser) {
-      const newUserId = uuidv4();
+      userIdToUse = uuidv4();
       const passwordHash = data.password ? hashPassword(data.password) : '';
-      db.prepare('INSERT INTO users (id, phone, name, role, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))').run(newUserId, data.phone, data.name, 'distributor', passwordHash);
-      userIdToUse = newUserId;
+      db.prepare('INSERT INTO users (id, phone, name, role, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\', \'localtime\'), datetime(\'now\', \'localtime\'))').run(userIdToUse, data.phone, data.name, 'distributor', passwordHash);
+    } else {
+      // 再次确认该 user 尚未被其他分销商占用
+      const existingDistByUser = db.prepare('SELECT id FROM distributors WHERE user_id = ?').get(existingUser.id) as { id: string } | undefined;
+      if (existingDistByUser) {
+        throw new Error('该手机号已存在分销商');
+      }
+      userIdToUse = existingUser.id;
     }
 
     db.prepare(
@@ -39,6 +53,12 @@ export const distributorModel = {
 
   findByUserId(userId: string): Distributor | undefined {
     return db.prepare('SELECT * FROM distributors WHERE user_id = ?').get(userId) as Distributor | undefined;
+  },
+
+  findByPhone(phone: string): Distributor | undefined {
+    return db.prepare(
+      'SELECT d.* FROM distributors d JOIN users u ON d.user_id = u.id WHERE u.phone = ?'
+    ).get(phone) as Distributor | undefined;
   },
 
   findByIdWithUser(id: string): (Distributor & { user: any }) | undefined {

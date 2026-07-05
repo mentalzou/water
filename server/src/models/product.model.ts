@@ -20,8 +20,8 @@ export const productModel = {
       data.stock ?? 99999,
       data.frozen_stock ?? 0,
       data.min_order_quantity ?? 1,
-      data.brand_id || '',
-      data.category_id || '',
+      data.brand_id || null,
+      data.category_id || null,
       data.status || 'active',
       data.sort_order ?? 0
     );
@@ -114,11 +114,13 @@ export const productModel = {
 
   /** 扣减库存 + 释放冻结（派送完成时调用） */
   deductFrozenStock(productId: string, quantity: number): void {
-    db.prepare('UPDATE products SET stock = stock - ?, frozen_stock = frozen_stock - ? WHERE id = ?').run(quantity, quantity, productId);
+    db.prepare('UPDATE products SET stock = stock - ?, frozen_stock = frozen_stock - ? WHERE id = ? AND frozen_stock >= ? AND stock >= ?')
+      .run(quantity, quantity, productId, quantity, quantity);
   },
 
   /** 释放冻结库存（取消/退款时调用） */
   releaseFrozenStock(productId: string, quantity: number): void {
-    db.prepare('UPDATE products SET frozen_stock = frozen_stock - ? WHERE id = ?').run(quantity, productId);
+    db.prepare('UPDATE products SET frozen_stock = frozen_stock - ? WHERE id = ? AND frozen_stock >= ?')
+      .run(quantity, productId, quantity);
   },
 };

@@ -181,7 +181,7 @@ export default function ProductManage() {
         stock: form.stock.trim() === '' ? 99999 : parseInt(form.stock),
         min_order_quantity: parseInt(form.min_order_quantity) || 1,
         category_id: form.category_id || undefined,
-        brand_id: form.brand_id || undefined
+        brand_id: form.brand_id
       };
       if (form.image) data.image = form.image;
       const url = editId ? `${API_BASE}/admin/products/${editId}` : `${API_BASE}/admin/products`;
@@ -375,7 +375,7 @@ export default function ProductManage() {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl my-auto" onClick={e => e.stopPropagation()} style={{ maxHeight: '92vh', overflowY: 'auto' }}>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold text-gray-800">{editId ? '编辑产品' : '添加产品'}</h2>
@@ -391,10 +391,10 @@ export default function ProductManage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">品牌</label>
-                <select value={form.brand_id} onChange={e => setForm({ ...form, brand_id: e.target.value })}
+                <label className="block text-sm font-medium text-gray-700 mb-1">品牌 *</label>
+                <select value={form.brand_id} onChange={e => setForm({ ...form, brand_id: e.target.value })} required
                         className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-water/30 text-sm">
-                  <option value="">不选择品牌</option>
+                  <option value="">请选择品牌</option>
                   {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
                 {!form.category_id && (
