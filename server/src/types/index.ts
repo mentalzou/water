@@ -106,6 +106,7 @@ export interface Product {
 export interface Order {
   id: string;
   order_no: string;
+  user_id?: string;
   customer_phone: string;
   customer_name: string;
   address: string;
@@ -252,7 +253,7 @@ export interface BalanceTransaction {
   user_id: string;
   recharge_id?: string;
   order_id?: string;
-  tx_type: 'recharge_principal' | 'recharge_bonus' | 'consume_bonus' | 'consume_principal' | 'refund' | 'adjust' | 'expire';
+  tx_type: 'recharge_principal' | 'recharge_bonus' | 'consume_bonus' | 'consume_principal' | 'refund' | 'refund_principal' | 'refund_bonus' | 'adjust' | 'expire';
   amount: number;
   principal_after: number;
   bonus_after: number;

@@ -192,6 +192,7 @@ export function createCustomerOrder(data: {
   }
 
   const order = orderModel.create({
+    user_id: data.user_id || '',
     customer_phone: data.customer_phone,
     customer_name: data.customer_name,
     address: data.address,

@@ -163,4 +163,52 @@ export const userRechargeModel = {
     ).run(id);
     return this.findById(id);
   },
+
+  /** 退还余额到用户账户（用于订单退款回退） */
+  restoreBalance(userId: string, principalAmount: number, bonusAmount: number): void {
+    // 查找该用户最近一条充值记录（active 或 expired，优先 active）
+    let recharge = db.prepare(
+      "SELECT * FROM user_recharges WHERE user_id = ? ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, created_at DESC LIMIT 1"
+    ).get(userId) as UserRecharge | undefined;
+
+    // 恢复本金
+    if (principalAmount > 0) {
+      if (recharge) {
+        // 如果充值记录已过期但还有余额空间，重新激活
+        if (recharge.status === 'expired') {
+          db.prepare("UPDATE user_recharges SET status = 'active' WHERE id = ?").run(recharge.id);
+        }
+        db.prepare(
+          'UPDATE user_recharges SET remaining_balance = remaining_balance + ? WHERE id = ?'
+        ).run(principalAmount, recharge.id);
+      } else {
+        // 无历史充值记录，创建一条新的虚拟充值记录用于记账
+        const id = uuidv4();
+        db.prepare(
+          "INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, status, transaction_id, remark, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, datetime('now', 'localtime'))"
+        ).run(id, userId, '', principalAmount, 0, 0, principalAmount, principalAmount, 0, `REFUND_RESTORE_${Date.now()}`, '订单退款退回本金');
+      }
+    }
+
+    // 恢复赠送金
+    if (bonusAmount > 0) {
+      recharge = db.prepare(
+        "SELECT * FROM user_recharges WHERE user_id = ? ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, created_at DESC LIMIT 1"
+      ).get(userId) as UserRecharge | undefined;
+
+      if (recharge) {
+        if (recharge.status === 'expired') {
+          db.prepare("UPDATE user_recharges SET status = 'active' WHERE id = ?").run(recharge.id);
+        }
+        db.prepare(
+          'UPDATE user_recharges SET bonus_balance = bonus_balance + ? WHERE id = ?'
+        ).run(bonusAmount, recharge.id);
+      } else {
+        const id = uuidv4();
+        db.prepare(
+          "INSERT INTO user_recharges (id, user_id, package_id, amount, discount_rate, bonus_amount, paid_amount, remaining_balance, bonus_balance, status, transaction_id, remark, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, datetime('now', 'localtime'))"
+        ).run(id, userId, '', 0, 0, bonusAmount, 0, 0, bonusAmount, `REFUND_BONUS_${Date.now()}`, '订单退款退回赠送金');
+      }
+    }
+  },
 };

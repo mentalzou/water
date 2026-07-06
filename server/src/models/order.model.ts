@@ -15,6 +15,7 @@ function generateOrderNo(): string {
 
 export const orderModel = {
   create(data: {
+    user_id?: string;
     customer_phone: string;
     customer_name: string;
     address: string;
@@ -40,10 +41,11 @@ export const orderModel = {
     
     // 创建订单主表记录（不含商品信息）
     db.prepare(
-      `INSERT INTO orders (id, order_no, customer_phone, customer_name, address, total_amount, distributor_id, distributor_commission, pay_method, from_balance, from_bonus, delivery_date, delivery_time, delivery_fee, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))`
+      `INSERT INTO orders (id, order_no, user_id, customer_phone, customer_name, address, total_amount, distributor_id, distributor_commission, pay_method, from_balance, from_bonus, delivery_date, delivery_time, delivery_fee, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))`
     ).run(
       id, order_no,
+      data.user_id || '',
       data.customer_phone, data.customer_name, data.address,
       data.total_amount,
       data.distributor_id || null, data.distributor_commission || 0,

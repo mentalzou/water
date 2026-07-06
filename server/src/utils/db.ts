@@ -126,6 +126,7 @@ export function initTables(database: Database.Database): void {
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
       order_no TEXT NOT NULL UNIQUE,
+      user_id TEXT DEFAULT '',
       customer_phone TEXT NOT NULL,
       customer_name TEXT DEFAULT '',
       address TEXT NOT NULL,
@@ -244,7 +245,7 @@ export function initTables(database: Database.Database): void {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       recharge_id TEXT REFERENCES user_recharges(id),
       order_id TEXT REFERENCES orders(id),
-      tx_type TEXT NOT NULL CHECK(tx_type IN ('recharge_principal','recharge_bonus','consume_bonus','consume_principal','refund','adjust','expire')),
+      tx_type TEXT NOT NULL CHECK(tx_type IN ('recharge_principal','recharge_bonus','consume_bonus','consume_principal','refund','refund_principal','refund_bonus','adjust','expire')),
       amount REAL NOT NULL,
       principal_after REAL DEFAULT 0,
       bonus_after REAL DEFAULT 0,
@@ -303,7 +304,7 @@ function recordMigration(db: Database.Database, version: number, description: st
  */
 function applyMigrations(db: Database.Database): void {
   const currentVersion = getCurrentVersion(db);
-  const LATEST_VERSION = 30;
+  const LATEST_VERSION = 32;
 
   // 已达最新版本，无需迁移，静默返回（避免每次启动都刷日志）
   if (currentVersion >= LATEST_VERSION) return;
@@ -946,6 +947,50 @@ function applyMigrations(db: Database.Database): void {
       try { db.exec(`ALTER TABLE orders ADD COLUMN delivery_fee REAL DEFAULT 0`); } catch (_) { /* ignore */ }
 
       recordMigration(db, 30, '新增配送费规则表 + 地址楼房类型/楼层 + 订单配送费字段');
+    });
+    txn();
+  }
+
+  // === v31: orders 表新增 user_id 字段（余额退款时直接定位用户） ===
+  if (currentVersion < 31) {
+    const txn = db.transaction(() => {
+      const orderCols = db.prepare('PRAGMA table_info(orders)').all() as any[];
+      if (!orderCols.some((c: any) => c.name === 'user_id')) {
+        db.exec("ALTER TABLE orders ADD COLUMN user_id TEXT DEFAULT ''");
+      }
+      recordMigration(db, 31, 'orders 新增 user_id（余额退款时直接定位用户）');
+    });
+    txn();
+  }
+
+  // === v32: balance_transactions CHECK 约束新增 refund_principal / refund_bonus ===
+  if (currentVersion < 32) {
+    const txn = db.transaction(() => {
+      // 同时补充旧库可能缺失的 order_id 列
+      const txCols = db.prepare('PRAGMA table_info(balance_transactions)').all() as any[];
+      if (!txCols.some((c: any) => c.name === 'order_id')) {
+        db.exec("ALTER TABLE balance_transactions ADD COLUMN order_id TEXT REFERENCES orders(id)");
+      }
+      // SQLite 不支持修改 CHECK 约束，需重建表
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS balance_transactions_new (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          recharge_id TEXT REFERENCES user_recharges(id),
+          order_id TEXT REFERENCES orders(id),
+          tx_type TEXT NOT NULL CHECK(tx_type IN ('recharge_principal','recharge_bonus','consume_bonus','consume_principal','refund','refund_principal','refund_bonus','adjust','expire')),
+          amount REAL NOT NULL,
+          principal_after REAL DEFAULT 0,
+          bonus_after REAL DEFAULT 0,
+          description TEXT DEFAULT '',
+          operator_ip TEXT DEFAULT '',
+          created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        );
+        INSERT INTO balance_transactions_new SELECT * FROM balance_transactions;
+        DROP TABLE balance_transactions;
+        ALTER TABLE balance_transactions_new RENAME TO balance_transactions;
+      `);
+      recordMigration(db, 32, 'balance_transactions CHECK 支持 refund_principal / refund_bonus');
     });
     txn();
   }

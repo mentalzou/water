@@ -195,9 +195,17 @@ export default function OrderManage() {
     }
   }
 
-  /** 向合利宝发起退款 */
+  /** 发起退款：余额订单直接回退账户余额，在线支付走合利宝 */
   async function requestRefund(order: any) {
-    if (!confirm(`确定要对该订单发起退款吗？\n\n订单号：${order.order_no}\n金额：¥${Number(order.total_amount || 0).toFixed(2)}\n\n退款请求提交后将不可撤销。`)) return;
+    const isBalancePay = order.pay_method === 'balance';
+    const isMixedPay = order.pay_method === 'mixed';
+    const balanceMsg = isBalancePay
+      ? `该订单通过账户余额支付，退款将直接退回用户账户余额中。`
+      : isMixedPay
+        ? `该订单为混合支付（余额+在线），余额部分将退回账户，在线支付部分将提交合利宝退款。`
+        : `退款请求将提交至合利宝处理。`;
+
+    if (!confirm(`确定要对该订单发起退款吗？\n\n订单号：${order.order_no}\n金额：¥${Number(order.total_amount || 0).toFixed(2)}\n支付方式：${payMethodMap[order.pay_method] || order.pay_method}\n\n${balanceMsg}\n\n退款请求提交后将不可撤销。`)) return;
 
     setRefundingOrders(prev => new Set(prev).add(order.id));
     try {
@@ -434,7 +442,7 @@ export default function OrderManage() {
                           onClick={() => requestRefund(o)}
                           disabled={refundingOrders.has(o.id)}
                           className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          title="向合利宝发起退款"
+                          title={o.pay_method === 'balance' ? '余额支付订单，直接退回账户余额' : o.pay_method === 'mixed' ? '混合支付订单，余额部分退回账户，在线支付部分走合利宝退款' : '向合利宝发起退款'}
                         >
                           {refundingOrders.has(o.id) ? (
                             <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
@@ -448,7 +456,7 @@ export default function OrderManage() {
                           onClick={() => queryRefund(o)}
                           disabled={refundQueryingOrders.has(o.id)}
                           className="p-1.5 rounded-lg hover:bg-yellow-50 text-yellow-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          title="向合利宝查询退款状态"
+                          title="查询退款状态"
                         >
                           {refundQueryingOrders.has(o.id) ? (
                             <div className="w-4 h-4 border-2 border-yellow-300 border-t-yellow-500 rounded-full animate-spin" />

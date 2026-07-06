@@ -611,7 +611,7 @@ export async function queryOrderPayment(req: Request, res: Response): Promise<vo
   }
 }
 
-// ============ 订单退款（向合利宝发起退款） ============
+// ============ 订单退款（向合利宝发起退款，或余额订单直接回退） ============
 export async function refundOrder(req: Request, res: Response): Promise<void> {
   const id = str(req.params.id);
 
@@ -628,14 +628,98 @@ export async function refundOrder(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if (!order.order_no) {
-    error(res, '订单缺少订单号');
-    return;
-  }
-
   const refundAmount = order.total_amount;
   if (!refundAmount || refundAmount <= 0) {
     error(res, '订单金额无效');
+    return;
+  }
+
+  // 账户余额支付（balance / mixed）：直接回退余额到用户账户，不走合利宝
+  const fromBalance = Number(order.from_balance || 0);
+  const fromBonus = Number(order.from_bonus || 0);
+  const onlineAmount = Math.round((refundAmount - fromBalance - fromBonus) * 100) / 100;
+
+  if (order.pay_method === 'balance' || order.pay_method === 'mixed') {
+    if (fromBalance > 0 || fromBonus > 0) {
+      // 通过订单记录的 user_id 直接定位用户
+      const uid = (order as any).user_id || '';
+      if (!uid) {
+        error(res, '订单未关联用户（user_id 缺失），无法退还余额');
+        return;
+      }
+
+      const userId = uid;
+
+      // 恢复本金余额
+      if (fromBalance > 0) {
+        userRechargeModel.restoreBalance(userId, fromBalance, 0);
+
+        const cumulative = userRechargeModel.getTotalBalanceByUserId(userId);
+        balanceTransactionModel.create({
+          user_id: userId,
+          tx_type: 'refund_principal',
+          amount: fromBalance,
+          principal_after: cumulative.total_principal,
+          bonus_after: cumulative.total_bonus,
+          description: `订单退款-本金退回 - 订单号:${order.order_no} ¥${fromBalance.toFixed(2)}`,
+        });
+      }
+
+      // 恢复赠送金余额
+      if (fromBonus > 0) {
+        userRechargeModel.restoreBalance(userId, 0, fromBonus);
+
+        const cumulative = userRechargeModel.getTotalBalanceByUserId(userId);
+        balanceTransactionModel.create({
+          user_id: userId,
+          tx_type: 'refund_bonus',
+          amount: fromBonus,
+          principal_after: cumulative.total_principal,
+          bonus_after: cumulative.total_bonus,
+          description: `订单退款-赠送金退回 - 订单号:${order.order_no} ¥${fromBonus.toFixed(2)}`,
+        });
+      }
+
+      console.log(`[余额退款] 订单 ${order.order_no} 余额已退回用户 ${userId}: 本金¥${fromBalance.toFixed(2)} 赠送金¥${fromBonus.toFixed(2)}`);
+    }
+
+    // 如果还有在线支付部分（mixed 场景），仍需要向合利宝发起退款
+    if (onlineAmount > 0) {
+      try {
+        const { requestRefund } = require('../services/heliPay.service');
+        const result = await requestRefund(order.order_no, onlineAmount);
+        console.log(`[混合退款] 订单 ${order.order_no} 在线支付部分 ¥${onlineAmount.toFixed(2)} 已提交合利宝退款, 退款订单号: ${result.refundOrderNo}`);
+        orderModel.markRefunding(order.id, result.refundOrderNo);
+
+        success(res, {
+          orderNo: result.orderNo,
+          refundOrderNo: result.refundOrderNo,
+          orderStatus: result.orderStatus,
+          balanceRefunded: { principal: fromBalance, bonus: fromBonus },
+          message: `余额部分已退回账户（本金¥${fromBalance.toFixed(2)} 赠送金¥${fromBonus.toFixed(2)}），在线支付部分 ¥${onlineAmount.toFixed(2)} 已提交合利宝退款`,
+        });
+        return;
+      } catch (err: any) {
+        error(res, `余额已退回账户，但在线支付部分退款失败: ${err.message}`);
+        return;
+      }
+    }
+
+    // 纯余额订单：直接标记为已退款
+    updateOrderStatus(order.id, 'refunded');
+    orderModel.markRefunded(order.id);
+
+    success(res, {
+      orderNo: order.order_no,
+      balanceRefunded: { principal: fromBalance, bonus: fromBonus },
+      message: `退款成功，¥${refundAmount.toFixed(2)} 已退回用户账户余额`,
+    });
+    return;
+  }
+
+  // 在线支付订单：走合利宝退款
+  if (!order.order_no) {
+    error(res, '订单缺少订单号');
     return;
   }
 
