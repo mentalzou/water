@@ -180,7 +180,7 @@ export default function ProductManage() {
         price: parseFloat(form.price),
         unit: form.unit,
         stock: form.stock.trim() === '' ? 99999 : parseInt(form.stock),
-        min_order_quantity: parseInt(form.min_order_quantity) || 1,
+        min_order_quantity: (v => isNaN(v) ? 1 : v)(parseInt(form.min_order_quantity)),
         category_id: form.category_id || undefined,
         brand_id: form.brand_id
       };

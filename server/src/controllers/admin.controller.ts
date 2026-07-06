@@ -950,7 +950,7 @@ export function createDeliveryFeeRule(req: Request, res: Response): void {
   const building_type = str(req.body.building_type) as 'stairs' | 'elevator';
   const floor_from = parseInt(req.body.floor_from, 10);
   const floor_to = parseInt(req.body.floor_to, 10);
-  const fee = parseFloat(req.body.fee) || 0;
+  const fee = (v => isNaN(v) ? 0 : v)(parseFloat(req.body.fee));
 
   if (!building_type || !['stairs', 'elevator'].includes(building_type)) {
     error(res, '请选择楼房类型（楼梯房/电梯房）');
@@ -979,7 +979,7 @@ export function updateDeliveryFeeRule(req: Request, res: Response): void {
   if (req.body.building_type) data.building_type = str(req.body.building_type);
   if (req.body.floor_from !== undefined) data.floor_from = parseInt(req.body.floor_from, 10);
   if (req.body.floor_to !== undefined) data.floor_to = parseInt(req.body.floor_to, 10);
-  if (req.body.fee !== undefined) data.fee = parseFloat(req.body.fee) || 0;
+  if (req.body.fee !== undefined) data.fee = (v => isNaN(v) ? 0 : v)(parseFloat(req.body.fee));
 
   const rule = deliveryFeeRuleModel.update(id, data);
   if (!rule) { error(res, '规则不存在', 404); return; }

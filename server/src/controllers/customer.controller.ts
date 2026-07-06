@@ -275,7 +275,7 @@ export function getProducts(_req: Request, res: Response): void {
 export function createOrder(req: Request, res: Response): void {
   let { customer_phone, customer_name, address, items, distributor_code, pay_method, delivery_date, delivery_time } = req.body;
   const building_type = str(req.body.building_type);
-  const floor = parseInt(req.body.floor, 10) || 1;
+  const floor = (v => isNaN(v) ? 1 : v)(parseInt(req.body.floor, 10));
 
   // 将"明天"转为系统日期 +1 天，避免存储文字
   if (delivery_date === '明天') {
@@ -458,7 +458,7 @@ export function addAddress(req: Request, res: Response): void {
   const district = str(req.body.district);
   const detail = str(req.body.detail);
   const building_type = str(req.body.building_type);
-  const floor = parseInt(req.body.floor, 10) || 1;
+  const floor = (v => isNaN(v) ? 1 : v)(parseInt(req.body.floor, 10));
 
   if (!contact_name || !contact_phone || !detail) {
     error(res, '请填写完整地址信息（联系人、手机号、详细地址）');
@@ -510,7 +510,7 @@ export function updateAddress(req: Request, res: Response): void {
   if (req.body.district !== undefined) data.district = str(req.body.district);
   if (req.body.detail) data.detail = str(req.body.detail);
   if (req.body.building_type) data.building_type = str(req.body.building_type);
-  if (req.body.floor !== undefined) data.floor = parseInt(req.body.floor, 10) || 1;
+  if (req.body.floor !== undefined) data.floor = (v => isNaN(v) ? 1 : v)(parseInt(req.body.floor, 10));
   if (req.body.is_default !== undefined) data.is_default = req.body.is_default ? 1 : 0;
 
   const updated = addressModel.update(id, data);

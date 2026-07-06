@@ -155,7 +155,7 @@ export default function OrderPage() {
   function setQty(productId: string, value: number) {
     const product = products.find(p => p.id === productId);
     const maxQty = product ? Math.max(0, (product.stock ?? 99999) - (product.frozen_stock ?? 0)) : 999;
-    const rounded = Math.round(value) || 0;
+    const rounded = isNaN(value) ? 0 : Math.round(value);
     if (rounded > maxQty) {
       alert(`该商品库存不足，当前最多可购 ${maxQty} 件`);
     }
@@ -422,13 +422,17 @@ export default function OrderPage() {
                                   <Minus className="w-4 h-4"/>
                                 </button>
                                 <input
-                                    type="number"
+                                    type="text"
                                     inputMode="numeric"
-                                    min={1}
-                                    max={Math.max(0, (product.stock ?? 99999) - (product.frozen_stock ?? 0))}
-                                    value={qty}
-                                    onChange={e => setQty(product.id, parseInt(e.target.value) || 1)}
-                                    className="w-12 h-8 text-center text-sm font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-water [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    pattern="[0-9]*"
+                                    placeholder="1"
+                                    maxLength={3}
+                                    value={qty > 0 ? qty : ''}
+                                    onChange={e => {
+                                      const raw = e.target.value.replace(/\D/g, '');
+                                      setQty(product.id, raw === '' ? 0 : parseInt(raw));
+                                    }}
+                                    className="w-12 h-8 text-center text-sm font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-water"
                                 />
                                 <button
                                     type="button"
@@ -536,13 +540,17 @@ export default function OrderPage() {
                                   <Minus className="w-3 h-3"/>
                                 </button>
                                 <input
-                                    type="number"
+                                    type="text"
                                     inputMode="numeric"
-                                    min={1}
-                                    max={999}
-                                    value={item.quantity}
-                                    onChange={e => setQty(item.product.id, parseInt(e.target.value) || 1)}
-                                    className="w-10 h-7 text-center text-xs font-semibold border border-gray-200 rounded-md focus:outline-none focus:border-water [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    pattern="[0-9]*"
+                                    placeholder="1"
+                                    maxLength={3}
+                                    value={item.quantity > 0 ? item.quantity : ''}
+                                    onChange={e => {
+                                      const raw = e.target.value.replace(/\D/g, '');
+                                      setQty(item.product.id, raw === '' ? 0 : parseInt(raw));
+                                    }}
+                                    className="w-10 h-7 text-center text-xs font-semibold border border-gray-200 rounded-md focus:outline-none focus:border-water"
                                 />
                                 <button
                                     type="button"

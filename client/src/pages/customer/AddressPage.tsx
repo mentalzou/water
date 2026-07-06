@@ -248,8 +248,14 @@ export default function AddressPage() {
                     <option value="stairs">楼梯房</option>
                     <option value="elevator">电梯房</option>
                   </select>
-                  <input type="number" value={form.floor} onChange={e => setForm(f => ({ ...f, floor: parseInt(e.target.value) || 1 }))}
-                         min="1" max="99" placeholder="楼层" required
+                  <input type="text" inputMode="numeric" pattern="[0-9]*"
+                         value={form.floor > 0 ? form.floor : ''}
+                         onChange={e => {
+                           const raw = e.target.value.replace(/\D/g, '');
+                           const num = raw === '' ? 0 : Math.min(99, parseInt(raw));
+                           setForm(f => ({ ...f, floor: num }));
+                         }}
+                         placeholder="楼层" maxLength={2}
                          className="w-20 px-3 py-2.5 bg-gray-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-water/20" />
                 </div>
 
