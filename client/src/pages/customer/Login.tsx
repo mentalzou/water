@@ -297,6 +297,14 @@ export default function CustomerLogin() {
             </button>
           </div>
         </form>
+
+        {/* 备案信息 */}
+        <div className="text-center mt-10 pb-2">
+          <p className="text-xs text-white/50">&copy;{new Date().getFullYear()} 武夷屿都山水</p>
+          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
+            className="text-xs text-white/50 hover:text-white/70 transition-colors"
+          >闽ICP备2026019411号-1</a>
+        </div>
       </div>
     </div>
   );

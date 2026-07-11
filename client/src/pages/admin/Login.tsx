@@ -99,6 +99,21 @@ export default function Login() {
 
           <p className="text-center text-xs text-gray-600 mt-4">默认账号：13800000000 / admin123456</p>
         </form>
+
+        {/* 备案信息 */}
+        <div className="text-center mt-10 pb-2">
+          <p className="text-xs text-gray-500">
+            &copy;{new Date().getFullYear()} 武夷屿都山水
+          </p>
+          <a
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-500 hover:text-gray-400 transition-colors"
+          >
+            闽ICP备2026019411号-1
+          </a>
+        </div>
       </div>
     </div>
   );

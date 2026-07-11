@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Droplets, ShoppingCart, CheckCircle2, MapPin, Plus, Minus, Home, User, Trash2, X, Gift, FileText, ClipboardList, CreditCard, HeadphonesIcon } from 'lucide-react';
+import { ShoppingCart, CheckCircle2, Plus, Minus, Trash2, X, Gift, FileText, ClipboardList, CreditCard, HeadphonesIcon } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 import { customerApi } from '../../api/customer.api';
@@ -39,12 +39,12 @@ interface SelectedItem {
 export default function OrderPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { distributorCode, setDistributorCode } = useAppStore();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
-  const [submitting, setSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showCartDetail, setShowCartDetail] = useState(false);
@@ -71,7 +71,9 @@ export default function OrderPage() {
           });
           setItemQuantities(restored);
         }
-      } catch {}
+      } catch (e) {
+        console.error('解析购物车数据失败', e);
+      }
       localStorage.removeItem('pending_order_data');
     }
   }, []);
@@ -220,7 +222,6 @@ export default function OrderPage() {
     );
   }
 
-  const location = useLocation();
   const orderSuccessData = location.state?.result;
 
   if (orderSuccessData) {
@@ -240,8 +241,6 @@ export default function OrderPage() {
         </div>
     );
   }
-
-  const user = JSON.parse(localStorage.getItem('customer_user') || '{}');
 
   return (
       <div className="flex flex-col h-screen bg-gray-50">
@@ -465,6 +464,7 @@ export default function OrderPage() {
                   </div>
               )}
             </div>
+
           </main>
         </div>
 
@@ -604,15 +604,27 @@ export default function OrderPage() {
                 {/* 结算按钮 */}
                 <button
                     onClick={handleSubmit}
-                    disabled={submitting || selectedItems.length === 0}
+                    disabled={selectedItems.length === 0}
                     className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold text-base hover:bg-green-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? '处理中...' : '结算'}
+                  结算
                 </button>
               </div>
 
             </div>
         )}
+
+        {/* 备案信息 - 固定底部展示 */}
+        <div className="fixed bottom-16 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 z-[5] text-center py-1.5">
+          <a
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
+          >
+            &copy;{new Date().getFullYear()} 武夷屿都山水  闽ICP备2026019411号-1
+          </a>
+        </div>
 
         {/* 底部导航 */}
         <BottomNav/>
