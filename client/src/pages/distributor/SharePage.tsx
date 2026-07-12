@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Link2, Copy, Check, Share2, QrCode, Download } from 'lucide-react';
 import { distributorApi } from '../../api/distributor.api';
 import QRCode from 'qrcode';
+import { useSiteConfig } from '../../context/SiteConfigContext';
 
 export default function SharePage() {
+  const { siteName } = useSiteConfig();
   const navigate = useNavigate();
   const [shareLink, setShareLink] = useState('');
   const [copied, setCopied] = useState(false);
@@ -47,8 +49,8 @@ export default function SharePage() {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: '武夷屿都山水 - 天然矿泉水',
-          text: '我正在使用武夷屿都山水购买天然矿泉水，品质好、价格优！快来试试吧',
+          title: `${siteName} - 天然矿泉水`,
+          text: `我正在使用${siteName}购买天然矿泉水，品质好、价格优！快来试试吧`,
           url: shareLink,
         });
       } else {

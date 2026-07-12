@@ -44,6 +44,18 @@ app.get('/api/health', (_req, res) => {
   res.json({ code: 200, message: '服务运行正常', data: { time: new Date().toLocaleString() } });
 });
 
+// 公开接口：获取站点名称（无需认证，供前端各页面使用）
+app.get('/api/config/site-name', (_req, res) => {
+  try {
+    const { getDb } = require('./utils/db');
+    const row = getDb().prepare("SELECT value FROM system_config WHERE key = 'site_name'").get() as any;
+    const siteName = row?.value || '武夷屿都山水';
+    res.json({ code: 200, data: { site_name: siteName } });
+  } catch {
+    res.json({ code: 200, data: { site_name: '武夷屿都山水' } });
+  }
+});
+
 // 临时文件上传接口（用于上传资质证书图片）
 const qualityUploadDir = path.join(config.upload.baseDir, 'quality');
 if (!fs.existsSync(qualityUploadDir)) {

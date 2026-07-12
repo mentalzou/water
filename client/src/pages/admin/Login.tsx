@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Droplets, ArrowRight, Eye, EyeOff, Phone } from 'lucide-react';
+import { useSiteConfig } from '../../context/SiteConfigContext';
 
 const API_BASE = '/api';
 
 export default function Login() {
+  const { siteName } = useSiteConfig();
   const navigate = useNavigate();
   const [phone, setPhone] = useState('13800000000');
   const [password, setPassword] = useState('');
@@ -54,7 +56,7 @@ export default function Login() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 mx-auto mb-4 flex items-center justify-center shadow-lg shadow-cyan-500/30">
             <Droplets className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">武夷屿都山水</h1>
+          <h1 className="text-2xl font-bold text-white">{siteName}</h1>
           <p className="text-gray-400 text-sm mt-2">管理后台登录</p>
         </div>
 
@@ -103,7 +105,7 @@ export default function Login() {
         {/* 备案信息 */}
         <div className="text-center mt-10 pb-2">
           <p className="text-xs text-gray-500">
-            &copy;{new Date().getFullYear()} 武夷屿都山水
+            &copy;{new Date().getFullYear()} {siteName}
           </p>
           <a
             href="https://beian.miit.gov.cn/"

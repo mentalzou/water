@@ -6,6 +6,7 @@ import { rechargePackageModel } from '../models/rechargePackage.model';
 import { balanceTransactionModel } from '../models/balanceTransaction.model';
 import { createJsApiOrder, parsePaymentNotify } from '../services/heliPay.service';
 import { processPaymentSuccess, updateOrderStatus } from '../services/order.service';
+import { getSiteName } from '../utils/siteName';
 
 /**
  * 从请求中获取客户端真实IP
@@ -66,11 +67,12 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
 
     // 调用支付服务
     const clientIp = getClientIp(req);
+    const siteName = getSiteName();
     const payResult = await createJsApiOrder(
         order.id,
         order.order_no,
         order.total_amount,
-        `武夷屿都山水订单-${order.order_no}`,
+        `${siteName}订单-${order.order_no}`,
         openId,
         clientIp
     );

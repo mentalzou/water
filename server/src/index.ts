@@ -3,11 +3,14 @@ import 'dotenv/config';
 import app from './app';
 import config from './config';
 import { getDb } from './utils/db';
+import { getSiteName } from './utils/siteName';
 
 getDb();
 
+const siteName = getSiteName();
+
 const server = app.listen(config.port, () => {
-  console.log(`🚀 武夷屿都山水 API 服务已启动: http://localhost:${config.port}`);
+  console.log(`🚀 ${siteName} API 服务已启动: http://localhost:${config.port}`);
   console.log(`   环境: ${config.nodeEnv}`);
 });
 

@@ -1,4 +1,5 @@
 import { orderModel } from '../models/order.model';
+import { getSiteName } from '../utils/siteName';
 import {
   helipayConfig,
   API_ENDPOINTS,
@@ -267,7 +268,7 @@ export async function createJsApiOrder(
       orderAmount: totalAmount.toFixed(2),
       total_fee: Math.round(totalAmount * 100), // 合利宝JSAPI要求：金额，单位分
       openId,
-      payRemarks: description || '武夷屿都山水订单',
+      payRemarks: description || `${getSiteName()}订单`,
       orderIp,
     };
 

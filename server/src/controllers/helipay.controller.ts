@@ -3,6 +3,7 @@ import { success, error } from '../utils/response';
 import { orderModel } from '../models/order.model';
 import { createJsApiOrder, processPaymentNotify } from '../services/heliPay.service';
 import { processPaymentSuccess } from '../services/order.service';
+import { getSiteName } from '../utils/siteName';
 
 /**
  * 创建支付订单（JSAPI）
@@ -42,11 +43,12 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
     });
 
     // 调用支付服务
+    const siteName = getSiteName();
     const payResult = await createJsApiOrder(
         order.id,
         order.order_no,
         order.total_amount,
-        `武夷屿都山水订单-${order.order_no}`,
+        `${siteName}订单-${order.order_no}`,
         openId
     );
 

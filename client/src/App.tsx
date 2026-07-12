@@ -50,6 +50,7 @@ const DistributorLayout = lazy(() => import('./components/DistributorLayout'))
 const DeliverymanLogin = lazy(() => import('./pages/deliveryman/Login'))
 const DeliverymanLayout = lazy(() => import('./components/DeliverymanLayout'))
 import { useWechatOAuth } from './hooks/useWechatOAuth';
+import { SiteConfigProvider } from './context/SiteConfigContext';
 
 function LoadingSpinner() {
     return (
@@ -61,9 +62,11 @@ function LoadingSpinner() {
 
 function App() {
     return (
-        <Suspense fallback={<LoadingSpinner />}>
-            <AppContent />
-        </Suspense>
+        <SiteConfigProvider>
+            <Suspense fallback={<LoadingSpinner />}>
+                <AppContent />
+            </Suspense>
+        </SiteConfigProvider>
     );
 }
 

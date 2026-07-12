@@ -6,6 +6,7 @@ import { customerApi } from '../../api/customer.api';
 import { useAppStore } from '../../stores/store';
 import BottomNav from "../../components/BottomNav.tsx";
 import AdBanner from '../../components/AdBanner';
+import { useSiteConfig } from '../../context/SiteConfigContext';
 
 interface Category {
   id: string;
@@ -37,6 +38,7 @@ interface SelectedItem {
 }
 
 export default function OrderPage() {
+  const { siteName } = useSiteConfig();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -622,7 +624,7 @@ export default function OrderPage() {
             rel="noopener noreferrer"
             className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
           >
-            &copy;{new Date().getFullYear()} 武夷屿都山水  闽ICP备2026019411号-1
+            &copy;{new Date().getFullYear()} {siteName}  闽ICP备2026019411号-1
           </a>
         </div>
 

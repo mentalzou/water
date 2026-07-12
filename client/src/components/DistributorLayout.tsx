@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Share2, Receipt, ShoppingBag, TrendingUp, LogOut, ArrowRightLeft, User } from 'lucide-react';
+import { useSiteConfig } from '../context/SiteConfigContext';
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: '工作台', path: '/distributor' },
@@ -21,6 +22,7 @@ function getToken(): string | null {
 }
 
 export default function DistributorLayout() {
+  const { siteName } = useSiteConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<any>(getDistributorUser());
@@ -59,7 +61,7 @@ export default function DistributorLayout() {
               <span className="text-white font-bold text-sm">好</span>
             </div>
             <div>
-              <span className="font-bold text-gray-800 text-sm">武夷屿都山水</span>
+              <span className="font-bold text-gray-800 text-sm">{siteName}</span>
               <p className="text-xs text-gray-400">分销商中心</p>
             </div>
           </div>

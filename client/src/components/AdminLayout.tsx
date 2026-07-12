@@ -6,6 +6,7 @@ import {
   Shield, UserCog, LogOut, Tag, FolderOpen, CreditCard, Image, Coins, Wallet
 } from 'lucide-react';
 import { apiFetch } from '../utils/apiFetch';
+import { useSiteConfig } from '../context/SiteConfigContext';
 
 function getToken(): string {
   return localStorage.getItem('admin_token') || '';
@@ -63,6 +64,7 @@ function DropletsIcon() {
 }
 
 export default function AdminLayout() {
+  const { siteName } = useSiteConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [permissions, setPermissions] = useState<string[]>(() => getPermissions());
@@ -118,7 +120,7 @@ export default function AdminLayout() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
               <DropletsIcon />
             </div>
-            <span className="font-bold text-white text-lg">武夷屿都山水</span>
+            <span className="font-bold text-white text-lg">{siteName}</span>
           </div>
         </div>
 

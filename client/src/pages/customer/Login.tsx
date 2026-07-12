@@ -4,6 +4,7 @@ import { Lock, Droplets, ArrowRight, Eye, EyeOff, Phone, UserPlus } from 'lucide
 import api from '../../api/client';
 import { customerApi } from '../../api/customer.api';
 import { useAppStore } from '../../stores/store';
+import { useSiteConfig } from '../../context/SiteConfigContext';
 import {
   isWechat,
   getWechatAppId,
@@ -16,6 +17,7 @@ import {
 const WECHAT_LOGIN_KEY = 'wechat_login_pending';
 
 export default function CustomerLogin() {
+  const { siteName } = useSiteConfig();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const submitting = useRef(false);
@@ -183,7 +185,7 @@ export default function CustomerLogin() {
           <div className="w-16 h-16 rounded-2xl bg-white mx-auto mb-4 flex items-center justify-center shadow-lg">
             <Droplets className="w-8 h-8 text-water" />
           </div>
-          <h1 className="text-2xl font-bold text-white">武夷屿都山水</h1>
+          <h1 className="text-2xl font-bold text-white">{siteName}</h1>
           <p className="text-white/70 text-sm mt-1">{isRegister ? '注册新账户' : '欢迎回来'}</p>
         </div>
 
@@ -300,7 +302,7 @@ export default function CustomerLogin() {
 
         {/* 备案信息 */}
         <div className="text-center mt-10 pb-2">
-          <p className="text-xs text-white/50">&copy;{new Date().getFullYear()} 武夷屿都山水</p>
+          <p className="text-xs text-white/50">&copy;{new Date().getFullYear()} {siteName}</p>
           <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
             className="text-xs text-white/50 hover:text-white/70 transition-colors"
           >闽ICP备2026019411号-1</a>

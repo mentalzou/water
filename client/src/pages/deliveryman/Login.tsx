@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Truck, ArrowRight, Eye, EyeOff, Phone, UserCheck } from 'lucide-react';
+import { useSiteConfig } from '../../context/SiteConfigContext';
 
 const API_BASE = '/api';
 
 export default function DeliverymanLogin() {
+  const { siteName } = useSiteConfig();
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -54,7 +56,7 @@ export default function DeliverymanLogin() {
           <div className="w-16 h-16 rounded-2xl bg-white mx-auto mb-4 flex items-center justify-center shadow-lg">
             <Truck className="w-8 h-8 text-water" />
           </div>
-          <h1 className="text-2xl font-bold text-white">武夷屿都山水</h1>
+          <h1 className="text-2xl font-bold text-white">{siteName}</h1>
           <p className="text-white/70 text-sm mt-2">派送中心登录</p>
         </div>
 
@@ -115,7 +117,7 @@ export default function DeliverymanLogin() {
 
         {/* 备案信息 */}
         <div className="text-center mt-10 pb-2">
-          <p className="text-xs text-white/50">&copy;{new Date().getFullYear()} 武夷屿都山水</p>
+          <p className="text-xs text-white/50">&copy;{new Date().getFullYear()} {siteName}</p>
           <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
             className="text-xs text-white/50 hover:text-white/70 transition-colors"
           >闽ICP备2026019411号-1</a>

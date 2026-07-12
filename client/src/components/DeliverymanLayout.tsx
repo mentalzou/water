@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, LogOut, ArrowRightLeft, Truck, User } from 'lucide-react';
+import { useSiteConfig } from '../context/SiteConfigContext';
 
 const navItems = [
   { icon: LayoutDashboard, label: '任务中心', path: '/deliveryman' },
@@ -17,6 +18,7 @@ function getToken(): string | null {
 }
 
 export default function DeliverymanLayout() {
+  const { siteName } = useSiteConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<any>(getDeliverymanUser());
@@ -146,7 +148,7 @@ export default function DeliverymanLayout() {
               <Truck className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="font-bold text-gray-800 text-sm tracking-tight">武夷屿都山水</span>
+              <span className="font-bold text-gray-800 text-sm tracking-tight">{siteName}</span>
               <p className="text-[11px] text-gray-400 mt-0.5">派送中心</p>
             </div>
           </div>
