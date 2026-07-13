@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { success, error } from '../utils/response';
 import { orderModel } from '../models/order.model';
-import { createJsApiOrder, processPaymentNotify } from '../services/heliPay.service';
+import { createJsApiOrder, parsePaymentNotify } from '../services/heliPay.service';
 import { processPaymentSuccess } from '../services/order.service';
 import { getSiteName } from '../utils/siteName';
 
@@ -44,12 +44,17 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
 
     // 调用支付服务
     const siteName = getSiteName();
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+        || req.socket.remoteAddress
+        || '127.0.0.1';
+
     const payResult = await createJsApiOrder(
         order.id,
         order.order_no,
         order.total_amount,
         `${siteName}订单-${order.order_no}`,
-        openId
+        openId,
+        clientIp
     );
 
     success(res, payResult, '支付订单创建成功');
@@ -72,9 +77,9 @@ export async function paymentNotify(req: Request, res: Response): Promise<void> 
     }
 
     // 处理支付回调
-    const success = processPaymentNotify(body, sign);
+    const result = parsePaymentNotify(body, sign);
 
-    if (success) {
+    if (result) {
       // 解析回调数据获取订单信息
       const decryptedContent = JSON.parse(
           require('../services/wechatPay.service').processPaymentNotify.toString()
