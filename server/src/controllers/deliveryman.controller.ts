@@ -7,6 +7,7 @@ import { getDb } from '../utils/db';
 import { generateToken } from '../utils/jwt';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { updateOrderStatus } from '../services/order.service';
+import type { AuthRequest } from '../middleware/auth.middleware';
 
 /** 安全提取 req.body 字段 */
 function str(val: unknown): string {
@@ -63,7 +64,8 @@ export function loginDeliveryman(req: Request, res: Response): void {
     userModel.update(userId, { password_hash: hashPassword(password) });
   }
 
-  const token = generateToken({ userId: userId || dm.id, role: 'deliveryman' });
+  // JWT 中 userId 统一使用派送员表的 id（deliverymen.id），确保和订单表 deliveryman_id 一致
+  const token = generateToken({ userId: dm.id, role: 'deliveryman' });
 
   success(res, {
     token,
@@ -75,11 +77,21 @@ export function loginDeliveryman(req: Request, res: Response): void {
 }
 
 export function getTaskList(req: Request, res: Response): void {
-  const id = str(req.params.id);
+  const authReq = req as AuthRequest;
+  const user = authReq.user;
+
+  // 校验身份：必须是派送员角色
+  if (!user || user.role !== 'deliveryman') {
+    error(res, '无权限访问', 403);
+    return;
+  }
+
+  // 从 JWT token 获取派送员 ID（login 时存的就是 dm.id）
+  const dmId = user.userId;
   const status = str(req.query.status) || undefined;
 
   let sql = "SELECT o.*, (SELECT GROUP_CONCAT(oi.product_name, ', ') FROM order_items oi WHERE oi.order_id = o.id) as product_name FROM orders o WHERE o.deliveryman_id = ?";
-  const params: any[] = [id];
+  const params: any[] = [dmId];
   
   if (status) {
     sql += ' AND o.status = ?';
@@ -94,7 +106,7 @@ export function getTaskList(req: Request, res: Response): void {
   // Count by status
   const stats = db.prepare(
     "SELECT status, COUNT(*) as count FROM orders WHERE deliveryman_id = ? GROUP BY status"
-  ).all(id) as { status: string; count: number }[];
+  ).all(dmId) as { status: string; count: number }[];
 
   success(res, {
     tasks,
@@ -109,23 +121,51 @@ export function getTaskList(req: Request, res: Response): void {
 }
 
 export function getTaskDetail(req: Request, res: Response): void {
+  const authReq = req as AuthRequest;
   const taskId = str(req.params.id);
   const order = orderModel.findByIdDetailed(taskId);
   if (!order) { error(res, '任务不存在', 404); return; }
+
+  // 校验归属：只能查看自己的任务
+  const dmId = authReq.user?.userId;
+  if (dmId && (order as any).deliveryman_id !== dmId) {
+    error(res, '无权查看此任务', 403);
+    return;
+  }
+
   success(res, order);
 }
 
 export function acceptTask(req: Request, res: Response): void {
+  const authReq = req as AuthRequest;
   const orderId = str(req.params.id);
+  const dmId = authReq.user?.userId;
+
+  // 校验归属：只能操作自己的任务
+  const order = orderModel.findById(orderId);
+  if (!order) { error(res, '订单不存在', 404); return; }
+  if (dmId && order.deliveryman_id !== dmId) {
+    error(res, '无权操作此任务', 403);
+    return;
+  }
+
   const updated = orderModel.updateStatus(orderId, 'delivering');
   if (!updated) { error(res, '操作失败', 400); return; }
   success(res, updated, '已开始配送');
 }
 
 export function completeTask(req: Request, res: Response): void {
+  const authReq = req as AuthRequest;
   const orderId = str(req.params.id);
+  const dmId = authReq.user?.userId;
   const order = orderModel.findById(orderId);
   if (!order) { error(res, '订单不存在', 404); return; }
+
+  // 校验归属：只能操作自己的任务
+  if (dmId && order.deliveryman_id !== dmId) {
+    error(res, '无权操作此任务', 403);
+    return;
+  }
   
   // Update deliveryman stats
   if (order.deliveryman_id) {
